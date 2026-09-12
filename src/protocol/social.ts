@@ -1,0 +1,183 @@
+import { z } from 'zod';
+import { unicodeTextSchema } from './text.js';
+import {
+  localeSchema,
+  publicIdSchema,
+  timestampSchema,
+  uuidSchema,
+} from './ids.js';
+
+const target = {
+  character_id: publicIdSchema,
+  locale: localeSchema.optional(),
+};
+const cursor = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
+const text = (maximum: number) =>
+  unicodeTextSchema
+    .min(1)
+    .max(maximum)
+    .refine(
+      (value) => value.trim().length > 0 && !/[^\P{Cc}\t\n\r]/u.test(value),
+      'Use nonempty plain text without control characters.',
+    );
+export const sendMonologueSchema = z
+  .object({ ...target, text: text(1000), language: localeSchema })
+  .strict();
+export const contentReferenceSchema = z
+  .object({
+    kind: z.enum(['activity', 'quest', 'item', 'character', 'location']),
+    id: unicodeTextSchema.min(1).max(128),
+  })
+  .strict();
+const journalFields = {
+  ...target,
+  request_id: uuidSchema,
+  text: text(8000),
+  language: localeSchema,
+  references: z.array(contentReferenceSchema).max(8).optional(),
+};
+export const writeJournalSchema = z.object(journalFields).strict();
+export const endSessionSchema = z
+  .object({
+    ...journalFields,
+    activity_policy: z.enum(['continue', 'stop_at_boundary']),
+  })
+  .strict();
+export const getJournalsSchema = z
+  .object({
+    ...target,
+    before: cursor.optional(),
+    query: unicodeTextSchema.max(100).optional(),
+    journal_id: uuidSchema.optional(),
+  })
+  .strict();
+export type WriteJournalInput = z.infer<typeof writeJournalSchema>;
+export type EndSessionInput = z.infer<typeof endSessionSchema>;
+export type GetJournalsInput = z.infer<typeof getJournalsSchema>;
+export const getPlanSchema = z.object(target).strict();
+export const updatePlanSchema = z
+  .object({
+    ...target,
+    text: unicodeTextSchema
+      .max(2000)
+      .refine(
+        (value) => !/[^\P{Cc}\t\n\r]/u.test(value),
+        'Use plain text without control characters.',
+      ),
+    language: localeSchema,
+  })
+  .strict();
+export type GetPlanInput = z.infer<typeof getPlanSchema>;
+export type UpdatePlanInput = z.infer<typeof updatePlanSchema>;
+export const planViewSchema = z.object({
+  body_ref: z.string(),
+  language: localeSchema,
+  updated_at: timestampSchema,
+});
+export const regionIdSchema = z.enum([
+  'selene',
+  'dolgan',
+  'corvent',
+  'crossroads',
+]);
+export type RegionId = z.infer<typeof regionIdSchema>;
+const messagePage = {
+  before: cursor.optional(),
+  after: cursor.optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+};
+const messageText = (maximum: number) =>
+  text(maximum * 2).refine(
+    (value) => [...value].length <= maximum,
+    `Use at most ${maximum} Unicode code points.`,
+  );
+export const getChatSchema = z
+  .object({
+    ...target,
+    ...messagePage,
+  })
+  .strict();
+export const sendChatSchema = z
+  .object({
+    ...target,
+    text: messageText(400),
+    language: localeSchema,
+    references: z.array(contentReferenceSchema).max(8).optional(),
+  })
+  .strict();
+export const getDirectMessagesSchema = z
+  .object({
+    ...target,
+    ...messagePage,
+    with_character_id: publicIdSchema.optional(),
+    unread_only: z.boolean().optional(),
+  })
+  .strict();
+export const getMentionsSchema = z
+  .object({
+    ...target,
+    ...messagePage,
+    unread_only: z.boolean().optional(),
+  })
+  .strict();
+export const sendDirectMessageSchema = z
+  .object({
+    ...target,
+    recipient_character_id: publicIdSchema,
+    text: messageText(1000),
+    language: localeSchema,
+  })
+  .strict();
+export const attentionSchema = z.object({
+  unread_direct_messages: z.number().int().nonnegative(),
+  unread_mentions: z.number().int().nonnegative(),
+  regional_chat: z.object({
+    region_id: regionIdSchema,
+    new_messages: z.number().int().nonnegative(),
+  }),
+});
+export const directMessageSchema = z.object({
+  message_id: uuidSchema,
+  number: cursor,
+  sender_character_id: publicIdSchema,
+  sender_name_ref: z.string(),
+  recipient_character_id: publicIdSchema,
+  recipient_name_ref: z.string(),
+  body_ref: z.string(),
+  created_at: timestampSchema,
+  language: localeSchema,
+  read_at: timestampSchema.nullable().optional(),
+});
+export const directConversationSchema = z.object({
+  character_id: publicIdSchema,
+  name_ref: z.string(),
+  last_direction: z.enum(['sent', 'received']),
+  last_message_at: timestampSchema,
+});
+export type GetChatInput = z.infer<typeof getChatSchema>;
+export type SendChatInput = z.infer<typeof sendChatSchema>;
+export const journalViewSchema = z
+  .object({
+    journal_id: uuidSchema,
+    number: cursor,
+    created_at: timestampSchema,
+    body_ref: z.string(),
+    language: localeSchema,
+    references: z.array(contentReferenceSchema),
+    truncated: z.boolean(),
+  })
+  .meta({ id: 'JournalEntry' });
+export const chatMessageSchema = z
+  .object({
+    message_id: uuidSchema,
+    number: cursor,
+    region_id: regionIdSchema,
+    author_character_id: publicIdSchema,
+    author_name_ref: z.string(),
+    body_ref: z.string(),
+    created_at: timestampSchema,
+    language: localeSchema,
+    references: z.array(contentReferenceSchema),
+  })
+  .meta({ id: 'ChatMessage' });
+export type JournalView = z.infer<typeof journalViewSchema>;
