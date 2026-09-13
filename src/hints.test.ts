@@ -1,17 +1,17 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
+import { withCommandHints } from './hints.js';
 import type { AgentGameResponse } from './protocol.js';
 
 afterEach(() => vi.restoreAllMocks());
 
 const response: AgentGameResponse = {
   ok: true,
-  schema_version: '2.0',
+  schema_version: '3.0',
   server_time: '2026-09-12T00:00:00.000Z',
   locale: 'ja',
   data: {},
-  user_content: [],
 };
 
 it.each([
@@ -54,11 +54,24 @@ it.each([
   },
 );
 
+it('provides an executable hello example after create', () => {
+  const created: AgentGameResponse = {
+    ...response,
+    data: {
+      created: { public_id: 'Aster' },
+      next_step: { operation: 'hello', arguments: { character_id: 'Aster' } },
+    },
+  };
+  expect(withCommandHints('create', created).hints).toEqual([
+    'Run hello -c Aster to start playing.',
+  ]);
+});
+
 it('leaves failures and ordinary reads unchanged', async () => {
   const failure: AgentGameResponse = {
     ...response,
     ok: false,
-    error: { code: 'RATE_LIMITED' },
+    error: { message: 'Too many requests.' },
   };
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')

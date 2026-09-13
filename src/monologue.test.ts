@@ -13,10 +13,9 @@ it('posts one aside with no follow-up read and preserves the receipt', async () 
   );
   const receipt: AgentGameResponse = {
     ok: true,
-    schema_version: '2.0',
+    schema_version: '3.0',
     locale: 'en',
     server_time: '2026-09-12T00:00:00.000Z',
-    user_content: [],
     data: {
       monologue: {
         message_id: '11111111-1111-4111-8111-111111111111',

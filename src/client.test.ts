@@ -179,7 +179,7 @@ it('does not replay a game mutation after a 401 or network failure', async () =>
   }
 });
 
-it('distinguishes invalid JSON from response fields without exposing response contents', async () => {
+it('reports 5xx and unreadable responses without exposing response contents', async () => {
   const { store } = await fixture();
   await store.update((entries) => {
     entries[origin]!.expires_at = Date.now() + 3600_000;
@@ -187,39 +187,90 @@ it('distinguishes invalid JSON from response fields without exposing response co
   const cases = [
     {
       response: new Response('private upstream details', { status: 502 }),
-      detail: { reason: 'invalid_json', http_status: 502 },
+      code: 'SERVICE_UNAVAILABLE',
     },
     {
       response: Response.json({
         ok: true,
-        schema_version: '2.0',
+        schema_version: '3.0',
         locale: 'en',
         server_time: '2026-09-11T00:00:00.000Z',
         next_poll_after_seconds: 'private upstream details',
         data: {},
-        user_content: [],
       }),
-      detail: {
-        reason: 'invalid_response',
-        http_status: 200,
-        fields: ['next_poll_after_seconds'],
-      },
+      code: 'INVALID_RESPONSE',
+      message: "The server response did not match this CLI's expected format.",
+    },
+    {
+      response: new Response('private upstream details', { status: 200 }),
+      code: 'INVALID_RESPONSE',
+      message: 'The server returned a response that was not valid JSON.',
     },
   ];
-  for (const { response, detail } of cases) {
+  for (const { response, code, message } of cases) {
     const request = vi.fn<typeof fetch>().mockResolvedValue(response);
     const client = new GameClient(origin, store, request);
     const error = await client
       .invoke('character/activity', {})
       .catch((error: unknown) => error);
-    expect(error).toMatchObject({
-      code: 'UPDATE_REQUIRED',
-      detail: { ...detail, operation: 'character/activity' },
-    });
+    expect(error).toMatchObject({ code });
+    if (message) expect(error).toMatchObject({ detail: { message } });
     expect(JSON.stringify(error)).not.toContain('private upstream details');
     expect(JSON.stringify(error)).not.toContain('old-access');
     expect(request).toHaveBeenCalledTimes(1);
   }
+});
+
+it('reports UPDATE_REQUIRED only when the server schema is newer', async () => {
+  const { store } = await fixture();
+  await store.update((entries) => {
+    entries[origin]!.expires_at = Date.now() + 3600_000;
+  });
+  const request = vi.fn<typeof fetch>().mockResolvedValue(
+    Response.json({
+      ok: true,
+      schema_version: '4.0',
+      server_time: '2026-09-11T00:00:00.000Z',
+      locale: 'en',
+      data: {},
+    }),
+  );
+  const client = new GameClient(origin, store, request);
+  await expect(client.invoke('character/activity', {})).rejects.toMatchObject({
+    code: 'UPDATE_REQUIRED',
+  });
+});
+
+it('shows the server message for 401 and 429 responses', async () => {
+  const { store } = await fixture();
+  await store.update((entries) => {
+    entries[origin]!.expires_at = Date.now() + 3600_000;
+  });
+  const request = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(
+      Response.json(
+        { ok: false, error: { message: 'Authentication failed.' } },
+        { status: 401 },
+      ),
+    )
+    .mockResolvedValueOnce(
+      Response.json(
+        { ok: false, error: { message: 'Too many requests.' } },
+        { status: 429, headers: { 'Retry-After': '3' } },
+      ),
+    );
+  const client = new GameClient(origin, store, request);
+  await expect(client.invoke('character/activity', {})).rejects.toMatchObject({
+    code: 'AUTH_REQUIRED',
+    detail: {
+      message: 'Authentication failed. Run auth login and try again.',
+    },
+  });
+  await expect(client.invoke('character/activity', {})).rejects.toMatchObject({
+    code: 'RATE_LIMITED',
+    detail: { message: 'Too many requests.', retry_after: '3' },
+  });
 });
 
 it('respects device polling interval and slow_down without exposing device codes or tokens', async () => {

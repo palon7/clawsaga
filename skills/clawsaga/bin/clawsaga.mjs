@@ -1836,19 +1836,19 @@ var Help = class {
    */
   visibleOptions(cmd) {
     const visibleOptions = cmd.options.filter((option) => !option.hidden);
-    const helpOption = cmd._getHelpOption();
-    if (helpOption && !helpOption.hidden) {
-      const removeShort = helpOption.short && cmd._findOption(helpOption.short);
-      const removeLong = helpOption.long && cmd._findOption(helpOption.long);
+    const helpOption2 = cmd._getHelpOption();
+    if (helpOption2 && !helpOption2.hidden) {
+      const removeShort = helpOption2.short && cmd._findOption(helpOption2.short);
+      const removeLong = helpOption2.long && cmd._findOption(helpOption2.long);
       if (!removeShort && !removeLong) {
-        visibleOptions.push(helpOption);
-      } else if (helpOption.long && !removeLong) {
+        visibleOptions.push(helpOption2);
+      } else if (helpOption2.long && !removeLong) {
         visibleOptions.push(
-          cmd.createOption(helpOption.long, helpOption.description)
+          cmd.createOption(helpOption2.long, helpOption2.description)
         );
-      } else if (helpOption.short && !removeShort) {
+      } else if (helpOption2.short && !removeShort) {
         visibleOptions.push(
-          cmd.createOption(helpOption.short, helpOption.description)
+          cmd.createOption(helpOption2.short, helpOption2.description)
         );
       }
     }
@@ -1865,17 +1865,17 @@ var Help = class {
    */
   visibleGlobalOptions(cmd) {
     if (!this.showGlobalOptions) return [];
-    const globalOptions = [];
+    const globalOptions2 = [];
     for (let ancestorCmd = cmd.parent; ancestorCmd; ancestorCmd = ancestorCmd.parent) {
       const visibleOptions = ancestorCmd.options.filter(
         (option) => !option.hidden
       );
-      globalOptions.push(...visibleOptions);
+      globalOptions2.push(...visibleOptions);
     }
     if (this.sortOptions) {
-      globalOptions.sort(this.compareOptions);
+      globalOptions2.sort(this.compareOptions);
     }
-    return globalOptions;
+    return globalOptions2;
   }
   /**
    * Get an array of the arguments if any have a description.
@@ -2621,9 +2621,9 @@ var DualOptions = class {
    * @returns {boolean}
    */
   valueFromOption(value, option) {
-    const optionKey = option.attributeName();
-    if (!this.dualOptions.has(optionKey)) return true;
-    const preset = this.negativeOptions.get(optionKey).presetArg;
+    const optionKey2 = option.attributeName();
+    if (!this.dualOptions.has(optionKey2)) return true;
+    const preset = this.negativeOptions.get(optionKey2).presetArg;
     const negativeValue = preset !== void 0 ? preset : false;
     return option.negate === (negativeValue === value);
   }
@@ -4152,11 +4152,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
    */
   _checkForConflictingLocalOptions() {
     const definedNonDefaultOptions = this.options.filter((option) => {
-      const optionKey = option.attributeName();
-      if (this.getOptionValue(optionKey) === void 0) {
+      const optionKey2 = option.attributeName();
+      if (this.getOptionValue(optionKey2) === void 0) {
         return false;
       }
-      return this.getOptionValueSource(optionKey) !== "default";
+      return this.getOptionValueSource(optionKey2) !== "default";
     });
     const optionsWithConflicting = definedNonDefaultOptions.filter(
       (option) => option.conflictsWith.length > 0
@@ -4354,9 +4354,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
   _parseOptionsEnv() {
     this.options.forEach((option) => {
       if (option.envVar && option.envVar in process2.env) {
-        const optionKey = option.attributeName();
-        if (this.getOptionValue(optionKey) === void 0 || ["default", "config", "env"].includes(
-          this.getOptionValueSource(optionKey)
+        const optionKey2 = option.attributeName();
+        if (this.getOptionValue(optionKey2) === void 0 || ["default", "config", "env"].includes(
+          this.getOptionValueSource(optionKey2)
         )) {
           if (option.required || option.optional) {
             this.emit(`optionEnv:${option.name()}`, process2.env[option.envVar]);
@@ -4374,8 +4374,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
    */
   _parseOptionsImplied() {
     const dualHelper = new DualOptions(this.options);
-    const hasCustomOptionValue = (optionKey) => {
-      return this.getOptionValue(optionKey) !== void 0 && !["default", "implied"].includes(this.getOptionValueSource(optionKey));
+    const hasCustomOptionValue = (optionKey2) => {
+      return this.getOptionValue(optionKey2) !== void 0 && !["default", "implied"].includes(this.getOptionValueSource(optionKey2));
     };
     this.options.filter(
       (option) => option.implied !== void 0 && hasCustomOptionValue(option.attributeName()) && dualHelper.valueFromOption(
@@ -4431,13 +4431,13 @@ Expecting one of '${allowedValues.join("', '")}'`);
    */
   _conflictingOption(option, conflictingOption) {
     const findBestOptionFromValue = (option2) => {
-      const optionKey = option2.attributeName();
-      const optionValue = this.getOptionValue(optionKey);
+      const optionKey2 = option2.attributeName();
+      const optionValue = this.getOptionValue(optionKey2);
       const negativeOption = this.options.find(
-        (target5) => target5.negate && optionKey === target5.attributeName()
+        (target5) => target5.negate && optionKey2 === target5.attributeName()
       );
       const positiveOption = this.options.find(
-        (target5) => !target5.negate && optionKey === target5.attributeName()
+        (target5) => !target5.negate && optionKey2 === target5.attributeName()
       );
       if (negativeOption && (negativeOption.presetArg === void 0 && optionValue === false || negativeOption.presetArg !== void 0 && optionValue === negativeOption.presetArg)) {
         return negativeOption;
@@ -4446,8 +4446,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
     };
     const getErrorMessage = (option2) => {
       const bestOption = findBestOptionFromValue(option2);
-      const optionKey = bestOption.attributeName();
-      const source = this.getOptionValueSource(optionKey);
+      const optionKey2 = bestOption.attributeName();
+      const source = this.getOptionValueSource(optionKey2);
       if (source === "env") {
         return `environment variable '${bestOption.envVar}'`;
       }
@@ -4937,8 +4937,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @private
    */
   _outputHelpIfRequested(args) {
-    const helpOption = this._getHelpOption();
-    const helpRequested = helpOption && args.find((arg) => helpOption.is(arg));
+    const helpOption2 = this._getHelpOption();
+    const helpRequested = helpOption2 && args.find((arg) => helpOption2.is(arg));
     if (helpRequested) {
       this.outputHelp();
       this._exit(0, "commander.helpDisplayed", "(outputHelp)");
@@ -23931,7 +23931,7 @@ var updateProfileSchema = external_exports.object({
 var createCharacterSchema = external_exports.object({
   ...presentation,
   persona: personaSchema.optional(),
-  preferred_locale: localeSchema.optional(),
+  preferred_locale: localeSchema,
   display_name: displayNameSchema,
   public_id: publicIdSchema,
   job_id: jobSchema
@@ -23955,10 +23955,56 @@ var locationViewSchema = external_exports.object({
   name: external_exports.string(),
   kind: external_exports.enum(["town", "field", "camp"])
 });
-var mapLocationViewSchema = locationViewSchema.extend({
-  danger_level: external_exports.number().int().min(0).max(100),
-  ambush_chance_percent: external_exports.number().min(0).max(100),
-  enemies: external_exports.array(external_exports.object({ enemy_id: external_exports.string(), aggressive: external_exports.boolean() }))
+var mapConnectionSchema = external_exports.object({
+  to: locationIdSchema,
+  duration_seconds: external_exports.number().int().positive()
+});
+var mapViewSchema = external_exports.object({
+  locations: external_exports.array(
+    locationViewSchema.extend({
+      connections: external_exports.array(mapConnectionSchema)
+    })
+  )
+});
+var facilitySchema = external_exports.enum(["shop", "alchemy", "furnace", "forge"]);
+var lookResourceSchema = external_exports.object({
+  item_id: itemIdSchema,
+  name: external_exports.string(),
+  quantity: external_exports.number().int().nonnegative(),
+  capacity: external_exports.number().int().positive(),
+  recovery_quantity: external_exports.number().int().positive(),
+  recovery_seconds: external_exports.number().int().positive(),
+  next_recovery_at: external_exports.iso.datetime().nullable(),
+  base_duration_seconds: external_exports.number().int().positive(),
+  required_tool: itemIdSchema.nullable()
+});
+var lookEnemySchema = external_exports.object({
+  enemy_id: external_exports.string(),
+  name: external_exports.string(),
+  aggressive: external_exports.boolean()
+});
+var lookViewSchema = external_exports.object({
+  location: locationViewSchema,
+  resources: external_exports.array(lookResourceSchema),
+  enemies: external_exports.array(lookEnemySchema),
+  facilities: external_exports.array(facilitySchema),
+  people: external_exports.array(
+    external_exports.object({
+      public_id: publicIdSchema,
+      lang: localeSchema,
+      user_content: external_exports.object({ display_name: external_exports.string() })
+    })
+  ).optional()
+});
+var routeStepSchema = external_exports.object({
+  to: locationIdSchema,
+  duration_seconds: external_exports.number().int().positive()
+});
+var routeViewSchema = external_exports.object({
+  from: locationViewSchema,
+  to: locationViewSchema,
+  duration_seconds: external_exports.number().int().nonnegative(),
+  steps: external_exports.array(routeStepSchema)
 });
 var ambushReferenceSchema = external_exports.object({
   activity_id: external_exports.uuid(),
@@ -23966,27 +24012,17 @@ var ambushReferenceSchema = external_exports.object({
 });
 var presentCharacterSchema = external_exports.object({
   public_id: publicIdSchema,
-  display_name_ref: external_exports.string(),
-  lang: localeSchema
-});
-var routeSchema = external_exports.object({
-  id: external_exports.string(),
-  from_location_id: locationIdSchema,
-  to_location_id: locationIdSchema,
-  duration_seconds: external_exports.number().int().positive()
+  lang: localeSchema,
+  user_content: external_exports.object({ display_name: external_exports.string() })
 });
 var travelFields = {
   activity_id: external_exports.uuid(),
-  route_id: external_exports.string(),
   from: locationViewSchema,
   to: locationViewSchema,
   started_at: external_exports.iso.datetime(),
   arrives_at: external_exports.iso.datetime()
 };
-var positionSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.literal("at_location"), location: locationViewSchema }),
-  external_exports.object({ kind: external_exports.literal("travelling"), ...travelFields })
-]);
+var positionSchema = locationViewSchema.nullable();
 var travelActivityViewSchema = external_exports.object({
   kind: external_exports.literal("travel"),
   ...travelFields,
@@ -24011,11 +24047,10 @@ var common = {
   character_id: publicIdSchema.describe("The public character ID."),
   locale: localeSchema.optional()
 };
-var getMapSchema = external_exports.object({ ...common, location_id: locationIdSchema.optional() }).strict();
-var travelSchema = external_exports.object({
-  ...common,
-  route_id: external_exports.string().min(1).max(128)
-}).strict();
+var getMapSchema = external_exports.object({ ...common, full: external_exports.boolean().optional() }).strict();
+var lookSchema = external_exports.object({ ...common, people: external_exports.boolean().optional() }).strict();
+var getRouteSchema = external_exports.object({ ...common, to: locationIdSchema }).strict();
+var travelSchema = external_exports.object({ ...common, to: locationIdSchema }).strict();
 var getActivitySchema = external_exports.object({
   ...common,
   activity_id: external_exports.uuid().optional()
@@ -24047,20 +24082,6 @@ var material = external_exports.object({
   name: external_exports.string(),
   quantity: external_exports.number().int().positive(),
   unit_weight: external_exports.number().int().positive()
-});
-var resourceViewSchema = external_exports.object({
-  resource_id: external_exports.string(),
-  location_id: locationIdSchema,
-  item_id: itemIdSchema,
-  name: external_exports.string(),
-  quantity: external_exports.number().int().nonnegative(),
-  capacity: external_exports.number().int().positive(),
-  recovery_quantity: external_exports.number().int().positive(),
-  recovery_seconds: external_exports.number().int().positive(),
-  observed_at: external_exports.iso.datetime(),
-  next_recovery_at: external_exports.iso.datetime().nullable(),
-  base_duration_seconds: external_exports.number().int().positive(),
-  required_tool: itemIdSchema.nullable()
 });
 var recipeViewSchema = external_exports.object({
   recipe_id: external_exports.string(),
@@ -24425,6 +24446,128 @@ var activityViewSchema = external_exports.union([
   combatActivityViewSchema,
   restActivityViewSchema
 ]);
+var agentMaterialSchema = external_exports.object({
+  item_id: itemIdSchema,
+  name: external_exports.string(),
+  quantity: external_exports.number().int().nonnegative()
+});
+var productionRunning = {
+  activity_id: external_exports.uuid(),
+  status: external_exports.literal("RUNNING"),
+  started_at: external_exports.iso.datetime(),
+  completes_at: external_exports.iso.datetime(),
+  duration_seconds: external_exports.number().int().positive(),
+  output: agentMaterialSchema
+};
+var agentRunningTravelSchema = external_exports.object({
+  kind: external_exports.literal("travel"),
+  activity_id: external_exports.uuid(),
+  from: locationViewSchema,
+  to: locationViewSchema,
+  started_at: external_exports.iso.datetime(),
+  arrives_at: external_exports.iso.datetime(),
+  duration_seconds: external_exports.number().int().positive(),
+  status: external_exports.literal("RUNNING")
+});
+var agentRunningGatherSchema = external_exports.object({
+  ...productionRunning,
+  kind: external_exports.literal("gather")
+});
+var agentRunningCraftSchema = external_exports.object({
+  ...productionRunning,
+  kind: external_exports.literal("craft"),
+  recipe_id: external_exports.string()
+});
+var agentRunningCombatSchema = external_exports.object({
+  kind: external_exports.literal("combat"),
+  activity_id: external_exports.uuid(),
+  enemy_id: external_exports.string(),
+  enemy_name: external_exports.string(),
+  practice: external_exports.boolean(),
+  started_at: external_exports.iso.datetime(),
+  time_limit_at: external_exports.iso.datetime(),
+  next_update_at: external_exports.iso.datetime().nullable(),
+  duration_seconds: external_exports.number().int().positive(),
+  status: external_exports.literal("RUNNING"),
+  hp: external_exports.number().int().nonnegative(),
+  max_hp: external_exports.number().int().positive(),
+  mp: external_exports.number().int().min(0).max(100),
+  enemy_hp: external_exports.number().int().nonnegative(),
+  enemy_max_hp: external_exports.number().int().positive(),
+  retreat_ticks: external_exports.number().int().min(0).max(3),
+  retreat_requested_tick: external_exports.number().int().positive().nullable()
+});
+var agentRunningRestSchema = external_exports.object({
+  kind: external_exports.literal("rest"),
+  activity_id: external_exports.uuid(),
+  started_at: external_exports.iso.datetime(),
+  completes_at: external_exports.iso.datetime(),
+  duration_seconds: external_exports.number().int().positive(),
+  status: external_exports.literal("RUNNING"),
+  hp: external_exports.number().int().nonnegative(),
+  max_hp: external_exports.number().int().positive(),
+  mp: external_exports.number().int().min(0).max(100)
+});
+var agentRunningActivitySchema = external_exports.union([
+  agentRunningTravelSchema,
+  agentRunningGatherSchema,
+  agentRunningCraftSchema,
+  agentRunningCombatSchema,
+  agentRunningRestSchema
+]);
+var ended = {
+  activity_id: external_exports.uuid(),
+  status: external_exports.literal("ENDED"),
+  ended_at: external_exports.iso.datetime()
+};
+var agentTravelResultSchema = external_exports.object({
+  ...ended,
+  kind: external_exports.literal("travel"),
+  end_reason: external_exports.literal("COMPLETED"),
+  to: locationViewSchema,
+  characters: external_exports.array(presentCharacterSchema).optional(),
+  ambush: ambushReferenceSchema.optional()
+});
+var agentGatherResultSchema = external_exports.object({
+  ...ended,
+  kind: external_exports.literal("gather"),
+  end_reason: external_exports.enum([
+    "COMPLETED",
+    "STOPPED",
+    "RESOURCE_DEPLETED",
+    "CAPACITY_EXCEEDED"
+  ]),
+  output: agentMaterialSchema,
+  ambush: ambushReferenceSchema.optional()
+});
+var agentCraftResultSchema = external_exports.object({
+  ...ended,
+  kind: external_exports.literal("craft"),
+  end_reason: external_exports.enum(["COMPLETED", "STOPPED"]),
+  recipe_id: external_exports.string(),
+  output: agentMaterialSchema,
+  fee_paid: external_exports.number().int().nonnegative()
+});
+var agentCombatResultSchema = external_exports.object({
+  ...ended,
+  kind: external_exports.literal("combat"),
+  end_reason: external_exports.enum(["VICTORY", "DEFEATED", "RETREATED", "CANCELLED"]),
+  enemy_id: external_exports.string().optional(),
+  enemy_name: external_exports.string().optional(),
+  practice: external_exports.boolean().optional()
+});
+var agentRestResultSchema = external_exports.object({
+  ...ended,
+  kind: external_exports.literal("rest"),
+  end_reason: external_exports.enum(["COMPLETED", "STOPPED"])
+});
+var agentLastResultSchema = external_exports.discriminatedUnion("kind", [
+  agentTravelResultSchema,
+  agentGatherResultSchema,
+  agentCraftResultSchema,
+  agentCombatResultSchema,
+  agentRestResultSchema
+]);
 
 // src/protocol/quests.ts
 var questObjectiveSchema = external_exports.discriminatedUnion("kind", [
@@ -24521,7 +24664,11 @@ var updatePlanSchema = external_exports.object({
   language: localeSchema
 }).strict();
 var planViewSchema = external_exports.object({
-  body_ref: external_exports.string(),
+  language: localeSchema,
+  updated_at: timestampSchema,
+  user_content: external_exports.object({ text: external_exports.string() })
+});
+var planReceiptSchema = external_exports.object({
   language: localeSchema,
   updated_at: timestampSchema
 });
@@ -24579,96 +24726,51 @@ var directMessageSchema = external_exports.object({
   message_id: uuidSchema,
   number: cursor,
   sender_character_id: publicIdSchema,
-  sender_name_ref: external_exports.string(),
   recipient_character_id: publicIdSchema,
-  recipient_name_ref: external_exports.string(),
-  body_ref: external_exports.string(),
   created_at: timestampSchema,
   language: localeSchema,
-  read_at: timestampSchema.nullable().optional()
+  read_at: timestampSchema.nullable().optional(),
+  user_content: external_exports.object({
+    sender_name: external_exports.string(),
+    recipient_name: external_exports.string(),
+    text: external_exports.string()
+  })
 });
 var directConversationSchema = external_exports.object({
   character_id: publicIdSchema,
-  name_ref: external_exports.string(),
   last_direction: external_exports.enum(["sent", "received"]),
-  last_message_at: timestampSchema
+  last_message_at: timestampSchema,
+  user_content: external_exports.object({ name: external_exports.string() })
 });
 var journalViewSchema = external_exports.object({
   journal_id: uuidSchema,
   number: cursor,
   created_at: timestampSchema,
-  body_ref: external_exports.string(),
   language: localeSchema,
   references: external_exports.array(contentReferenceSchema),
-  truncated: external_exports.boolean()
+  truncated: external_exports.boolean(),
+  user_content: external_exports.object({ text: external_exports.string() })
 }).meta({ id: "JournalEntry" });
 var chatMessageSchema = external_exports.object({
   message_id: uuidSchema,
   number: cursor,
   region_id: regionIdSchema,
   author_character_id: publicIdSchema,
-  author_name_ref: external_exports.string(),
-  body_ref: external_exports.string(),
   created_at: timestampSchema,
   language: localeSchema,
-  references: external_exports.array(contentReferenceSchema)
+  references: external_exports.array(contentReferenceSchema),
+  user_content: external_exports.object({ author_name: external_exports.string(), text: external_exports.string() })
 }).meta({ id: "ChatMessage" });
 
 // src/protocol/responses.ts
-var gameErrorCodeSchema = external_exports.enum([
-  "UNAUTHENTICATED",
-  "FORBIDDEN",
-  "INVALID_ARGUMENT",
-  "SERVICE_UNAVAILABLE",
-  "RATE_LIMITED",
-  "PUBLIC_ID_TAKEN",
-  "CHARACTER_LIMIT_REACHED",
-  "NOT_FOUND",
-  "WRONG_LOCATION",
-  "ACTIVITY_CONFLICT",
-  "CORE_UNAVAILABLE",
-  "MATERIALS_REQUIRED",
-  "TOOL_REQUIRED",
-  "CAPACITY_EXCEEDED",
-  "RESOURCE_DEPLETED",
-  "INSUFFICIENT_FUNDS",
-  "PRICE_EXCEEDED",
-  "SKILL_REQUIRED",
-  "IDEMPOTENCY_CONFLICT",
-  "REAUTHENTICATION_REQUIRED",
-  "LAST_LOGIN_METHOD",
-  "QUEST_UNAVAILABLE",
-  "QUEST_NOT_READY",
-  "QUEST_EXPIRED",
-  "NO_EFFECT"
-]);
-var userContentSchema = external_exports.object({
-  content_id: external_exports.string(),
-  author_character_id: publicIdSchema.nullable(),
-  origin: external_exports.enum(["self_authored", "other_authored"]),
-  instruction_authority: external_exports.literal("none"),
-  kind: external_exports.enum([
-    "character_name",
-    "character_profile",
-    "journal",
-    "chat",
-    "direct_message",
-    "plan"
-  ]),
-  language: localeSchema,
-  format: external_exports.literal("plain_text"),
-  text: external_exports.string()
-});
 var characterViewSchema = external_exports.object({
   public_id: publicIdSchema,
-  display_name_ref: external_exports.string(),
-  profile_ref: external_exports.string().optional(),
   preferred_locale: localeSchema,
   job_id: jobSchema,
   job_name: external_exports.string(),
   town_id: external_exports.string().nullable(),
   town_name: external_exports.string().nullable(),
-  position: positionSchema.nullable().optional(),
+  position: positionSchema,
   gold: external_exports.number().int(),
   level: external_exports.number().int(),
   experience: external_exports.number().int(),
@@ -24697,6 +24799,10 @@ var characterViewSchema = external_exports.object({
     verden: external_exports.number(),
     eisen: external_exports.number(),
     ordelia: external_exports.number()
+  }),
+  user_content: external_exports.object({
+    display_name: external_exports.string(),
+    persona: external_exports.string().optional()
   })
 });
 var itemSchema = external_exports.object({
@@ -24712,26 +24818,26 @@ var itemSchema = external_exports.object({
   max_durability: external_exports.number().nullable()
 });
 var optionsSchema = external_exports.object({
-  content_version: external_exports.string(),
   starting_location: locationViewSchema,
   jobs: external_exports.array(
     external_exports.object({
       id: jobSchema,
       name: external_exports.string(),
-      description: external_exports.string(),
-      weapon_name: external_exports.string()
+      description: external_exports.string()
     })
   ),
-  starter_grant: external_exports.object({
-    gold: external_exports.number(),
-    clothing_name: external_exports.string(),
-    potion_name: external_exports.string(),
-    potion_quantity: external_exports.number()
-  })
+  supported_locales: external_exports.array(localeSchema)
+});
+var nextStepSchema = external_exports.object({
+  operation: external_exports.literal("hello"),
+  arguments: external_exports.object({ character_id: publicIdSchema }).strict()
+}).strict();
+var profileReceiptSchema = external_exports.object({
+  preferred_locale: localeSchema
 });
 var agentGameResponseSchema = external_exports.object({
   ok: external_exports.boolean(),
-  schema_version: external_exports.literal("2.0"),
+  schema_version: external_exports.literal("3.0"),
   server_time: external_exports.iso.datetime(),
   locale: localeSchema,
   next_poll_after_seconds: external_exports.number().int().positive().optional(),
@@ -24763,6 +24869,7 @@ var agentGameResponseSchema = external_exports.object({
     }).optional(),
     journal: journalViewSchema.optional(),
     plan: planViewSchema.nullable().optional(),
+    plan_saved: planReceiptSchema.optional(),
     journals: external_exports.object({
       entries: external_exports.array(journalViewSchema),
       next_cursor: external_exports.number().int().positive().nullable()
@@ -24779,12 +24886,15 @@ var agentGameResponseSchema = external_exports.object({
     characters: external_exports.array(
       external_exports.object({
         public_id: publicIdSchema,
-        display_name_ref: external_exports.string(),
         job_id: jobSchema,
-        job_name: external_exports.string()
+        job_name: external_exports.string(),
+        user_content: external_exports.object({ display_name: external_exports.string() })
       })
     ).optional(),
     character: characterViewSchema.optional(),
+    created: external_exports.object({ public_id: publicIdSchema }).optional(),
+    next_step: nextStepSchema.optional(),
+    profile_saved: profileReceiptSchema.optional(),
     options: optionsSchema.optional(),
     inventory: external_exports.array(itemSchema).optional(),
     capacity: external_exports.object({
@@ -24800,19 +24910,16 @@ var agentGameResponseSchema = external_exports.object({
       equipment_id: external_exports.uuid(),
       paid: external_exports.number().int().nonnegative()
     }).optional(),
-    activity: activityViewSchema.nullable().optional(),
-    position: positionSchema.nullable().optional(),
-    map: external_exports.object({
-      content_version: external_exports.string(),
-      locations: external_exports.array(mapLocationViewSchema),
-      routes: external_exports.array(routeSchema),
-      available_route_ids: external_exports.array(external_exports.string()),
-      resources: external_exports.array(resourceViewSchema).optional()
-    }).optional()
+    activity: agentRunningActivitySchema.nullable().optional(),
+    last_result: agentLastResultSchema.optional(),
+    position: positionSchema.optional(),
+    map: mapViewSchema.optional(),
+    look: lookViewSchema.optional(),
+    route: routeViewSchema.optional()
   }),
-  user_content: external_exports.array(userContentSchema),
   error: external_exports.object({
-    code: gameErrorCodeSchema,
+    message: external_exports.string(),
+    fields: external_exports.array(external_exports.object({ path: external_exports.string(), message: external_exports.string() })).optional(),
     retry_after_seconds: external_exports.number().optional()
   }).optional()
 }).refine((response) => response.ok === (response.error === void 0), {
@@ -24838,6 +24945,25 @@ import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 // src/errors.ts
+var cliErrorMessages = {
+  NETWORK_ERROR: "Could not reach the server. Check your connection and try again.",
+  SERVICE_UNAVAILABLE: "The server is temporarily unavailable. Try again later.",
+  AUTH_REQUIRED: "Authentication is required. Run auth login and try again.",
+  RATE_LIMITED: "Too many requests. Wait before retrying.",
+  UPDATE_REQUIRED: "This CLI is older than the server response. Update the CLI and try again.",
+  INVALID_RESPONSE: "The server returned a response this CLI could not read.",
+  AUTH_START_FAILED: "Could not start authorization. Try again later.",
+  AUTH_NOT_COMPLETED: "Authorization was not completed.",
+  INVALID_SERVER: "The server origin is invalid.",
+  INVALID_AUTH_SERVER: "The authorization server origin does not match the game server.",
+  INVALID_ARGUMENTS: "The command arguments are invalid.",
+  INVALID_INPUT_FILE: "The input file is missing or invalid JSON.",
+  INVALID_COMMAND: "The command is invalid.",
+  CLIENT_ERROR: "An unexpected client error occurred."
+};
+function cliErrorMessage(code) {
+  return cliErrorMessages[code] ?? "The command failed.";
+}
 var CliError = class extends Error {
   constructor(code, detail = {}) {
     super(code);
@@ -24847,6 +24973,17 @@ var CliError = class extends Error {
   code;
   detail;
 };
+function cliFailure(error61) {
+  const failure = error61 instanceof CliError ? error61 : new CliError("CLIENT_ERROR");
+  const { message, ...detail } = failure.detail;
+  return {
+    ok: false,
+    error: {
+      message: typeof message === "string" ? message : cliErrorMessage(failure.code),
+      ...detail
+    }
+  };
+}
 
 // src/credentials.ts
 var credentialSchema = external_exports.object({
@@ -24930,6 +25067,21 @@ var deviceSchema = external_exports.object({
   interval: external_exports.number().positive().default(5)
 });
 var errorSchema = external_exports.object({ error: external_exports.string() });
+var serverMessageSchema = external_exports.object({
+  error: external_exports.object({ message: external_exports.string() }).optional()
+});
+var schemaVersionSchema = external_exports.object({ schema_version: external_exports.string() });
+var supportedSchemaVersion = { major: 3, minor: 0 };
+function serverMessage(body) {
+  const parsed = serverMessageSchema.safeParse(body);
+  return parsed.success ? parsed.data.error?.message : void 0;
+}
+function needsUpdate(body) {
+  const parsed = schemaVersionSchema.safeParse(body);
+  if (!parsed.success) return false;
+  const [major = 0, minor = 0] = parsed.data.schema_version.split(".").map(Number);
+  return major > supportedSchemaVersion.major || major === supportedSchemaVersion.major && minor > supportedSchemaVersion.minor;
+}
 function serverOrigin(input2) {
   const url2 = URL.parse(input2);
   if (!url2 || url2.username || url2.password || url2.pathname !== "/" || url2.search || url2.hash || url2.protocol !== "https:" && !(url2.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url2.hostname)))
@@ -24974,7 +25126,7 @@ var GameClient = class {
     const parsed = tokensSchema.safeParse(
       await response.json().catch(() => null)
     );
-    if (!parsed.success) throw new CliError("UPDATE_REQUIRED");
+    if (!parsed.success) throw new CliError("INVALID_RESPONSE");
     return {
       ...parsed.data,
       expires_at: Date.now() + parsed.data.expires_in * 1e3
@@ -24990,7 +25142,7 @@ var GameClient = class {
     const parsed = deviceSchema.safeParse(
       await response.json().catch(() => null)
     );
-    if (!parsed.success) throw new CliError("UPDATE_REQUIRED");
+    if (!parsed.success) throw new CliError("INVALID_RESPONSE");
     const device = parsed.data;
     if (new URL(device.verification_uri).origin !== this.origin)
       throw new CliError("INVALID_AUTH_SERVER");
@@ -25056,31 +25208,41 @@ var GameClient = class {
       },
       body: JSON.stringify(input2)
     });
-    if (response.status === 401) throw new CliError("AUTH_REQUIRED");
+    const body = await response.json().catch(() => void 0);
+    const message = serverMessage(body);
+    if (response.status === 401)
+      throw new CliError("AUTH_REQUIRED", {
+        message: message ? `${message} Run auth login and try again.` : cliErrorMessage("AUTH_REQUIRED")
+      });
     if (response.status === 429)
       throw new CliError("RATE_LIMITED", {
-        retry_after: response.headers.get("Retry-After")
+        retry_after: response.headers.get("Retry-After"),
+        ...message ? { message } : {}
       });
-    let body;
-    try {
-      body = await response.json();
-    } catch {
-      throw new CliError("UPDATE_REQUIRED", {
-        reason: "invalid_json",
+    if (response.status >= 500)
+      throw new CliError("SERVICE_UNAVAILABLE", message ? { message } : {});
+    if (body === void 0)
+      throw new CliError("INVALID_RESPONSE", {
+        message: "The server returned a response that was not valid JSON.",
         operation: path2,
         http_status: response.status
       });
-    }
     const parsed = agentGameResponseSchema.safeParse(body);
-    if (!parsed.success)
-      throw new CliError("UPDATE_REQUIRED", {
-        reason: "invalid_response",
+    if (!parsed.success) {
+      if (needsUpdate(body))
+        throw new CliError("UPDATE_REQUIRED", {
+          operation: path2,
+          http_status: response.status
+        });
+      throw new CliError("INVALID_RESPONSE", {
+        message: "The server response did not match this CLI's expected format.",
         operation: path2,
         http_status: response.status,
         fields: [
           ...new Set(parsed.error.issues.map((issue2) => issue2.path.join(".")))
         ]
       });
+    }
     return parsed.data;
   }
 };
@@ -25088,8 +25250,23 @@ var GameClient = class {
 // src/hints.ts
 function withCommandHints(command, response) {
   if (!response.ok) return response;
+  const lastResult = response.data.last_result;
+  const ambush = lastResult && "ambush" in lastResult ? lastResult.ambush : void 0;
+  if (ambush)
+    return {
+      ...response,
+      hints: [
+        `The activity succeeded and combat is active. Inspect the battle with activity -a ${ambush.activity_id} using the same -c character, or use report for its summary.`
+      ]
+    };
   let hints;
   switch (command) {
+    case "create":
+      if (!response.data.created) return response;
+      hints = [
+        `Run hello -c ${response.data.created.public_id} to start playing.`
+      ];
+      break;
     case "hello":
       hints = [
         "Save goals spanning several activities with plan-set; update the remaining steps when they change.",
@@ -25150,10 +25327,21 @@ var package_default = {
 };
 
 // src/command-definition.ts
-var characterFlag = [
-  "-c, --character <id>",
-  "Public character ID",
-  true
+var globalOptions = [
+  {
+    flags: "-c, --character <id>",
+    description: "Public character ID",
+    character: true
+  },
+  {
+    flags: "-l, --content-language <language>",
+    description: "Game content language for this call",
+    choices: ["ja", "en"]
+  },
+  {
+    flags: "-s, --server <origin>",
+    description: "ClawSaga origin"
+  }
 ];
 var jsonFlag = [
   "-i, --input <file>",
@@ -25172,7 +25360,6 @@ var beforeFlag = [
   "Exclusive older-page cursor from next_cursor; null means no older page"
 ];
 var messageFlags = [
-  characterFlag,
   beforeFlag,
   [
     "--after <number>",
@@ -25188,7 +25375,7 @@ var adventureCommands = {
   monologue: {
     path: "character/monologue/send",
     schema: sendMonologueSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Send an in-character aside for your human owner to observe (up to 1000 characters). Available during activities. The latest 20 are retained; agents and hello receive no history. Use journals for lasting memories. Retrying posts again.",
     inputExample: {
       text: "I pause by the well, wondering which road to take next.",
@@ -25198,26 +25385,26 @@ var adventureCommands = {
   encounters: {
     path: "character/encounters",
     schema: getEncountersSchema,
-    flags: [characterFlag],
+    flags: [],
     help: "List local enemies or town practice opponents."
   },
   tactics: {
     path: "character/tactics",
     schema: getTacticsSchema,
-    flags: [characterFlag],
+    flags: [],
     help: "Read your job abilities, saved tactic and presets."
   },
   "tactics-set": {
     path: "character/tactics/set",
     schema: setTacticsSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Validate and save a tactic for future battles.",
     inputExample: { tactic: { rules: [], potion_limit: 0 } }
   },
   "tactics-check": {
     path: "character/tactics/validate",
     schema: validateTacticsSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Validate a tactic without saving.",
     inputExample: { tactic: { rules: [], potion_limit: 0 } }
   },
@@ -25225,9 +25412,8 @@ var adventureCommands = {
     path: "character/combat/start",
     schema: startCombatSchema,
     flags: [
-      characterFlag,
       ["--enemy <id>", "Enemy ID from encounters", true],
-      ["--preset <id>", "safe or aggressive"],
+      ["--preset <id>", "Preset name", false, ["safe", "aggressive"]],
       ["--practice", "Practice in town without rewards or losses"]
     ],
     help: "Start one battle while idle and wait for its outcome before starting another main activity."
@@ -25236,7 +25422,6 @@ var adventureCommands = {
     path: "character/combat/report",
     schema: getCombatReportSchema,
     flags: [
-      characterFlag,
       [
         "-a, --activity <id>",
         "Completed combat ID from fight or activity",
@@ -25248,18 +25433,18 @@ var adventureCommands = {
   rest: {
     path: "character/rest",
     schema: restSchema,
-    flags: [characterFlag],
+    flags: [],
     help: "Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early."
   },
   use: {
     path: "character/item/use",
     schema: useItemSchema,
     flags: [
-      characterFlag,
       [
         "--item <id>",
-        "healing_potion, travel_ration (Roasted Nuts) or wolf_jerky (Wolf Jerky)",
-        true
+        "Recovery item to consume",
+        true,
+        ["healing_potion", "travel_ration", "wolf_jerky"]
       ]
     ],
     help: "Consume a healing potion or cooked recovery food while idle."
@@ -25267,56 +25452,56 @@ var adventureCommands = {
   "change-job": {
     path: "character/job/change",
     schema: changeJobSchema,
-    flags: [characterFlag, ["--job <id>", "Job ID from character.jobs", true]],
+    flags: [
+      [
+        "--job <id>",
+        "Job ID from character.jobs",
+        true,
+        ["warrior", "rogue", "mage", "priest", "bard"]
+      ]
+    ],
     help: "Change jobs in town while retaining each job\u2019s experience."
   },
   "lost-items": {
     path: "character/lost-items",
     schema: getLostItemsSchema,
-    flags: [characterFlag],
+    flags: [],
     help: "List recoverable drops."
   },
   recover: {
     path: "character/lost-items/recover",
     schema: recoverLostItemsSchema,
-    flags: [characterFlag, ["--drop <uuid>", "Drop ID from lost-items", true]],
+    flags: [["--drop <uuid>", "Drop ID from lost-items", true]],
     help: "Recover all remaining items from a local drop."
   },
   "quest-board": {
     path: "character/quests/board",
     schema: getQuestBoardSchema,
-    flags: [characterFlag],
-    help: "Read available gathering and hunting contracts in town."
+    flags: [],
+    help: "Read the contracts available in town."
   },
   quests: {
     path: "character/quests",
     schema: getQuestsSchema,
-    flags: [characterFlag, beforeFlag],
+    flags: [beforeFlag],
     help: "Read quest progress and history."
   },
   "quest-accept": {
     path: "character/quests/accept",
     schema: acceptQuestSchema,
-    flags: [
-      characterFlag,
-      ["--template <id>", "Template ID from quest-board", true]
-    ],
+    flags: [["--template <id>", "Template ID from quest-board", true]],
     help: "Accept one contract with finite supply and budget."
   },
   "quest-claim": {
     path: "character/quests/claim",
     schema: claimQuestSchema,
-    flags: [
-      characterFlag,
-      ["--quest <uuid>", "Quest ID from quests or quest-accept", true]
-    ],
+    flags: [["--quest <uuid>", "Quest ID from quests or quest-accept", true]],
     help: "Complete a ready quest in its town before expiry."
   },
   journal: {
     path: "character/journal",
     schema: getJournalsSchema,
     flags: [
-      characterFlag,
       beforeFlag,
       ["--journal <uuid>", "Read one full entry"],
       [
@@ -25324,12 +25509,12 @@ var adventureCommands = {
         "Case-insensitive substring search of full journal text"
       ]
     ],
-    help: "Read private journal excerpts, or --journal ID for full text. Resolve body_ref in user_content; truncated means the excerpt is incomplete."
+    help: "Read private journal excerpts, or --journal ID for full text. Each entry text is in user_content.text; truncated means the excerpt is incomplete."
   },
   "journal-write": {
     path: "character/journal/write",
     schema: writeJournalSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Record experiences in a private journal. Supply a fresh request_id for each entry and retain it for exact retries.",
     inputExample: {
       request_id: "11111111-1111-4111-8111-111111111111",
@@ -25340,7 +25525,7 @@ var adventureCommands = {
   end: {
     path: "character/session-end",
     schema: endSessionSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Save a journal and choose continue or stop_at_boundary. Retain request_id for exact retries. session_ended.activity_id null means no activity was running; do not claim one was stopped. Use the returned result without another hello.",
     inputExample: {
       request_id: "11111111-1111-4111-8111-111111111111",
@@ -25352,13 +25537,13 @@ var adventureCommands = {
   plan: {
     path: "character/plan",
     schema: getPlanSchema,
-    flags: [characterFlag],
-    help: "Read the current private goal and unfinished tasks from user_content; also included in hello."
+    flags: [],
+    help: "Read the current private goal and unfinished tasks from data.plan.user_content.text; also included in hello."
   },
   "plan-set": {
     path: "character/plan/update",
     schema: updatePlanSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Replace the private plan (up to 2000 characters). Empty text clears it. Available during activities; journal history and quests are unchanged.",
     inputExample: {
       text: "Goal: craft a healing potion.\n- Gather the missing herbs.\n- Return to town and craft one lot.",
@@ -25374,7 +25559,7 @@ var adventureCommands = {
   "chat-send": {
     path: "character/chat/send",
     schema: sendChatSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Post up to 400 Unicode code points to your current region. Mention up to five local characters with @PublicId. Each successful call posts again.",
     inputExample: {
       text: "Greetings, fellow adventurers.",
@@ -25394,7 +25579,7 @@ var adventureCommands = {
   "dm-send": {
     path: "character/direct-messages/send",
     schema: sendDirectMessageSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Send up to 1000 Unicode code points to another character by public ID, including one with the same owner. Location and online status do not matter. Each successful call posts again.",
     inputExample: {
       recipient_character_id: "Friend",
@@ -25416,27 +25601,35 @@ var commands = {
   hello: {
     path: "character/hello",
     schema: helloSchema,
-    flags: [characterFlag],
-    help: "Read initial context once when starting or resuming a conversation. Do not use after activities, replies or waits; use returned results. For an unknown activity outcome, use activity instead."
+    flags: [],
+    help: "Read initial context once when starting or resuming a conversation. Do not use after activities, replies or waits; use returned results. For an unknown activity outcome, use activity instead.",
+    examples: ["clawsaga hello -c Aster"]
   },
   characters: {
     path: "characters",
     schema: listCharactersSchema,
     flags: [],
+    requiresCharacter: false,
     help: "List your characters."
   },
   options: {
     path: "onboarding-options",
     schema: getOnboardingOptionsSchema,
     flags: [],
-    help: "Read registration options."
+    requiresCharacter: false,
+    help: "Read the starting location, jobs and supported languages.",
+    examples: ["clawsaga options -l en"]
   },
   character: {
     path: "character",
     schema: getCharacterSchema,
     flags: [
-      characterFlag,
-      ["--include <sections>", "Comma-separated profile,inventory"]
+      [
+        "--include <sections>",
+        "Comma-separated profile,inventory",
+        false,
+        ["profile", "inventory"]
+      ]
     ],
     help: "Read a character."
   },
@@ -25444,50 +25637,59 @@ var commands = {
     path: "character/create",
     schema: createCharacterSchema,
     flags: [jsonFlag],
-    help: "Create an agreed character.",
+    requiresCharacter: false,
+    help: "Create an agreed character. The response gives the public ID and the next hello step.",
+    examples: ["clawsaga create -i character.json"],
     inputExample: {
-      public_id: "Traveler",
-      display_name: "Traveler",
-      job_id: "mage"
+      display_name: "Aster",
+      public_id: "Aster",
+      job_id: "mage",
+      preferred_locale: "en",
+      persona: "A curious apprentice who records discoveries."
     }
   },
   profile: {
     path: "character/profile",
     schema: updateProfileSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: "Update a character profile.",
     inputExample: { persona: "A curious traveler who records discoveries." }
   },
   map: {
     path: "world/map",
     schema: getMapSchema,
-    flags: [
-      characterFlag,
-      ["--location <id>", "Location whose resources to inspect"]
-    ],
-    help: "Read the map and available routes."
+    flags: [["--full", "Return the whole known map"]],
+    help: "Read locations and connections near your current location. Use --full for the whole known map."
+  },
+  look: {
+    path: "character/look",
+    schema: lookSchema,
+    flags: [["--people", "Include active other characters at this location"]],
+    help: "Read resources, enemies and facilities at your current location. Resource item_ids are passed to gather; enemy ids to fight. Use encounters for full enemy details."
+  },
+  route: {
+    path: "character/route",
+    schema: getRouteSchema,
+    flags: [["--to <id>", "Destination location ID", true]],
+    help: "Read the shortest-duration path to a destination while stationary. Pass each steps[].to to travel one step at a time."
   },
   activity: {
     path: "character/activity",
     schema: getActivitySchema,
-    flags: [characterFlag, ["-a, --activity <id>", "Accepted activity ID"]],
+    flags: [["-a, --activity <id>", "Accepted activity ID"]],
     help: "Read a running or completed activity when its outcome is unknown. Omit -a for the current or latest activity. If a CLI process is still running, collect its result instead of polling here."
   },
   travel: {
     path: "character/travel",
     schema: travelSchema,
-    flags: [
-      characterFlag,
-      ["-r, --route <id>", "Available route ID from map", true]
-    ],
-    help: "Travel one route while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID."
+    flags: [["--to <id>", "Adjacent destination location ID", true]],
+    help: "Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID."
   },
   gather: {
     path: "character/gather",
     schema: gatherSchema,
     flags: [
-      characterFlag,
-      ["--item <id>", "Resource item ID from map", true],
+      ["--item <id>", "Resource item ID from look", true],
       ["--count <number>", "Attempts, one at a time (default 1)"]
     ],
     help: "Gather the selected item at your current location while idle; wait for each completion. An ambush keeps that harvest but ends --count repetition. Finish the whole command before starting another main activity."
@@ -25495,14 +25697,13 @@ var commands = {
   recipes: {
     path: "character/recipes",
     schema: getRecipesSchema,
-    flags: [characterFlag, ["--location <id>", "Location to inspect"]],
+    flags: [["--location <id>", "Location to inspect"]],
     help: "Read recipes: inputs.quantity is required per lot; owned_quantity and missing_quantity describe current materials. Check unavailable_reasons, facility and fee."
   },
   craft: {
     path: "character/craft",
     schema: craftSchema,
     flags: [
-      characterFlag,
       ["--recipe <id>", "Recipe ID from recipes", true],
       ["--max-fee-per-lot <gold>", "Maximum fee for each lot", true],
       ["--count <number>", "Lots, one at a time (default 1)"]
@@ -25513,7 +25714,6 @@ var commands = {
     path: "character/activity/stop",
     schema: stopActivitySchema,
     flags: [
-      characterFlag,
       [
         "-a, --activity <id>",
         "Running activity ID from activity or hello",
@@ -25525,14 +25725,13 @@ var commands = {
   shop: {
     path: "shop",
     schema: getShopSchema,
-    flags: [characterFlag],
+    flags: [],
     help: "Read the current town equipment shop."
   },
   buy: {
     path: "character/shop-purchases",
     schema: buySchema,
     flags: [
-      characterFlag,
       ["--item <id>", "Item ID from shop", true],
       ["--max-payment <gold>", "Maximum payment", true],
       [
@@ -25546,7 +25745,6 @@ var commands = {
     path: "character/equipment/equip",
     schema: equipSchema,
     flags: [
-      characterFlag,
       [
         "--equipment <uuid>",
         "Equipment ID from purchase.equipment_id or inventory[].id",
@@ -25558,10 +25756,7 @@ var commands = {
   unequip: {
     path: "character/equipment/unequip",
     schema: equipSchema,
-    flags: [
-      characterFlag,
-      ["--equipment <uuid>", "Equipped inventory entry id", true]
-    ],
+    flags: [["--equipment <uuid>", "Equipped inventory entry id", true]],
     help: "Return equipment to carried inventory while idle."
   }
 };
@@ -25569,7 +25764,9 @@ var optionsSchema2 = external_exports.object({
   server: external_exports.string(),
   contentLanguage: external_exports.enum(["ja", "en"]).optional(),
   character: external_exports.string().optional(),
-  route: external_exports.string().optional(),
+  to: external_exports.string().optional(),
+  full: external_exports.boolean().optional(),
+  people: external_exports.boolean().optional(),
   activity: external_exports.string().optional(),
   input: external_exports.string().optional(),
   include: external_exports.string().optional(),
@@ -25624,7 +25821,9 @@ async function commandInput(values, definition) {
   const input2 = {};
   if (values.contentLanguage) input2.locale = values.contentLanguage;
   if (values.character) input2.character_id = values.character;
-  if (values.route) input2.route_id = values.route;
+  if (values.to) input2.to = values.to;
+  if (values.full) input2.full = true;
+  if (values.people) input2.people = true;
   if (values.activity) input2.activity_id = values.activity;
   if (values.include) input2.include = values.include.split(",");
   if (values.location) input2.location_id = values.location;
@@ -25662,39 +25861,129 @@ function validateInput(schema, input2) {
     });
   return parsed.data;
 }
+function helpOption(option, required2) {
+  return {
+    flags: option.flags,
+    description: option.description,
+    required: required2,
+    ...option.choices ? { choices: option.choices } : {}
+  };
+}
+function requiredUsage(flags) {
+  const value = flags.match(/<[^>]+>/)?.[0] ?? "";
+  const short = (flags.split(",")[0] ?? flags).trim();
+  if (value && short.includes(value)) return short;
+  return [short, value].filter(Boolean).join(" ");
+}
+function optionKey(flags) {
+  const long = flags.split(",").map((part) => part.trim()).find((part) => part.startsWith("--"));
+  const name = (long ?? flags).replace(/^--?/, "").split(" ")[0] ?? flags;
+  return name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+function commandUsage(name, definition) {
+  const parts = [`clawsaga ${name}`];
+  if (definition.requiresCharacter !== false) parts.push("-c <id>");
+  for (const [flags, , required2] of definition.flags) {
+    if (required2) parts.push(requiredUsage(flags));
+  }
+  parts.push("[options]");
+  return parts.join(" ");
+}
+function commandHelp(name, definition) {
+  return {
+    command: `clawsaga ${name}`,
+    description: definition.help,
+    usage: commandUsage(name, definition),
+    options: [
+      ...globalOptions.map(
+        (option) => helpOption(
+          option,
+          option.character === true && definition.requiresCharacter !== false
+        )
+      ),
+      ...definition.flags.map(
+        ([flags, description, required2, choices]) => helpOption({ flags, description, choices }, required2 ?? false)
+      )
+    ],
+    examples: [...definition.examples ?? []],
+    ...definition.inputExample ? { input_example: definition.inputExample } : {}
+  };
+}
+function programHelp() {
+  return {
+    command: "clawsaga",
+    description: "Play ClawSaga. Requires Node.js 22.12.0 or later.",
+    usage: "clawsaga <command> [options]",
+    options: globalOptions.map((option) => helpOption(option, false)),
+    examples: [
+      "clawsaga options -l en",
+      "clawsaga create -i character.json",
+      "clawsaga hello -c Aster"
+    ],
+    commands: [
+      ...Object.entries(commands).map(([name, definition]) => ({
+        name,
+        description: definition.help
+      })),
+      { name: "schema <command>", description: "Read a command input schema." },
+      {
+        name: "auth login",
+        description: "Authorize this CLI with the server."
+      }
+    ]
+  };
+}
+function authLoginHelp() {
+  return {
+    command: "clawsaga auth login",
+    description: "Request human approval using a device code.",
+    usage: "clawsaga auth login [options]",
+    options: globalOptions.map((option) => helpOption(option, false)),
+    examples: ["clawsaga auth login"]
+  };
+}
+function schemaHelp() {
+  return {
+    command: "clawsaga schema <command>",
+    description: "Read the JSON body schema for an input-file command, or the API request schema for a flag command.",
+    usage: "clawsaga schema <command>",
+    options: globalOptions.map((option) => helpOption(option, false)),
+    examples: ["clawsaga schema create", "clawsaga schema gather"]
+  };
+}
 async function execute(args, notify) {
-  let help = "";
-  let helpExample;
+  let helpTarget = "clawsaga";
   let helpCommand = "clawsaga --help";
   let executedCommand = "";
-  let schemaHelp;
+  let schemaHelpResult;
   let result;
   const program2 = new Command("clawsaga").description("Play ClawSaga. Requires Node.js 22.12.0 or later.").version(package_default.version).addOption(
     new Option("-s, --server <origin>", "ClawSaga origin").env("CLAWSAGA_SERVER").default(package_default.homepage)
   ).addOption(
     new Option(
       "-l, --content-language <language>",
-      "Game content language override"
+      "Game content language for this call"
     ).choices(["ja", "en"])
-  ).exitOverride().configureHelp({
+  ).addOption(new Option("-c, --character <id>", "Public character ID")).exitOverride().configureHelp({
     showGlobalOptions: true,
     optionTerm: (option) => `${option.flags}${option.mandatory ? " (required)" : ""}`
   }).configureOutput({
-    writeOut: (text2) => {
-      help += text2;
-    },
+    writeOut: () => void 0,
     writeErr: () => void 0,
     outputError: () => void 0
   });
   program2.action(() => program2.help());
-  program2.command("schema").description(
+  program2.on("--help", () => {
+    helpTarget = "clawsaga";
+  });
+  const schemaCommand = program2.command("schema").description(
     "Read the JSON body schema for an input-file command, or the API request schema for a flag command."
   ).argument("<command>", "Game command name").action((name) => {
     const definition = commands[name];
     if (!definition)
       throw new CliError("INVALID_ARGUMENTS", { fields: ["command"] });
     const hasBody = definition.flags.some(([flags]) => flags === jsonFlag[0]);
-    schemaHelp = {
+    schemaHelpResult = {
       input_kind: hasBody ? "json_body" : "api_request",
       input_schema: external_exports.toJSONSchema(
         hasBody ? bodySchema(definition) : definition.schema,
@@ -25702,10 +25991,16 @@ async function execute(args, notify) {
       )
     };
   });
+  schemaCommand.on("--help", () => {
+    helpTarget = "schema";
+  });
   const login = program2.command("auth").description("Manage authorization").command("login").description("Request human approval using a device code").configureOutput({
     outputError: () => {
       helpCommand = "clawsaga auth login --help";
     }
+  });
+  login.on("--help", () => {
+    helpTarget = "auth login";
   });
   login.action(async () => {
     result = await clientFor(
@@ -25718,14 +26013,9 @@ async function execute(args, notify) {
         helpCommand = `clawsaga ${name} --help`;
       }
     });
-    for (const [flags, description, required2] of definition.flags) {
-      if (required2) command.requiredOption(flags, description);
-      else command.option(flags, description);
+    for (const [flags, description] of definition.flags) {
+      command.option(flags, description);
     }
-    const requiredUsage = command.options.filter((option) => option.mandatory).map(
-      (option) => `${option.short ?? option.long} ${option.flags.match(/<[^>]+>/)?.[0] ?? ""}`.trim()
-    );
-    command.usage([...requiredUsage, "[options]"].join(" "));
     if (definition.inputExample)
       command.addHelpText(
         "after",
@@ -25733,12 +26023,25 @@ async function execute(args, notify) {
 JSON body: use input_example below with your own content. Full schema: clawsaga schema ${name}.`
       );
     command.on("--help", () => {
-      helpExample = definition.inputExample;
+      helpTarget = `clawsaga ${name}`;
     });
     command.action(async () => {
       executedCommand = name;
       helpCommand = `clawsaga ${name} --help`;
       const values = optionsSchema2.parse(command.optsWithGlobals());
+      if (definition.requiresCharacter !== false && !values.character)
+        throw new CliError("INVALID_ARGUMENTS", {
+          fields: ["character"],
+          message: "Required option '-c, --character <id>' was not provided."
+        });
+      const provided = command.opts();
+      for (const [flags, , required2] of definition.flags) {
+        if (!required2 || provided[optionKey(flags)] !== void 0) continue;
+        throw new CliError("INVALID_ARGUMENTS", {
+          fields: [optionKey(flags)],
+          message: `Required option '${flags}' was not provided.`
+        });
+      }
       if (name === "buy" && !values.request) values.request = randomUUID2();
       const inputValues = name === "characters" || name === "options" ? {
         ...values,
@@ -25797,51 +26100,67 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
     if (error61.code === "commander.version")
       return { ok: true, version: package_default.version };
     if (error61.code === "commander.helpDisplayed" || error61.code === "commander.help" && error61.exitCode === 0)
-      return {
-        ok: true,
-        help,
-        ...helpExample ? { input_example: helpExample } : {}
-      };
+      return { ok: true, help: structuredHelp(helpTarget) };
     throw new CliError("INVALID_ARGUMENTS", {
       message: error61.message,
       help_command: helpCommand
     });
   }
-  if (schemaHelp) return { ok: true, ...schemaHelp };
+  if (schemaHelpResult) return { ok: true, ...schemaHelpResult };
   if (!result) throw new CliError("INVALID_COMMAND");
   return "schema_version" in result ? withCommandHints(executedCommand, result) : result;
+}
+function structuredHelp(target5) {
+  if (target5 === "clawsaga") return programHelp();
+  if (target5 === "auth login") return authLoginHelp();
+  if (target5 === "schema") return schemaHelp();
+  const name = target5.startsWith("clawsaga ") ? target5.slice("clawsaga ".length) : target5;
+  const definition = commands[name];
+  return definition ? commandHelp(name, definition) : programHelp();
 }
 async function repeatActivity(client, path2, input2, values, count) {
   let confirmed = 0;
   const produced = {};
-  const summary = () => ({
+  const summary = (stoppedReason) => ({
     requested_count: count,
     completed_count: confirmed,
-    produced: { ...produced }
+    produced: { ...produced },
+    stopped_reason: stoppedReason
+  });
+  const incomplete = (response, stoppedReason) => ({
+    ...response,
+    ok: false,
+    error: {
+      message: "The repetition ended before all requested attempts completed."
+    },
+    repetition: summary(stoppedReason)
   });
   while (confirmed < count) {
     try {
       const started = await client.invoke(path2, input2);
-      if (!started.ok) return { ...started, repetition: summary() };
+      if (!started.ok)
+        return { ...started, repetition: summary("start_rejected") };
       const completed = await waitForActivity(client, values, started);
-      if (!completed.ok) return { ...completed, repetition: summary() };
-      const activity = completed.data.activity;
-      if (!activity || activity.kind !== "gather" && activity.kind !== "craft" || activity.status !== "ENDED")
-        throw new CliError("UPDATE_REQUIRED", {
+      if (!completed.ok)
+        return { ...completed, repetition: summary("activity_failed") };
+      const result = completed.data.last_result;
+      if (!result || result.kind !== "gather" && result.kind !== "craft" || result.status !== "ENDED")
+        throw new CliError("INVALID_RESPONSE", {
           reason: "unexpected_production_result"
         });
-      if (activity.end_reason !== "COMPLETED")
-        return { ...completed, ok: false, repetition: summary() };
+      if (result.end_reason !== "COMPLETED")
+        return incomplete(completed, "activity_stopped");
       confirmed += 1;
-      produced[activity.output.item_id] = (produced[activity.output.item_id] ?? 0) + activity.produced_quantity;
-      if (activity.kind === "gather" && activity.ambush)
-        return { ...completed, repetition: summary() };
-      if (confirmed === count) return { ...completed, repetition: summary() };
+      produced[result.output.item_id] = (produced[result.output.item_id] ?? 0) + result.output.quantity;
+      if (result.kind === "gather" && result.ambush)
+        return confirmed === count ? { ...completed, repetition: summary("ambush") } : incomplete(completed, "ambush");
+      if (confirmed === count)
+        return { ...completed, repetition: summary("count_reached") };
     } catch (error61) {
       if (error61 instanceof CliError)
         throw new CliError(error61.code, {
           ...error61.detail,
-          repetition: summary()
+          repetition: summary("unknown")
         });
       throw error61;
     }
@@ -25855,11 +26174,11 @@ async function waitForActivity(client, values, initial) {
   let result = initial;
   const activityId = result.data.activity?.activity_id;
   if (!activityId)
-    throw new CliError("UPDATE_REQUIRED", { reason: "missing_activity_id" });
-  while (result.data.activity?.status === "RUNNING") {
+    throw new CliError("INVALID_RESPONSE", { reason: "missing_activity_id" });
+  while (result.data.activity?.activity_id === activityId) {
     const seconds = result.next_poll_after_seconds;
     if (!seconds)
-      throw new CliError("UPDATE_REQUIRED", {
+      throw new CliError("INVALID_RESPONSE", {
         reason: "missing_poll_interval",
         activity_id: activityId
       });
@@ -25874,17 +26193,19 @@ async function waitForActivity(client, values, initial) {
       if (error61 instanceof CliError)
         throw new CliError(error61.code, {
           ...error61.detail,
-          activity_id: activityId
+          activity_id: activityId,
+          outcome: "unknown"
         });
       throw error61;
     }
     if (!result.ok) return result;
-    if (result.data.activity?.activity_id !== activityId)
-      throw new CliError("UPDATE_REQUIRED", {
-        reason: "activity_id_mismatch",
-        activity_id: activityId
-      });
   }
+  const lastResult = result.data.last_result;
+  if (!lastResult || lastResult.activity_id !== activityId)
+    throw new CliError("INVALID_RESPONSE", {
+      reason: "activity_id_mismatch",
+      activity_id: activityId
+    });
   return result;
 }
 
@@ -25899,10 +26220,7 @@ try {
 `);
   process.exitCode = result.ok ? 0 : 1;
 } catch (error61) {
-  const failure = error61 instanceof CliError ? error61 : new CliError("CLIENT_ERROR");
-  process.stdout.write(
-    `${JSON.stringify({ ok: false, error: { code: failure.code, ...failure.detail } })}
-`
-  );
+  process.stdout.write(`${JSON.stringify(cliFailure(error61))}
+`);
   process.exitCode = 1;
 }

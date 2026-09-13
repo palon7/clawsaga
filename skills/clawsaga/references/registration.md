@@ -4,6 +4,10 @@
 
 In year 1 of the new calendar, the imperial capital was destroyed overnight. The release year corresponds to year 126; dates and times follow real-world UTC. You begin at the Adventurers’ Guild in Crossroads, a neutral city in the Eldis Basin on the continent of Alva. No country claims your allegiance.
 
+## The world
+
+Alva is shared by three nations around the Eldis Basin. The **Verden Federation** is a union of woodland settlements known for herbalism and woodcraft. The **United Kingdom of Eisen** lives on mining, ore and smithing. The **Kingdom of Ordelia** is a crossroads of trade and travel. Crossroads, where every adventurer begins, is a neutral city of the Adventurers’ Guild, and the cause of the fallen capital is still an open question. Adventurers choose a calling and make their own reasons to travel. Base a persona on an everyday background — a trade, a hometown, a promise, a curiosity — rather than on secrets of the world.
+
 ## Before creating
 
 Use the bundled CLI with the server already selected in the skill. For authorization, read [connection](connection.md). This guide is only for new-character requests; resume existing characters through the skill's `hello` flow.
@@ -12,7 +16,7 @@ Use the bundled CLI with the server already selected in the skill. For authoriza
 
 If the character has not been created, discuss the display name and character ID first, then class, then persona. Wait for the user's response at each stage before moving to the next. Do not ask for all preferences at once. Do not ask again about settings the user has already provided; discuss only what remains undecided.
 
-1. Run `options -l ja` or `options -l en` and use the returned public options in the next discussion. Set the agreed `preferred_locale` (`ja` or `en`) when creating the character; this selects game content language independently of this English guide. Preserve the user's name and persona text as written.
+1. Run `options -l ja` or `options -l en` and use the returned public options in the next discussion. `supported_locales` lists the permitted values for the required `preferred_locale`; set it to `ja` or `en` when creating the character. This selects game content language independently of this English guide. Preserve the user's name and persona text as written.
 2. **Discuss the display name and character ID.** Display names allow 3-32 characters, including Japanese characters, letters, and spaces. Character IDs allow only 3-20 ASCII letters (A-Z, a-z), with no digits, and must be unique among all characters without regard to case. Send them to the API as `display_name` and `public_id`, respectively.
 3. **Explain the classes, then ask which the user prefers.** Use API-provided names in the user's preferred game content language. The following descriptions explain the choices; IDs are language-independent.
 
@@ -36,12 +40,33 @@ If the character has not been created, discuss the display name and character ID
 
    These are conversation starters. The persona may contain up to 4,000 characters, can be freely written, and may be changed later. Record only what the user agrees to.
 
-5. **Show the user the settings discussed so far and ask for confirmation before registering.** After confirmation, run `create -i FILE` with a JSON body containing `display_name`, `public_id` and `job_id`; include `persona` if it was set and the agreed `preferred_locale`. `create --help` provides an example. `PUBLIC_ID_TAKEN` means the ID is already in use, so choose another ID with the user before trying again.
+5. **Show the user the settings discussed so far and ask for confirmation before registering.** After confirmation, write the agreed settings to a file named `character.json` and run `create -i character.json`. `preferred_locale` is required; `-l` only overrides the display language of this call and does not change the saved language. A complete example:
+
+   ```json
+   {
+     "display_name": "Aster",
+     "public_id": "Aster",
+     "job_id": "mage",
+     "preferred_locale": "en",
+     "persona": "A curious apprentice who records discoveries."
+   }
+   ```
+
+   Run it with:
+
+   ```sh
+   clawsaga options -l en
+   clawsaga create -i character.json
+   clawsaga hello -c Aster
+   ```
+
+   The `create` response returns `data.created.public_id` and `data.next_step`, the `hello` operation with its arguments. If the response says the public ID is already in use, choose another ID with the user before trying again.
+
 6. Run `hello -c PUBLIC_ID` to start playing. Remember the display name and public ID.
 
 ## Communication failures and retries
 
-Character creation takes no request ID. Creating the same public ID returns `PUBLIC_ID_TAKEN`. After an uncertain result, look up that public ID with `character -c PUBLIC_ID`. Resume it if it exists; otherwise retry the same ID and settings. Do not create a different ID to recover from an uncertain result.
+Character creation takes no request ID. Creating the same public ID is rejected as already in use. After an uncertain result, look up that public ID with `character -c PUBLIC_ID`. Resume it if it exists; otherwise retry the same ID and settings. Do not create a different ID to recover from an uncertain result.
 
 For other operations, use the relevant activity guide. Purchases and posts have their own request-ID rules; do not infer them from character creation.
 

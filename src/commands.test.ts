@@ -84,12 +84,26 @@ it('keeps English help available without authorization and separates content lan
   vi.stubEnv('CLAWSAGA_SERVER', undefined);
   expect(await execute([], vi.fn())).toMatchObject({
     ok: true,
-    help: expect.stringContaining('Usage: clawsaga'),
+    help: {
+      command: 'clawsaga',
+      commands: expect.arrayContaining([
+        expect.objectContaining({ name: 'hello' }),
+      ]),
+    },
   });
   const help = await execute(['hello', '--help'], vi.fn());
   expect(help).toMatchObject({
     ok: true,
-    help: expect.stringContaining('Usage: clawsaga hello -c <id> [options]'),
+    help: {
+      command: 'clawsaga hello',
+      usage: 'clawsaga hello -c <id> [options]',
+      options: expect.arrayContaining([
+        expect.objectContaining({
+          flags: '-c, --character <id>',
+          required: true,
+        }),
+      ]),
+    },
   });
   expect(help).not.toHaveProperty('input_schema');
   expect(await execute(['schema', 'hello'], vi.fn())).toMatchObject({
@@ -106,6 +120,10 @@ it('keeps English help available without authorization and separates content lan
   expect(invoke).toHaveBeenLastCalledWith('character/hello', {
     character_id: 'Traveler',
   });
+  await execute(['-c', 'Traveler', 'hello'], vi.fn());
+  expect(invoke).toHaveBeenLastCalledWith('character/hello', {
+    character_id: 'Traveler',
+  });
   await execute(
     ['hello', '-s', 'https://example.com', '-c', 'Traveler', '-l', 'ja'],
     vi.fn(),
@@ -114,6 +132,94 @@ it('keeps English help available without authorization and separates content lan
     character_id: 'Traveler',
     locale: 'ja',
   });
+});
+
+it('generates structured help examples from the command definitions without authorization', async () => {
+  const createHelp = (await execute(
+    ['create', '--help'],
+    vi.fn(),
+  )) as unknown as {
+    help: {
+      usage: string;
+      examples: string[];
+      input_example: Record<string, unknown>;
+      options: { flags: string; required: boolean; choices?: string[] }[];
+    };
+  };
+  expect(createHelp.help.usage).toBe('clawsaga create -i <file> [options]');
+  expect(createHelp.help.examples).toContain(
+    'clawsaga create -i character.json',
+  );
+  expect(createHelp.help.input_example).toMatchObject({
+    preferred_locale: 'en',
+  });
+  expect(createHelp.help.options).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        flags: '-c, --character <id>',
+        required: false,
+      }),
+      expect.objectContaining({
+        flags: '-l, --content-language <language>',
+        choices: ['ja', 'en'],
+      }),
+    ]),
+  );
+  const schema = await execute(['schema', 'create'], vi.fn());
+  expect(schema).toMatchObject({
+    input_kind: 'json_body',
+    input_schema: { required: expect.arrayContaining(['preferred_locale']) },
+  });
+  const helloHelp = (await execute(
+    ['hello', '--help'],
+    vi.fn(),
+  )) as unknown as {
+    help: { examples: string[] };
+  };
+  expect(helloHelp.help.examples).toContain('clawsaga hello -c Aster');
+  const routeHelp = (await execute(
+    ['route', '--help'],
+    vi.fn(),
+  )) as unknown as { help: { usage: string } };
+  expect(routeHelp.help.usage).toBe(
+    'clawsaga route -c <id> --to <id> [options]',
+  );
+});
+
+it('accepts comma-separated include sections while help lists each choice', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  await execute(
+    ['character', '-c', 'Aster', '--include', 'profile,inventory'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith('character', {
+    character_id: 'Aster',
+    include: ['profile', 'inventory'],
+  });
+  const help = (await execute(['character', '--help'], vi.fn())) as unknown as {
+    help: { options: { flags: string; choices?: string[] }[] };
+  };
+  expect(help.help.options).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        flags: '--include <sections>',
+        choices: ['profile', 'inventory'],
+      }),
+    ]),
+  );
+});
+
+it('rejects a command option value outside its request schema enum', async () => {
+  const invoke = vi.spyOn(GameClient.prototype, 'invoke');
+  await expect(
+    execute(
+      ['fight', '-c', 'Aster', '--enemy', 'wolf', '--preset', 'reckless'],
+      vi.fn(),
+    ),
+  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
+  expect(invoke).not.toHaveBeenCalled();
 });
 
 it('returns the parser reason and command-specific help without sending a request', async () => {
@@ -166,7 +272,7 @@ it('names the missing required option and points to concise help', async () => {
     code: 'INVALID_ARGUMENTS',
     detail: {
       message: expect.stringContaining(
-        "required option '-c, --character <id>'",
+        "Required option '-c, --character <id>'",
       ),
       help_command: 'clawsaga report --help',
     },
@@ -190,10 +296,10 @@ it('validates JSON examples and keeps character and locale outside the body', as
     'plan-set',
   ]) {
     const help = await execute([name, '--help'], vi.fn());
-    expect(help).toHaveProperty('input_example');
-    vi.mocked(readFile).mockResolvedValue(
-      JSON.stringify((help as { input_example: unknown }).input_example),
-    );
+    const inputExample = (help as { help: { input_example: unknown } }).help
+      .input_example;
+    expect(inputExample).toBeDefined();
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(inputExample));
     const args = [name, '-i', 'body.json', '-l', 'ja'];
     if (name !== 'create') args.push('-c', 'Traveler');
     await execute(args, vi.fn());
@@ -254,24 +360,20 @@ it('rejects invalid Unicode in journal searches before making a request', async 
 
 const initial: AgentGameResponse = {
   ok: true,
-  schema_version: '2.0',
+  schema_version: '3.0',
   locale: 'en',
   server_time: '2026-09-09T00:00:00.000Z',
-  user_content: [],
   next_poll_after_seconds: 5,
   data: {
     activity: {
       kind: 'travel',
       activity_id: '00000000-0000-4000-8000-000000000001',
-      route_id: 'dolgan_to_openpit',
       from: { id: 'dolgan', name: 'Dolgan', kind: 'town' },
       to: { id: 'openpit', name: 'Open pit', kind: 'field' },
       started_at: '2026-09-09T00:00:00.000Z',
       arrives_at: '2026-09-09T00:00:15.000Z',
       duration_seconds: 15,
       status: 'RUNNING',
-      ended_at: null,
-      end_reason: null,
     },
   },
 };
@@ -283,12 +385,14 @@ it('waits the server interval and queries only the accepted activity until compl
   const completed: AgentGameResponse = {
     ...initial,
     data: {
-      activity: {
-        ...initial.data.activity!,
+      activity: null,
+      last_result: {
+        kind: 'travel',
+        activity_id: initial.data.activity.activity_id,
         status: 'ENDED',
-        ended_at: '2026-09-09T00:00:15.000Z',
         end_reason: 'COMPLETED',
-        characters: [],
+        ended_at: '2026-09-09T00:00:15.000Z',
+        to: initial.data.activity.to,
       },
     },
   };
@@ -299,7 +403,7 @@ it('waits the server interval and queries only the accepted activity until compl
     .mockResolvedValueOnce(completed);
   const notify = vi.fn();
   const pending = execute(
-    ['travel', '-c', 'Traveler', '-r', 'dolgan_to_openpit', '-l', 'en'],
+    ['travel', '-c', 'Traveler', '--to', 'openpit', '-l', 'en'],
     notify,
   );
   await vi.advanceTimersByTimeAsync(4999);
@@ -315,6 +419,37 @@ it('waits the server interval and queries only the accepted activity until compl
     character_id: 'Traveler',
     activity_id: initial.data.activity!.activity_id,
     locale: 'en',
+  });
+});
+
+it('sends map scope, look people and route or travel destinations', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  await execute(['map', '-c', 'Traveler', '--full'], vi.fn());
+  expect(invoke).toHaveBeenLastCalledWith('world/map', {
+    character_id: 'Traveler',
+    full: true,
+  });
+  await execute(['look', '-c', 'Traveler', '--people'], vi.fn());
+  expect(invoke).toHaveBeenLastCalledWith('character/look', {
+    character_id: 'Traveler',
+    people: true,
+  });
+  await execute(['route', '-c', 'Traveler', '--to', 'openpit'], vi.fn());
+  expect(invoke).toHaveBeenLastCalledWith('character/route', {
+    character_id: 'Traveler',
+    to: 'openpit',
+  });
+  invoke.mockResolvedValueOnce({
+    ...initial,
+    ok: false,
+    error: { message: 'That destination is not adjacent.' },
+  });
+  await execute(['travel', '-c', 'Traveler', '--to', 'mossway'], vi.fn());
+  expect(invoke).toHaveBeenLastCalledWith('character/travel', {
+    character_id: 'Traveler',
+    to: 'mossway',
   });
 });
 
@@ -351,7 +486,7 @@ it('reports wait contract failures without resubmitting accepted activities', as
       },
     ),
   ).rejects.toMatchObject({
-    code: 'UPDATE_REQUIRED',
+    code: 'INVALID_RESPONSE',
     detail: {
       reason: 'missing_poll_interval',
       activity_id: initial.data.activity!.activity_id,
@@ -363,7 +498,7 @@ it('reports wait contract failures without resubmitting accepted activities', as
   const mismatched = expect(
     waitForActivity(client, { character: 'Traveler' }, initial),
   ).rejects.toMatchObject({
-    code: 'UPDATE_REQUIRED',
+    code: 'INVALID_RESPONSE',
     detail: {
       reason: 'activity_id_mismatch',
       activity_id: initial.data.activity!.activity_id,
@@ -374,7 +509,7 @@ it('reports wait contract failures without resubmitting accepted activities', as
   expect(invoke).toHaveBeenCalledTimes(1);
 
   invoke.mockClear().mockRejectedValue(
-    new CliError('UPDATE_REQUIRED', {
+    new CliError('INVALID_RESPONSE', {
       reason: 'invalid_response',
       operation: 'character/activity',
       http_status: 200,
@@ -384,7 +519,7 @@ it('reports wait contract failures without resubmitting accepted activities', as
   const invalid = expect(
     waitForActivity(client, { character: 'Traveler' }, initial),
   ).rejects.toMatchObject({
-    code: 'UPDATE_REQUIRED',
+    code: 'INVALID_RESPONSE',
     detail: {
       reason: 'invalid_response',
       operation: 'character/activity',
@@ -407,7 +542,6 @@ it('waits for an accepted fight and returns a cancellation without starting anot
       activity: {
         kind: 'combat',
         activity_id: '00000000-0000-4000-8000-000000000002',
-        location: { id: 'selene', name: 'Selene', kind: 'town' },
         enemy_id: 'wolf',
         enemy_name: 'Wolf',
         practice: true,
@@ -415,32 +549,24 @@ it('waits for an accepted fight and returns a cancellation without starting anot
         time_limit_at: '2026-09-09T00:08:00.000Z',
         next_update_at: '2026-09-09T00:00:10.000Z',
         duration_seconds: 480,
-        simulation_tick: 0,
-        next_action: { kind: 'attack' },
         status: 'RUNNING',
-        end_reason: null,
-        ended_at: null,
         hp: 120,
         max_hp: 120,
         mp: 100,
         enemy_hp: 120,
         enemy_max_hp: 120,
-        enemy_windup_ticks: 0,
         retreat_ticks: 0,
         retreat_requested_tick: null,
-        potions_remaining: 3,
-        statuses: [],
       },
     },
   };
   const cancelled: AgentGameResponse = {
     ...initial,
     data: {
-      activity: {
+      activity: null,
+      last_result: {
         kind: 'combat',
         activity_id: battle.data.activity!.activity_id,
-        started_at: initial.server_time,
-        duration_seconds: 480,
         status: 'ENDED',
         end_reason: 'CANCELLED',
         ended_at: '2026-09-09T00:00:10.000Z',

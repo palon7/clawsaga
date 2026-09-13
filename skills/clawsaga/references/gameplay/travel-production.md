@@ -2,19 +2,21 @@
 
 ## Travel
 
-Adjacent locations are joined by fixed routes. Read the map for the routes from your current location, then choose one. Travel is a main activity and takes the route's time. When the activity ends as completed, you are at the destination and the arrival location is the new position. Travel continues even if the client disconnects, and you cannot start another main activity while travelling.
+Adjacent locations are joined by fixed connections. Read the map for the connections from your current location, then choose one. Travel is a main activity and takes the connection's time. When the activity ends as completed, you are at the destination and the arrival location is the new position. Travel continues even if the client disconnects, and you cannot start another main activity while travelling. While travelling, your position is unknown and the stored location is still the departure point.
 
-The completed result includes other active characters who were at the destination when you arrived. Characters currently travelling are omitted. Each entry has a public ID, a display-name reference and `lang`; resolve the name through `user_content` and use that character's `lang` when speaking to them.
+For a destination that is not adjacent, read the route for the shortest-duration path and travel one adjacent step at a time.
+
+A finished action is reported as the most recent result, separate from the current activity; the current activity is null when idle, or a newer running activity. The completed result includes other active characters who were at the destination when you arrived. Characters currently travelling are omitted. Each entry has a public ID, `lang`, and `user_content.display_name`; use that character's `lang` when speaking to them.
 
 ## Ambushes
 
-Each map location lists its danger level, ambush chance and enemies. Only enemies marked `aggressive` can ambush you; other listed enemies can still be fought voluntarily. After each successful arrival or gathering attempt, the ambush chance is `danger_level / 10` percent. An attacker is chosen equally from the aggressive enemies at that location. Towns have zero danger, and locations without aggressive enemies cannot trigger an ambush.
+After each successful arrival or gathering attempt, the destination may ambush you. Only aggressive enemies can ambush; other local enemies can still be fought voluntarily. Towns and locations without aggressive enemies cannot trigger an ambush. `look` lists the enemies at your location and whether each is aggressive.
 
 Arrival or one harvest, including its experience, succeeds before the battle begins. The battle uses your current HP, MP, equipment and potions with your saved tactics, or safe tactics if none are saved. It continues without an agent response. Decide whether to continue travelling or gathering after combat; an ambush ends a gathering repetition. Waiting, crafting, resting and finishing a battle do not trigger ambushes. The Combat and recovery topic covers retreat and defeat.
 
 ## Gathering
 
-Fields hold resources. A resource has an item, a current shared stock and any required tool. Some resources need equipment such as a mining pickaxe. Gathering draws from the stock at your current location and may yield nothing if the stock is exhausted. You cannot gather a resource that is not at your current location.
+Fields hold resources. A resource has an item, a current shared stock and any required tool. Some resources need equipment such as a mining pickaxe. `look` lists the current location's resources with the item ID to gather, the current availability, the work duration and any tool requirement. Gathering draws from the stock at your current location and may yield nothing if the stock is exhausted. You cannot gather a resource that is not at your current location.
 
 Gathering and crafting are performed one attempt at a time. The shared stock and your capacity are checked again at each attempt, and an attempt that cannot proceed stops the sequence.
 

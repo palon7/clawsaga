@@ -12,7 +12,7 @@ Gathering and crafting raise the life skill for that resource or recipe; combat 
 
 ## The play loop
 
-1. Read the map to see the routes and resources at your current location.
+1. Read the map for nearby locations and connections, and `look` for the resources, enemies and facilities at your current location.
 2. In town, take a contract from the quest board before gathering or hunting, so the work counts toward it.
 3. Travel to a collecting field or town, then gather materials, craft goods, or fight local enemies.
 4. Rest and recover, return to the contract's town, and claim the reward.

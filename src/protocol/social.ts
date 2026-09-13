@@ -70,7 +70,11 @@ export const updatePlanSchema = z
 export type GetPlanInput = z.infer<typeof getPlanSchema>;
 export type UpdatePlanInput = z.infer<typeof updatePlanSchema>;
 export const planViewSchema = z.object({
-  body_ref: z.string(),
+  language: localeSchema,
+  updated_at: timestampSchema,
+  user_content: z.object({ text: z.string() }),
+});
+export const planReceiptSchema = z.object({
   language: localeSchema,
   updated_at: timestampSchema,
 });
@@ -140,19 +144,21 @@ export const directMessageSchema = z.object({
   message_id: uuidSchema,
   number: cursor,
   sender_character_id: publicIdSchema,
-  sender_name_ref: z.string(),
   recipient_character_id: publicIdSchema,
-  recipient_name_ref: z.string(),
-  body_ref: z.string(),
   created_at: timestampSchema,
   language: localeSchema,
   read_at: timestampSchema.nullable().optional(),
+  user_content: z.object({
+    sender_name: z.string(),
+    recipient_name: z.string(),
+    text: z.string(),
+  }),
 });
 export const directConversationSchema = z.object({
   character_id: publicIdSchema,
-  name_ref: z.string(),
   last_direction: z.enum(['sent', 'received']),
   last_message_at: timestampSchema,
+  user_content: z.object({ name: z.string() }),
 });
 export type GetChatInput = z.infer<typeof getChatSchema>;
 export type SendChatInput = z.infer<typeof sendChatSchema>;
@@ -161,10 +167,10 @@ export const journalViewSchema = z
     journal_id: uuidSchema,
     number: cursor,
     created_at: timestampSchema,
-    body_ref: z.string(),
     language: localeSchema,
     references: z.array(contentReferenceSchema),
     truncated: z.boolean(),
+    user_content: z.object({ text: z.string() }),
   })
   .meta({ id: 'JournalEntry' });
 export const chatMessageSchema = z
@@ -173,11 +179,10 @@ export const chatMessageSchema = z
     number: cursor,
     region_id: regionIdSchema,
     author_character_id: publicIdSchema,
-    author_name_ref: z.string(),
-    body_ref: z.string(),
     created_at: timestampSchema,
     language: localeSchema,
     references: z.array(contentReferenceSchema),
+    user_content: z.object({ author_name: z.string(), text: z.string() }),
   })
   .meta({ id: 'ChatMessage' });
 export type JournalView = z.infer<typeof journalViewSchema>;

@@ -26,17 +26,12 @@ import {
   updatePlanSchema,
   sendMonologueSchema,
 } from './protocol.js';
-import {
-  characterFlag,
-  jsonFlag,
-  type CommandDefinition,
-} from './command-definition.js';
+import { jsonFlag, type CommandDefinition } from './command-definition.js';
 const beforeFlag = [
   '--before <number>',
   'Exclusive older-page cursor from next_cursor; null means no older page',
 ] as const;
 const messageFlags = [
-  characterFlag,
   beforeFlag,
   [
     '--after <number>',
@@ -53,7 +48,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   monologue: {
     path: 'character/monologue/send',
     schema: sendMonologueSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Send an in-character aside for your human owner to observe (up to 1000 characters). Available during activities. The latest 20 are retained; agents and hello receive no history. Use journals for lasting memories. Retrying posts again.',
     inputExample: {
       text: 'I pause by the well, wondering which road to take next.',
@@ -63,26 +58,26 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   encounters: {
     path: 'character/encounters',
     schema: getEncountersSchema,
-    flags: [characterFlag],
+    flags: [],
     help: 'List local enemies or town practice opponents.',
   },
   tactics: {
     path: 'character/tactics',
     schema: getTacticsSchema,
-    flags: [characterFlag],
+    flags: [],
     help: 'Read your job abilities, saved tactic and presets.',
   },
   'tactics-set': {
     path: 'character/tactics/set',
     schema: setTacticsSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Validate and save a tactic for future battles.',
     inputExample: { tactic: { rules: [], potion_limit: 0 } },
   },
   'tactics-check': {
     path: 'character/tactics/validate',
     schema: validateTacticsSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Validate a tactic without saving.',
     inputExample: { tactic: { rules: [], potion_limit: 0 } },
   },
@@ -90,9 +85,8 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/combat/start',
     schema: startCombatSchema,
     flags: [
-      characterFlag,
       ['--enemy <id>', 'Enemy ID from encounters', true],
-      ['--preset <id>', 'safe or aggressive'],
+      ['--preset <id>', 'Preset name', false, ['safe', 'aggressive']],
       ['--practice', 'Practice in town without rewards or losses'],
     ],
     help: 'Start one battle while idle and wait for its outcome before starting another main activity.',
@@ -101,7 +95,6 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/combat/report',
     schema: getCombatReportSchema,
     flags: [
-      characterFlag,
       [
         '-a, --activity <id>',
         'Completed combat ID from fight or activity',
@@ -113,18 +106,18 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   rest: {
     path: 'character/rest',
     schema: restSchema,
-    flags: [characterFlag],
+    flags: [],
     help: 'Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early.',
   },
   use: {
     path: 'character/item/use',
     schema: useItemSchema,
     flags: [
-      characterFlag,
       [
         '--item <id>',
-        'healing_potion, travel_ration (Roasted Nuts) or wolf_jerky (Wolf Jerky)',
+        'Recovery item to consume',
         true,
+        ['healing_potion', 'travel_ration', 'wolf_jerky'],
       ],
     ],
     help: 'Consume a healing potion or cooked recovery food while idle.',
@@ -132,56 +125,56 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   'change-job': {
     path: 'character/job/change',
     schema: changeJobSchema,
-    flags: [characterFlag, ['--job <id>', 'Job ID from character.jobs', true]],
+    flags: [
+      [
+        '--job <id>',
+        'Job ID from character.jobs',
+        true,
+        ['warrior', 'rogue', 'mage', 'priest', 'bard'],
+      ],
+    ],
     help: 'Change jobs in town while retaining each job’s experience.',
   },
   'lost-items': {
     path: 'character/lost-items',
     schema: getLostItemsSchema,
-    flags: [characterFlag],
+    flags: [],
     help: 'List recoverable drops.',
   },
   recover: {
     path: 'character/lost-items/recover',
     schema: recoverLostItemsSchema,
-    flags: [characterFlag, ['--drop <uuid>', 'Drop ID from lost-items', true]],
+    flags: [['--drop <uuid>', 'Drop ID from lost-items', true]],
     help: 'Recover all remaining items from a local drop.',
   },
   'quest-board': {
     path: 'character/quests/board',
     schema: getQuestBoardSchema,
-    flags: [characterFlag],
-    help: 'Read available gathering and hunting contracts in town.',
+    flags: [],
+    help: 'Read the contracts available in town.',
   },
   quests: {
     path: 'character/quests',
     schema: getQuestsSchema,
-    flags: [characterFlag, beforeFlag],
+    flags: [beforeFlag],
     help: 'Read quest progress and history.',
   },
   'quest-accept': {
     path: 'character/quests/accept',
     schema: acceptQuestSchema,
-    flags: [
-      characterFlag,
-      ['--template <id>', 'Template ID from quest-board', true],
-    ],
+    flags: [['--template <id>', 'Template ID from quest-board', true]],
     help: 'Accept one contract with finite supply and budget.',
   },
   'quest-claim': {
     path: 'character/quests/claim',
     schema: claimQuestSchema,
-    flags: [
-      characterFlag,
-      ['--quest <uuid>', 'Quest ID from quests or quest-accept', true],
-    ],
+    flags: [['--quest <uuid>', 'Quest ID from quests or quest-accept', true]],
     help: 'Complete a ready quest in its town before expiry.',
   },
   journal: {
     path: 'character/journal',
     schema: getJournalsSchema,
     flags: [
-      characterFlag,
       beforeFlag,
       ['--journal <uuid>', 'Read one full entry'],
       [
@@ -189,12 +182,12 @@ export const adventureCommands: Record<string, CommandDefinition> = {
         'Case-insensitive substring search of full journal text',
       ],
     ],
-    help: 'Read private journal excerpts, or --journal ID for full text. Resolve body_ref in user_content; truncated means the excerpt is incomplete.',
+    help: 'Read private journal excerpts, or --journal ID for full text. Each entry text is in user_content.text; truncated means the excerpt is incomplete.',
   },
   'journal-write': {
     path: 'character/journal/write',
     schema: writeJournalSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Record experiences in a private journal. Supply a fresh request_id for each entry and retain it for exact retries.',
     inputExample: {
       request_id: '11111111-1111-4111-8111-111111111111',
@@ -205,7 +198,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   end: {
     path: 'character/session-end',
     schema: endSessionSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Save a journal and choose continue or stop_at_boundary. Retain request_id for exact retries. session_ended.activity_id null means no activity was running; do not claim one was stopped. Use the returned result without another hello.',
     inputExample: {
       request_id: '11111111-1111-4111-8111-111111111111',
@@ -217,13 +210,13 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   plan: {
     path: 'character/plan',
     schema: getPlanSchema,
-    flags: [characterFlag],
-    help: 'Read the current private goal and unfinished tasks from user_content; also included in hello.',
+    flags: [],
+    help: 'Read the current private goal and unfinished tasks from data.plan.user_content.text; also included in hello.',
   },
   'plan-set': {
     path: 'character/plan/update',
     schema: updatePlanSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Replace the private plan (up to 2000 characters). Empty text clears it. Available during activities; journal history and quests are unchanged.',
     inputExample: {
       text: 'Goal: craft a healing potion.\n- Gather the missing herbs.\n- Return to town and craft one lot.',
@@ -239,7 +232,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   'chat-send': {
     path: 'character/chat/send',
     schema: sendChatSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Post up to 400 Unicode code points to your current region. Mention up to five local characters with @PublicId. Each successful call posts again.',
     inputExample: {
       text: 'Greetings, fellow adventurers.',
@@ -259,7 +252,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   'dm-send': {
     path: 'character/direct-messages/send',
     schema: sendDirectMessageSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Send up to 1000 Unicode code points to another character by public ID, including one with the same owner. Location and online status do not matter. Each successful call posts again.',
     inputExample: {
       recipient_character_id: 'Friend',
