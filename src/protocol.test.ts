@@ -2,17 +2,67 @@ import { expect, it } from 'vitest';
 import { agentGameResponseSchema } from './protocol.js';
 import { combatReportSchema, useItemSchema } from './protocol/combat.js';
 import { itemIdSchema } from './protocol/ids.js';
-import { recipeViewSchema, resourceViewSchema } from './protocol/production.js';
-import { travelActivityViewSchema } from './protocol/movement.js';
+import { recipeViewSchema } from './protocol/production.js';
+import { lookResourceSchema } from './protocol/movement.js';
+
+it('accepts the compact profile receipt', () => {
+  expect(
+    agentGameResponseSchema.safeParse({
+      ok: true,
+      schema_version: '3.0',
+      server_time: '2026-09-12T00:00:00.000Z',
+      locale: 'en',
+      data: { profile_saved: { preferred_locale: 'en' } },
+    }).success,
+  ).toBe(true);
+});
+
+it('requires a position in character responses', () => {
+  const character = {
+    public_id: 'Aster',
+    preferred_locale: 'en',
+    job_id: 'mage',
+    job_name: 'Mage',
+    town_id: 'crossroads',
+    town_name: 'Crossroads',
+    position: null,
+    gold: 100,
+    level: 1,
+    experience: 0,
+    hp: 100,
+    max_hp: 100,
+    mp: 100,
+    max_mp: 100,
+    weakened_until: null,
+    jobs: [{ id: 'mage', level: 1, experience: 0 }],
+    skills: [],
+    reputation: { verden: 0, eisen: 0, ordelia: 0 },
+    user_content: { display_name: 'Aster' },
+  };
+  const response = {
+    ok: true,
+    schema_version: '3.0',
+    server_time: '2026-09-12T00:00:00.000Z',
+    locale: 'en',
+    data: { character },
+  };
+  expect(agentGameResponseSchema.safeParse(response).success).toBe(true);
+  const { position: _position, ...withoutPosition } = character;
+  expect(
+    agentGameResponseSchema.safeParse({
+      ...response,
+      data: { character: withoutPosition },
+    }).success,
+  ).toBe(false);
+});
 
 it('rejects responses whose status and error disagree', () => {
   const result = {
     ok: true,
-    schema_version: '2.0',
+    schema_version: '3.0',
     server_time: '2026-09-12T00:00:00.000Z',
     locale: 'en',
     data: {},
-    user_content: [],
   };
   expect(
     agentGameResponseSchema.safeParse({ ...result, ok: false }).success,
@@ -20,41 +70,59 @@ it('rejects responses whose status and error disagree', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ...result,
-      error: { code: 'NOT_FOUND' },
+      error: { message: 'Not found.' },
     }).success,
   ).toBe(false);
   expect(
     agentGameResponseSchema.safeParse({
       ...result,
       ok: false,
-      error: { code: 'NOT_FOUND' },
+      error: { message: 'Not found.' },
     }).success,
   ).toBe(true);
+  expect(
+    agentGameResponseSchema.parse({
+      ...result,
+      ok: false,
+      error: { message: 'Not found.', code: 'NOT_FOUND' },
+    }).error,
+  ).not.toHaveProperty('code');
 });
 
 it('accepts characters discovered in a completed travel result', () => {
-  expect(
-    travelActivityViewSchema.safeParse({
-      kind: 'travel',
-      activity_id: '11111111-1111-4111-8111-111111111111',
-      route_id: 'selene_to_mossway',
-      from: { id: 'selene', name: 'Selene', kind: 'town' },
-      to: { id: 'mossway', name: 'Mossway', kind: 'field' },
-      started_at: '2026-09-12T00:00:00.000Z',
-      arrives_at: '2026-09-12T00:00:15.000Z',
-      duration_seconds: 15,
-      status: 'ENDED',
-      ended_at: '2026-09-12T00:00:15.000Z',
-      end_reason: 'COMPLETED',
-      characters: [
-        {
-          public_id: 'Alicia',
-          display_name_ref: 'character:Alicia:name',
-          lang: 'ja',
-        },
-      ],
-    }).success,
-  ).toBe(true);
+  const response = agentGameResponseSchema.parse({
+    ok: true,
+    schema_version: '3.0',
+    server_time: '2026-09-12T00:00:15.000Z',
+    locale: 'en',
+    data: {
+      last_result: {
+        kind: 'travel',
+        activity_id: '11111111-1111-4111-8111-111111111111',
+        to: { id: 'mossway', name: 'Mossway', kind: 'field' },
+        status: 'ENDED',
+        ended_at: '2026-09-12T00:00:15.000Z',
+        end_reason: 'COMPLETED',
+        characters: [
+          {
+            public_id: 'Alicia',
+            lang: 'ja',
+            user_content: { display_name: 'アリシア' },
+          },
+        ],
+      },
+    },
+  });
+  expect(response.data.last_result).toMatchObject({
+    kind: 'travel',
+    characters: [
+      {
+        public_id: 'Alicia',
+        lang: 'ja',
+        user_content: { display_name: 'アリシア' },
+      },
+    ],
+  });
 });
 
 function inventoryItem(definition_id: string, name: string) {
@@ -81,10 +149,9 @@ it('accepts wolf meat and wolf jerky in inventory responses', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '2.0',
+      schema_version: '3.0',
       server_time: '2026-09-12T00:00:00.000Z',
       locale: 'en',
-      user_content: [],
       data: {
         inventory: [
           inventoryItem('wolf_meat', 'Wolf Meat'),
@@ -147,18 +214,15 @@ it('accepts wolf meat loot and the wolf jerky recipe', () => {
   ).toBe(true);
 });
 
-it('accepts gathered nuts as a resource item', () => {
+it('accepts gathered nuts as a look resource', () => {
   expect(
-    resourceViewSchema.safeParse({
-      resource_id: 'mossway_food',
-      location_id: 'mossway',
+    lookResourceSchema.safeParse({
       item_id: 'food',
       name: 'Nuts',
       quantity: 10,
       capacity: 60,
       recovery_quantity: 1,
       recovery_seconds: 15,
-      observed_at: '2026-09-12T00:00:00.000Z',
       next_recovery_at: null,
       base_duration_seconds: 45,
       required_tool: null,
@@ -175,6 +239,33 @@ it('uses only cooked recovery foods and rejects raw ingredients', () => {
   for (const item_id of ['wolf_meat', 'food', 'herb']) {
     expect(
       useItemSchema.safeParse({ character_id: 'Traveler', item_id }).success,
+    ).toBe(false);
+  }
+});
+
+it('accepts only the exact hello next step in a create response', () => {
+  const result = {
+    ok: true,
+    schema_version: '3.0',
+    server_time: '2026-09-12T00:00:00.000Z',
+    locale: 'en',
+    data: {
+      created: { public_id: 'Aster' },
+      next_step: { operation: 'hello', arguments: { character_id: 'Aster' } },
+    },
+  };
+  expect(agentGameResponseSchema.safeParse(result).success).toBe(true);
+  for (const next_step of [
+    { operation: 'goodbye', arguments: { character_id: 'Aster' } },
+    { operation: 'hello', arguments: { character_id: 'Aster', extra: 'x' } },
+    { operation: 'hello', arguments: { character_id: 'A' } },
+    { operation: 'hello', arguments: {} },
+  ]) {
+    expect(
+      agentGameResponseSchema.safeParse({
+        ...result,
+        data: { ...result.data, next_step },
+      }).success,
     ).toBe(false);
   }
 });

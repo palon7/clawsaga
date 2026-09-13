@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { GameClient } from './client.js';
 import { execute, repeatActivity } from './commands.js';
 import { CliError } from './errors.js';
-import { agentGameResponseSchema, type AgentGameResponse } from './protocol.js';
+import type { AgentGameResponse } from './protocol.js';
 import { buySchema, shopViewSchema } from './protocol/production.js';
 
 it('accepts purchasable weapons in shop responses and purchase inputs', () => {
@@ -43,34 +43,50 @@ vi.mock('node:timers/promises', () => ({
 }));
 afterEach(() => vi.restoreAllMocks());
 
-function result(
+const gatherId = '11111111-1111-4111-8111-111111111111';
+
+function running(): AgentGameResponse {
+  return {
+    ok: true,
+    schema_version: '3.0',
+    locale: 'en',
+    server_time: '2026-09-09T00:00:00.000Z',
+    next_poll_after_seconds: 1,
+    data: {
+      activity: {
+        kind: 'gather',
+        activity_id: gatherId,
+        status: 'RUNNING',
+        started_at: '2026-09-09T00:00:00.000Z',
+        completes_at: '2026-09-09T00:00:45.000Z',
+        duration_seconds: 45,
+        output: { item_id: 'herb', name: 'Wolf Mint', quantity: 1 },
+      },
+    },
+  };
+}
+
+function completed(
   reason: 'COMPLETED' | 'RESOURCE_DEPLETED' = 'COMPLETED',
 ): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '2.0',
+    schema_version: '3.0',
     locale: 'en',
     server_time: '2026-09-09T00:00:45.000Z',
-    user_content: [],
     data: {
-      activity: {
-        activity_id: '11111111-1111-4111-8111-111111111111',
+      activity: null,
+      last_result: {
         kind: 'gather',
-        resource_id: 'mossway_herb',
-        location: { id: 'mossway', name: 'Mossway', kind: 'field' },
-        started_at: '2026-09-09T00:00:00.000Z',
-        completes_at: '2026-09-09T00:00:45.000Z',
-        duration_seconds: 45,
+        activity_id: gatherId,
+        status: 'ENDED',
+        end_reason: reason,
+        ended_at: '2026-09-09T00:00:45.000Z',
         output: {
           item_id: 'herb',
           name: 'Wolf Mint',
-          quantity: 1,
-          unit_weight: 1,
+          quantity: reason === 'COMPLETED' ? 1 : 0,
         },
-        status: 'ENDED',
-        ended_at: '2026-09-09T00:00:45.000Z',
-        end_reason: reason,
-        produced_quantity: reason === 'COMPLETED' ? 1 : 0,
       },
     },
   };
@@ -80,17 +96,20 @@ const args = ['gather', '-c', 'Maker', '--item', 'herb'];
 it('accepts counts above five without sending the repetition count to the API', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(result());
+    .mockImplementation((path) =>
+      Promise.resolve(path === 'character/activity' ? completed() : running()),
+    );
   expect(await execute([...args, '--count', '100'], vi.fn())).toMatchObject({
     ok: true,
     repetition: {
       requested_count: 100,
       completed_count: 100,
       produced: { herb: 100 },
+      stopped_reason: 'count_reached',
     },
   });
-  expect(invoke).toHaveBeenCalledTimes(100);
-  expect(invoke).toHaveBeenLastCalledWith('character/gather', {
+  expect(invoke).toHaveBeenCalledTimes(200);
+  expect(invoke).toHaveBeenCalledWith('character/gather', {
     character_id: 'Maker',
     item_id: 'herb',
   });
@@ -122,33 +141,26 @@ it('rejects invalid counts before starting an activity', async () => {
 });
 
 it('waits for each accepted result before starting the next and stops on depletion', async () => {
-  const completed = result();
-  const running = agentGameResponseSchema.parse({
-    ...completed,
-    next_poll_after_seconds: 1,
-    data: {
-      activity: {
-        ...completed.data.activity!,
-        status: 'RUNNING',
-        ended_at: null,
-        end_reason: null,
-        produced_quantity: 0,
-      },
-    },
-  });
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValueOnce(running)
-    .mockResolvedValueOnce(completed)
-    .mockResolvedValueOnce(running)
-    .mockResolvedValueOnce(result('RESOURCE_DEPLETED'));
+    .mockResolvedValueOnce(running())
+    .mockResolvedValueOnce(completed())
+    .mockResolvedValueOnce(running())
+    .mockResolvedValueOnce(completed('RESOURCE_DEPLETED'));
   const response = await execute([...args, '--count', '6'], vi.fn());
   expect(response).toMatchObject({
     ok: false,
+    error: {
+      message: 'The repetition ended before all requested attempts completed.',
+    },
+    data: {
+      last_result: { end_reason: 'RESOURCE_DEPLETED' },
+    },
     repetition: {
       requested_count: 6,
       completed_count: 1,
       produced: { herb: 1 },
+      stopped_reason: 'activity_stopped',
     },
   });
   expect(invoke.mock.calls.map((call) => call[0])).toEqual([
@@ -162,7 +174,8 @@ it('waits for each accepted result before starting the next and stops on depleti
 it('preserves confirmed output on an uncertain later start without retrying it', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValueOnce(result())
+    .mockResolvedValueOnce(running())
+    .mockResolvedValueOnce(completed())
     .mockRejectedValueOnce(new CliError('NETWORK_ERROR'));
   await expect(
     repeatActivity(
@@ -179,32 +192,19 @@ it('preserves confirmed output on an uncertain later start without retrying it',
         requested_count: 6,
         completed_count: 1,
         produced: { herb: 1 },
+        stopped_reason: 'unknown',
       },
     },
   });
-  expect(invoke).toHaveBeenCalledTimes(2);
+  expect(invoke).toHaveBeenCalledTimes(3);
 });
 
 it('keeps response diagnostics and the accepted activity when a repetition cannot read its result', async () => {
-  const completed = result();
-  const running = agentGameResponseSchema.parse({
-    ...completed,
-    next_poll_after_seconds: 45,
-    data: {
-      activity: {
-        ...completed.data.activity,
-        status: 'RUNNING',
-        ended_at: null,
-        end_reason: null,
-        produced_quantity: 0,
-      },
-    },
-  });
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValueOnce(running)
+    .mockResolvedValueOnce(running())
     .mockRejectedValueOnce(
-      new CliError('UPDATE_REQUIRED', {
+      new CliError('INVALID_RESPONSE', {
         reason: 'invalid_response',
         operation: 'character/activity',
         http_status: 200,
@@ -214,13 +214,14 @@ it('keeps response diagnostics and the accepted activity when a repetition canno
   await expect(
     execute([...args, '--count', '3'], vi.fn()),
   ).rejects.toMatchObject({
-    code: 'UPDATE_REQUIRED',
+    code: 'INVALID_RESPONSE',
     detail: {
       reason: 'invalid_response',
       operation: 'character/activity',
       http_status: 200,
       fields: ['data.activity'],
-      activity_id: running.data.activity!.activity_id,
+      activity_id: gatherId,
+      outcome: 'unknown',
       repetition: { requested_count: 3, completed_count: 0, produced: {} },
     },
   });

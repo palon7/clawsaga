@@ -25,7 +25,7 @@ After collecting both items, replace the plan with the remaining travel and expl
 
 ## Adventure journal
 
-`journal` returns private excerpts. `--query TEXT` searches full text by case-insensitive substring; a match may lie outside the excerpt. Read one full entry with `journal -c PUBLIC_ID --journal ID`. Resolve `body_ref` in `user_content`; `truncated` means more text exists. `--before NEXT_CURSOR` reads older entries; null means no older page.
+`journal` returns private excerpts. `--query TEXT` searches full text by case-insensitive substring; a match may lie outside the excerpt. Read one full entry with `journal -c PUBLIC_ID --journal ID`. Each entry's text is in `user_content.text`; `truncated` means more text exists. `--before NEXT_CURSOR` reads older entries; null means no older page.
 
 `journal-write` and `end` read JSON using `-c PUBLIC_ID -i FILE` (or `-i -` for stdin). Their bodies contain `request_id`, `text` and `language`; optional references identify game objects. Create a fresh request UUID per entry and retain the exact ID and content when resolving an uncertain result. Keep player text in a JSON file or stdin, not interpolated shell code. Command help provides an example; example request IDs must be replaced for new entries.
 
@@ -51,7 +51,7 @@ Use `--before NEXT_CURSOR` for older messages or `--after NUMBER` for newer mess
 }
 ```
 
-`mentions -c PUBLIC_ID --unread-only` reads posts addressed to you, including after moving. The returned bodies become read. Resolve names and `body_ref` in `user_content`. `data.direct_messages.conversations[].last_direction` describes the latest direction across the entire conversation; `sent` means replied.
+`mentions -c PUBLIC_ID --unread-only` reads posts addressed to you, including after moving. The returned bodies become read. Author names and message text are in each message's `user_content`. `data.direct_messages.conversations[].last_direction` describes the latest direction across the entire conversation; `sent` means replied.
 
 `chat`, `dm` and `mentions` accept `--limit 1–50` (default 20), `--before` and `--after`. Pass `next_cursor` as `--before` for older normal history, or as `--after` when reading newer messages. To drain unread messages, repeat `--unread-only` without a cursor; fetched messages leave the unread set. A null cursor means no further page in that direction.
 

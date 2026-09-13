@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { localeSchema, publicIdSchema } from './ids.js';
+import { itemIdSchema, localeSchema, publicIdSchema } from './ids.js';
 
 export const locationIdSchema = z.enum([
   'selene',
@@ -18,10 +18,58 @@ export const locationViewSchema = z.object({
   name: z.string(),
   kind: z.enum(['town', 'field', 'camp']),
 });
-export const mapLocationViewSchema = locationViewSchema.extend({
-  danger_level: z.number().int().min(0).max(100),
-  ambush_chance_percent: z.number().min(0).max(100),
-  enemies: z.array(z.object({ enemy_id: z.string(), aggressive: z.boolean() })),
+const mapConnectionSchema = z.object({
+  to: locationIdSchema,
+  duration_seconds: z.number().int().positive(),
+});
+export const mapViewSchema = z.object({
+  locations: z.array(
+    locationViewSchema.extend({
+      connections: z.array(mapConnectionSchema),
+    }),
+  ),
+});
+export const facilitySchema = z.enum(['shop', 'alchemy', 'furnace', 'forge']);
+export const lookResourceSchema = z.object({
+  item_id: itemIdSchema,
+  name: z.string(),
+  quantity: z.number().int().nonnegative(),
+  capacity: z.number().int().positive(),
+  recovery_quantity: z.number().int().positive(),
+  recovery_seconds: z.number().int().positive(),
+  next_recovery_at: z.iso.datetime().nullable(),
+  base_duration_seconds: z.number().int().positive(),
+  required_tool: itemIdSchema.nullable(),
+});
+export const lookEnemySchema = z.object({
+  enemy_id: z.string(),
+  name: z.string(),
+  aggressive: z.boolean(),
+});
+export const lookViewSchema = z.object({
+  location: locationViewSchema,
+  resources: z.array(lookResourceSchema),
+  enemies: z.array(lookEnemySchema),
+  facilities: z.array(facilitySchema),
+  people: z
+    .array(
+      z.object({
+        public_id: publicIdSchema,
+        lang: localeSchema,
+        user_content: z.object({ display_name: z.string() }),
+      }),
+    )
+    .optional(),
+});
+export const routeStepSchema = z.object({
+  to: locationIdSchema,
+  duration_seconds: z.number().int().positive(),
+});
+export const routeViewSchema = z.object({
+  from: locationViewSchema,
+  to: locationViewSchema,
+  duration_seconds: z.number().int().nonnegative(),
+  steps: z.array(routeStepSchema),
 });
 export const ambushReferenceSchema = z.object({
   activity_id: z.uuid(),
@@ -29,29 +77,18 @@ export const ambushReferenceSchema = z.object({
 });
 export const presentCharacterSchema = z.object({
   public_id: publicIdSchema,
-  display_name_ref: z.string(),
   lang: localeSchema,
+  user_content: z.object({ display_name: z.string() }),
 });
-export const routeSchema = z.object({
-  id: z.string(),
-  from_location_id: locationIdSchema,
-  to_location_id: locationIdSchema,
-  duration_seconds: z.number().int().positive(),
-});
-export type Route = z.infer<typeof routeSchema>;
 
 const travelFields = {
   activity_id: z.uuid(),
-  route_id: z.string(),
   from: locationViewSchema,
   to: locationViewSchema,
   started_at: z.iso.datetime(),
   arrives_at: z.iso.datetime(),
 };
-export const positionSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('at_location'), location: locationViewSchema }),
-  z.object({ kind: z.literal('travelling'), ...travelFields }),
-]);
+export const positionSchema = locationViewSchema.nullable();
 export const travelActivityViewSchema = z
   .object({
     kind: z.literal('travel'),
@@ -81,13 +118,16 @@ const common = {
   locale: localeSchema.optional(),
 };
 export const getMapSchema = z
-  .object({ ...common, location_id: locationIdSchema.optional() })
+  .object({ ...common, full: z.boolean().optional() })
+  .strict();
+export const lookSchema = z
+  .object({ ...common, people: z.boolean().optional() })
+  .strict();
+export const getRouteSchema = z
+  .object({ ...common, to: locationIdSchema })
   .strict();
 export const travelSchema = z
-  .object({
-    ...common,
-    route_id: z.string().min(1).max(128),
-  })
+  .object({ ...common, to: locationIdSchema })
   .strict();
 export const getActivitySchema = z
   .object({

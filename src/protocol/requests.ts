@@ -48,7 +48,7 @@ export const createCharacterSchema = z
   .object({
     ...presentation,
     persona: personaSchema.optional(),
-    preferred_locale: localeSchema.optional(),
+    preferred_locale: localeSchema,
     display_name: displayNameSchema,
     public_id: publicIdSchema,
     job_id: jobSchema,

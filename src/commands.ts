@@ -9,6 +9,8 @@ import {
   getCharacterSchema,
   helloSchema,
   getMapSchema,
+  lookSchema,
+  getRouteSchema,
   getOnboardingOptionsSchema,
   listCharactersSchema,
   travelSchema,
@@ -29,7 +31,7 @@ import metadata from '../package.json' with { type: 'json' };
 import { adventureCommands } from './adventure-commands.js';
 import {
   bodySchema,
-  characterFlag,
+  globalOptions,
   jsonFlag,
   type CommandDefinition,
 } from './command-definition.js';
@@ -39,27 +41,35 @@ const commands: Record<string, CommandDefinition> = {
   hello: {
     path: 'character/hello',
     schema: helloSchema,
-    flags: [characterFlag],
+    flags: [],
     help: 'Read initial context once when starting or resuming a conversation. Do not use after activities, replies or waits; use returned results. For an unknown activity outcome, use activity instead.',
+    examples: ['clawsaga hello -c Aster'],
   },
   characters: {
     path: 'characters',
     schema: listCharactersSchema,
     flags: [],
+    requiresCharacter: false,
     help: 'List your characters.',
   },
   options: {
     path: 'onboarding-options',
     schema: getOnboardingOptionsSchema,
     flags: [],
-    help: 'Read registration options.',
+    requiresCharacter: false,
+    help: 'Read the starting location, jobs and supported languages.',
+    examples: ['clawsaga options -l en'],
   },
   character: {
     path: 'character',
     schema: getCharacterSchema,
     flags: [
-      characterFlag,
-      ['--include <sections>', 'Comma-separated profile,inventory'],
+      [
+        '--include <sections>',
+        'Comma-separated profile,inventory',
+        false,
+        ['profile', 'inventory'],
+      ],
     ],
     help: 'Read a character.',
   },
@@ -67,50 +77,59 @@ const commands: Record<string, CommandDefinition> = {
     path: 'character/create',
     schema: createCharacterSchema,
     flags: [jsonFlag],
-    help: 'Create an agreed character.',
+    requiresCharacter: false,
+    help: 'Create an agreed character. The response gives the public ID and the next hello step.',
+    examples: ['clawsaga create -i character.json'],
     inputExample: {
-      public_id: 'Traveler',
-      display_name: 'Traveler',
+      display_name: 'Aster',
+      public_id: 'Aster',
       job_id: 'mage',
+      preferred_locale: 'en',
+      persona: 'A curious apprentice who records discoveries.',
     },
   },
   profile: {
     path: 'character/profile',
     schema: updateProfileSchema,
-    flags: [characterFlag, jsonFlag],
+    flags: [jsonFlag],
     help: 'Update a character profile.',
     inputExample: { persona: 'A curious traveler who records discoveries.' },
   },
   map: {
     path: 'world/map',
     schema: getMapSchema,
-    flags: [
-      characterFlag,
-      ['--location <id>', 'Location whose resources to inspect'],
-    ],
-    help: 'Read the map and available routes.',
+    flags: [['--full', 'Return the whole known map']],
+    help: 'Read locations and connections near your current location. Use --full for the whole known map.',
+  },
+  look: {
+    path: 'character/look',
+    schema: lookSchema,
+    flags: [['--people', 'Include active other characters at this location']],
+    help: 'Read resources, enemies and facilities at your current location. Resource item_ids are passed to gather; enemy ids to fight. Use encounters for full enemy details.',
+  },
+  route: {
+    path: 'character/route',
+    schema: getRouteSchema,
+    flags: [['--to <id>', 'Destination location ID', true]],
+    help: 'Read the shortest-duration path to a destination while stationary. Pass each steps[].to to travel one step at a time.',
   },
   activity: {
     path: 'character/activity',
     schema: getActivitySchema,
-    flags: [characterFlag, ['-a, --activity <id>', 'Accepted activity ID']],
+    flags: [['-a, --activity <id>', 'Accepted activity ID']],
     help: 'Read a running or completed activity when its outcome is unknown. Omit -a for the current or latest activity. If a CLI process is still running, collect its result instead of polling here.',
   },
   travel: {
     path: 'character/travel',
     schema: travelSchema,
-    flags: [
-      characterFlag,
-      ['-r, --route <id>', 'Available route ID from map', true],
-    ],
-    help: 'Travel one route while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID.',
+    flags: [['--to <id>', 'Adjacent destination location ID', true]],
+    help: 'Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID.',
   },
   gather: {
     path: 'character/gather',
     schema: gatherSchema,
     flags: [
-      characterFlag,
-      ['--item <id>', 'Resource item ID from map', true],
+      ['--item <id>', 'Resource item ID from look', true],
       ['--count <number>', 'Attempts, one at a time (default 1)'],
     ],
     help: 'Gather the selected item at your current location while idle; wait for each completion. An ambush keeps that harvest but ends --count repetition. Finish the whole command before starting another main activity.',
@@ -118,14 +137,13 @@ const commands: Record<string, CommandDefinition> = {
   recipes: {
     path: 'character/recipes',
     schema: getRecipesSchema,
-    flags: [characterFlag, ['--location <id>', 'Location to inspect']],
+    flags: [['--location <id>', 'Location to inspect']],
     help: 'Read recipes: inputs.quantity is required per lot; owned_quantity and missing_quantity describe current materials. Check unavailable_reasons, facility and fee.',
   },
   craft: {
     path: 'character/craft',
     schema: craftSchema,
     flags: [
-      characterFlag,
       ['--recipe <id>', 'Recipe ID from recipes', true],
       ['--max-fee-per-lot <gold>', 'Maximum fee for each lot', true],
       ['--count <number>', 'Lots, one at a time (default 1)'],
@@ -136,7 +154,6 @@ const commands: Record<string, CommandDefinition> = {
     path: 'character/activity/stop',
     schema: stopActivitySchema,
     flags: [
-      characterFlag,
       [
         '-a, --activity <id>',
         'Running activity ID from activity or hello',
@@ -148,14 +165,13 @@ const commands: Record<string, CommandDefinition> = {
   shop: {
     path: 'shop',
     schema: getShopSchema,
-    flags: [characterFlag],
+    flags: [],
     help: 'Read the current town equipment shop.',
   },
   buy: {
     path: 'character/shop-purchases',
     schema: buySchema,
     flags: [
-      characterFlag,
       ['--item <id>', 'Item ID from shop', true],
       ['--max-payment <gold>', 'Maximum payment', true],
       [
@@ -169,7 +185,6 @@ const commands: Record<string, CommandDefinition> = {
     path: 'character/equipment/equip',
     schema: equipSchema,
     flags: [
-      characterFlag,
       [
         '--equipment <uuid>',
         'Equipment ID from purchase.equipment_id or inventory[].id',
@@ -181,10 +196,7 @@ const commands: Record<string, CommandDefinition> = {
   unequip: {
     path: 'character/equipment/unequip',
     schema: equipSchema,
-    flags: [
-      characterFlag,
-      ['--equipment <uuid>', 'Equipped inventory entry id', true],
-    ],
+    flags: [['--equipment <uuid>', 'Equipped inventory entry id', true]],
     help: 'Return equipment to carried inventory while idle.',
   },
 };
@@ -193,7 +205,9 @@ const optionsSchema = z.object({
   server: z.string(),
   contentLanguage: z.enum(['ja', 'en']).optional(),
   character: z.string().optional(),
-  route: z.string().optional(),
+  to: z.string().optional(),
+  full: z.boolean().optional(),
+  people: z.boolean().optional(),
   activity: z.string().optional(),
   input: z.string().optional(),
   include: z.string().optional(),
@@ -257,7 +271,9 @@ async function commandInput(
   const input: Record<string, unknown> = {};
   if (values.contentLanguage) input.locale = values.contentLanguage;
   if (values.character) input.character_id = values.character;
-  if (values.route) input.route_id = values.route;
+  if (values.to) input.to = values.to;
+  if (values.full) input.full = true;
+  if (values.people) input.people = true;
   if (values.activity) input.activity_id = values.activity;
   if (values.include) input.include = values.include.split(',');
   if (values.location) input.location_id = values.location;
@@ -299,15 +315,145 @@ function validateInput(schema: z.ZodObject, input: unknown) {
   return parsed.data;
 }
 
+type HelpOption = {
+  flags: string;
+  description: string;
+  required: boolean;
+  choices?: readonly string[];
+};
+
+type StructuredHelp = {
+  command: string;
+  description: string;
+  usage: string;
+  options: HelpOption[];
+  examples: string[];
+  input_example?: Record<string, unknown>;
+  commands?: { name: string; description: string }[];
+};
+
+function helpOption(
+  option: {
+    flags: string;
+    description: string;
+    choices?: readonly string[] | undefined;
+  },
+  required: boolean,
+): HelpOption {
+  return {
+    flags: option.flags,
+    description: option.description,
+    required,
+    ...(option.choices ? { choices: option.choices } : {}),
+  };
+}
+
+function requiredUsage(flags: string) {
+  const value = flags.match(/<[^>]+>/)?.[0] ?? '';
+  const short = (flags.split(',')[0] ?? flags).trim();
+  if (value && short.includes(value)) return short;
+  return [short, value].filter(Boolean).join(' ');
+}
+
+function optionKey(flags: string) {
+  const long = flags
+    .split(',')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('--'));
+  const name = (long ?? flags).replace(/^--?/, '').split(' ')[0] ?? flags;
+  return name.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
+function commandUsage(name: string, definition: CommandDefinition) {
+  const parts = [`clawsaga ${name}`];
+  if (definition.requiresCharacter !== false) parts.push('-c <id>');
+  for (const [flags, , required] of definition.flags) {
+    if (required) parts.push(requiredUsage(flags));
+  }
+  parts.push('[options]');
+  return parts.join(' ');
+}
+
+function commandHelp(
+  name: string,
+  definition: CommandDefinition,
+): StructuredHelp {
+  return {
+    command: `clawsaga ${name}`,
+    description: definition.help,
+    usage: commandUsage(name, definition),
+    options: [
+      ...globalOptions.map((option) =>
+        helpOption(
+          option,
+          option.character === true && definition.requiresCharacter !== false,
+        ),
+      ),
+      ...definition.flags.map(([flags, description, required, choices]) =>
+        helpOption({ flags, description, choices }, required ?? false),
+      ),
+    ],
+    examples: [...(definition.examples ?? [])],
+    ...(definition.inputExample
+      ? { input_example: definition.inputExample }
+      : {}),
+  };
+}
+
+function programHelp(): StructuredHelp {
+  return {
+    command: 'clawsaga',
+    description: 'Play ClawSaga. Requires Node.js 22.12.0 or later.',
+    usage: 'clawsaga <command> [options]',
+    options: globalOptions.map((option) => helpOption(option, false)),
+    examples: [
+      'clawsaga options -l en',
+      'clawsaga create -i character.json',
+      'clawsaga hello -c Aster',
+    ],
+    commands: [
+      ...Object.entries(commands).map(([name, definition]) => ({
+        name,
+        description: definition.help,
+      })),
+      { name: 'schema <command>', description: 'Read a command input schema.' },
+      {
+        name: 'auth login',
+        description: 'Authorize this CLI with the server.',
+      },
+    ],
+  };
+}
+
+function authLoginHelp(): StructuredHelp {
+  return {
+    command: 'clawsaga auth login',
+    description: 'Request human approval using a device code.',
+    usage: 'clawsaga auth login [options]',
+    options: globalOptions.map((option) => helpOption(option, false)),
+    examples: ['clawsaga auth login'],
+  };
+}
+
+function schemaHelp(): StructuredHelp {
+  return {
+    command: 'clawsaga schema <command>',
+    description:
+      'Read the JSON body schema for an input-file command, or the API request schema for a flag command.',
+    usage: 'clawsaga schema <command>',
+    options: globalOptions.map((option) => helpOption(option, false)),
+    examples: ['clawsaga schema create', 'clawsaga schema gather'],
+  };
+}
+
 export async function execute(
   args: string[],
   notify: (value: unknown) => void,
 ) {
-  let help = '';
-  let helpExample: Record<string, unknown> | undefined;
+  let helpTarget = 'clawsaga';
   let helpCommand = 'clawsaga --help';
   let executedCommand = '';
-  let schemaHelp:
+  let schemaHelpResult:
     { input_schema: Record<string, unknown>; input_kind: string } | undefined;
   let result:
     AgentGameResponse | { ok: boolean; authenticated: boolean } | undefined;
@@ -322,9 +468,10 @@ export async function execute(
     .addOption(
       new Option(
         '-l, --content-language <language>',
-        'Game content language override',
+        'Game content language for this call',
       ).choices(['ja', 'en']),
     )
+    .addOption(new Option('-c, --character <id>', 'Public character ID'))
     .exitOverride()
     .configureHelp({
       showGlobalOptions: true,
@@ -332,14 +479,15 @@ export async function execute(
         `${option.flags}${option.mandatory ? ' (required)' : ''}`,
     })
     .configureOutput({
-      writeOut: (text) => {
-        help += text;
-      },
+      writeOut: () => undefined,
       writeErr: () => undefined,
       outputError: () => undefined,
     });
   program.action(() => program.help());
-  program
+  program.on('--help', () => {
+    helpTarget = 'clawsaga';
+  });
+  const schemaCommand = program
     .command('schema')
     .description(
       'Read the JSON body schema for an input-file command, or the API request schema for a flag command.',
@@ -350,7 +498,7 @@ export async function execute(
       if (!definition)
         throw new CliError('INVALID_ARGUMENTS', { fields: ['command'] });
       const hasBody = definition.flags.some(([flags]) => flags === jsonFlag[0]);
-      schemaHelp = {
+      schemaHelpResult = {
         input_kind: hasBody ? 'json_body' : 'api_request',
         input_schema: z.toJSONSchema(
           hasBody ? bodySchema(definition) : definition.schema,
@@ -358,6 +506,9 @@ export async function execute(
         ),
       };
     });
+  schemaCommand.on('--help', () => {
+    helpTarget = 'schema';
+  });
   const login = program
     .command('auth')
     .description('Manage authorization')
@@ -368,6 +519,9 @@ export async function execute(
         helpCommand = 'clawsaga auth login --help';
       },
     });
+  login.on('--help', () => {
+    helpTarget = 'auth login';
+  });
   login.action(async () => {
     result = await clientFor(
       optionsSchema.parse(login.optsWithGlobals()),
@@ -382,28 +536,34 @@ export async function execute(
           helpCommand = `clawsaga ${name} --help`;
         },
       });
-    for (const [flags, description, required] of definition.flags) {
-      if (required) command.requiredOption(flags, description);
-      else command.option(flags, description);
+    for (const [flags, description] of definition.flags) {
+      command.option(flags, description);
     }
-    const requiredUsage = command.options
-      .filter((option) => option.mandatory)
-      .map((option) =>
-        `${option.short ?? option.long} ${option.flags.match(/<[^>]+>/)?.[0] ?? ''}`.trim(),
-      );
-    command.usage([...requiredUsage, '[options]'].join(' '));
     if (definition.inputExample)
       command.addHelpText(
         'after',
         `\nJSON body: use input_example below with your own content. Full schema: clawsaga schema ${name}.`,
       );
     command.on('--help', () => {
-      helpExample = definition.inputExample;
+      helpTarget = `clawsaga ${name}`;
     });
     command.action(async () => {
       executedCommand = name;
       helpCommand = `clawsaga ${name} --help`;
       const values = optionsSchema.parse(command.optsWithGlobals());
+      if (definition.requiresCharacter !== false && !values.character)
+        throw new CliError('INVALID_ARGUMENTS', {
+          fields: ['character'],
+          message: "Required option '-c, --character <id>' was not provided.",
+        });
+      const provided = command.opts() as Record<string, unknown>;
+      for (const [flags, , required] of definition.flags) {
+        if (!required || provided[optionKey(flags)] !== undefined) continue;
+        throw new CliError('INVALID_ARGUMENTS', {
+          fields: [optionKey(flags)],
+          message: `Required option '${flags}' was not provided.`,
+        });
+      }
       if (name === 'buy' && !values.request) values.request = randomUUID();
       const inputValues =
         name === 'characters' || name === 'options'
@@ -474,21 +634,28 @@ export async function execute(
       error.code === 'commander.helpDisplayed' ||
       (error.code === 'commander.help' && error.exitCode === 0)
     )
-      return {
-        ok: true,
-        help,
-        ...(helpExample ? { input_example: helpExample } : {}),
-      };
+      return { ok: true, help: structuredHelp(helpTarget) };
     throw new CliError('INVALID_ARGUMENTS', {
       message: error.message,
       help_command: helpCommand,
     });
   }
-  if (schemaHelp) return { ok: true, ...schemaHelp };
+  if (schemaHelpResult) return { ok: true, ...schemaHelpResult };
   if (!result) throw new CliError('INVALID_COMMAND');
   return 'schema_version' in result
     ? withCommandHints(executedCommand, result)
     : result;
+}
+
+function structuredHelp(target: string): StructuredHelp {
+  if (target === 'clawsaga') return programHelp();
+  if (target === 'auth login') return authLoginHelp();
+  if (target === 'schema') return schemaHelp();
+  const name = target.startsWith('clawsaga ')
+    ? target.slice('clawsaga '.length)
+    : target;
+  const definition = commands[name];
+  return definition ? commandHelp(name, definition) : programHelp();
 }
 
 export async function repeatActivity(
@@ -500,39 +667,53 @@ export async function repeatActivity(
 ) {
   let confirmed = 0;
   const produced: Record<string, number> = {};
-  const summary = () => ({
+  const summary = (stoppedReason: string) => ({
     requested_count: count,
     completed_count: confirmed,
     produced: { ...produced },
+    stopped_reason: stoppedReason,
+  });
+  const incomplete = (response: AgentGameResponse, stoppedReason: string) => ({
+    ...response,
+    ok: false as const,
+    error: {
+      message: 'The repetition ended before all requested attempts completed.',
+    },
+    repetition: summary(stoppedReason),
   });
   while (confirmed < count) {
     try {
       const started = await client.invoke(path, input);
-      if (!started.ok) return { ...started, repetition: summary() };
+      if (!started.ok)
+        return { ...started, repetition: summary('start_rejected') };
       const completed = await waitForActivity(client, values, started);
-      if (!completed.ok) return { ...completed, repetition: summary() };
-      const activity = completed.data.activity;
+      if (!completed.ok)
+        return { ...completed, repetition: summary('activity_failed') };
+      const result = completed.data.last_result;
       if (
-        !activity ||
-        (activity.kind !== 'gather' && activity.kind !== 'craft') ||
-        activity.status !== 'ENDED'
+        !result ||
+        (result.kind !== 'gather' && result.kind !== 'craft') ||
+        result.status !== 'ENDED'
       )
-        throw new CliError('UPDATE_REQUIRED', {
+        throw new CliError('INVALID_RESPONSE', {
           reason: 'unexpected_production_result',
         });
-      if (activity.end_reason !== 'COMPLETED')
-        return { ...completed, ok: false, repetition: summary() };
+      if (result.end_reason !== 'COMPLETED')
+        return incomplete(completed, 'activity_stopped');
       confirmed += 1;
-      produced[activity.output.item_id] =
-        (produced[activity.output.item_id] ?? 0) + activity.produced_quantity;
-      if (activity.kind === 'gather' && activity.ambush)
-        return { ...completed, repetition: summary() };
-      if (confirmed === count) return { ...completed, repetition: summary() };
+      produced[result.output.item_id] =
+        (produced[result.output.item_id] ?? 0) + result.output.quantity;
+      if (result.kind === 'gather' && result.ambush)
+        return confirmed === count
+          ? { ...completed, repetition: summary('ambush') }
+          : incomplete(completed, 'ambush');
+      if (confirmed === count)
+        return { ...completed, repetition: summary('count_reached') };
     } catch (error) {
       if (error instanceof CliError)
         throw new CliError(error.code, {
           ...error.detail,
-          repetition: summary(),
+          repetition: summary('unknown'),
         });
       throw error;
     }
@@ -552,11 +733,11 @@ export async function waitForActivity(
   let result = initial;
   const activityId = result.data.activity?.activity_id;
   if (!activityId)
-    throw new CliError('UPDATE_REQUIRED', { reason: 'missing_activity_id' });
-  while (result.data.activity?.status === 'RUNNING') {
+    throw new CliError('INVALID_RESPONSE', { reason: 'missing_activity_id' });
+  while (result.data.activity?.activity_id === activityId) {
     const seconds = result.next_poll_after_seconds;
     if (!seconds)
-      throw new CliError('UPDATE_REQUIRED', {
+      throw new CliError('INVALID_RESPONSE', {
         reason: 'missing_poll_interval',
         activity_id: activityId,
       });
@@ -572,15 +753,17 @@ export async function waitForActivity(
         throw new CliError(error.code, {
           ...error.detail,
           activity_id: activityId,
+          outcome: 'unknown',
         });
       throw error;
     }
     if (!result.ok) return result;
-    if (result.data.activity?.activity_id !== activityId)
-      throw new CliError('UPDATE_REQUIRED', {
-        reason: 'activity_id_mismatch',
-        activity_id: activityId,
-      });
   }
+  const lastResult = result.data.last_result;
+  if (!lastResult || lastResult.activity_id !== activityId)
+    throw new CliError('INVALID_RESPONSE', {
+      reason: 'activity_id_mismatch',
+      activity_id: activityId,
+    });
   return result;
 }

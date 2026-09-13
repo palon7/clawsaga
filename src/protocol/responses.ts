@@ -2,11 +2,15 @@ import { z } from 'zod';
 import {
   positionSchema,
   locationViewSchema,
-  mapLocationViewSchema,
-  routeSchema,
+  mapViewSchema,
+  lookViewSchema,
+  routeViewSchema,
   locationIdSchema,
 } from './movement.js';
-import { activityViewSchema } from './activity.js';
+import {
+  agentRunningActivitySchema,
+  agentLastResultSchema,
+} from './activity.js';
 import {
   tacticViewSchema,
   tacticIssueSchema,
@@ -20,15 +24,12 @@ import {
   chatMessageSchema,
   regionIdSchema,
   planViewSchema,
+  planReceiptSchema,
   attentionSchema,
   directMessageSchema,
   directConversationSchema,
 } from './social.js';
-import {
-  recipeViewSchema,
-  resourceViewSchema,
-  shopViewSchema,
-} from './production.js';
+import { recipeViewSchema, shopViewSchema } from './production.js';
 import {
   localeSchema,
   jobSchema,
@@ -36,64 +37,14 @@ import {
   skillIdSchema,
 } from './ids.js';
 
-export const gameErrorCodeSchema = z.enum([
-  'UNAUTHENTICATED',
-  'FORBIDDEN',
-  'INVALID_ARGUMENT',
-  'SERVICE_UNAVAILABLE',
-  'RATE_LIMITED',
-  'PUBLIC_ID_TAKEN',
-  'CHARACTER_LIMIT_REACHED',
-  'NOT_FOUND',
-  'WRONG_LOCATION',
-  'ACTIVITY_CONFLICT',
-  'CORE_UNAVAILABLE',
-  'MATERIALS_REQUIRED',
-  'TOOL_REQUIRED',
-  'CAPACITY_EXCEEDED',
-  'RESOURCE_DEPLETED',
-  'INSUFFICIENT_FUNDS',
-  'PRICE_EXCEEDED',
-  'SKILL_REQUIRED',
-  'IDEMPOTENCY_CONFLICT',
-  'REAUTHENTICATION_REQUIRED',
-  'LAST_LOGIN_METHOD',
-  'QUEST_UNAVAILABLE',
-  'QUEST_NOT_READY',
-  'QUEST_EXPIRED',
-  'NO_EFFECT',
-]);
-
-export type GameErrorCode = z.infer<typeof gameErrorCodeSchema>;
-
-const userContentSchema = z.object({
-  content_id: z.string(),
-  author_character_id: publicIdSchema.nullable(),
-  origin: z.enum(['self_authored', 'other_authored']),
-  instruction_authority: z.literal('none'),
-  kind: z.enum([
-    'character_name',
-    'character_profile',
-    'journal',
-    'chat',
-    'direct_message',
-    'plan',
-  ]),
-  language: localeSchema,
-  format: z.literal('plain_text'),
-  text: z.string(),
-});
-
 export const characterViewSchema = z.object({
   public_id: publicIdSchema,
-  display_name_ref: z.string(),
-  profile_ref: z.string().optional(),
   preferred_locale: localeSchema,
   job_id: jobSchema,
   job_name: z.string(),
   town_id: z.string().nullable(),
   town_name: z.string().nullable(),
-  position: positionSchema.nullable().optional(),
+  position: positionSchema,
   gold: z.number().int(),
   level: z.number().int(),
   experience: z.number().int(),
@@ -123,6 +74,10 @@ export const characterViewSchema = z.object({
     eisen: z.number(),
     ordelia: z.number(),
   }),
+  user_content: z.object({
+    display_name: z.string(),
+    persona: z.string().optional(),
+  }),
 });
 
 const itemSchema = z.object({
@@ -141,28 +96,32 @@ const itemSchema = z.object({
 export type InventoryItem = z.infer<typeof itemSchema>;
 
 export const optionsSchema = z.object({
-  content_version: z.string(),
   starting_location: locationViewSchema,
   jobs: z.array(
     z.object({
       id: jobSchema,
       name: z.string(),
       description: z.string(),
-      weapon_name: z.string(),
     }),
   ),
-  starter_grant: z.object({
-    gold: z.number(),
-    clothing_name: z.string(),
-    potion_name: z.string(),
-    potion_quantity: z.number(),
-  }),
+  supported_locales: z.array(localeSchema),
+});
+
+export const nextStepSchema = z
+  .object({
+    operation: z.literal('hello'),
+    arguments: z.object({ character_id: publicIdSchema }).strict(),
+  })
+  .strict();
+
+export const profileReceiptSchema = z.object({
+  preferred_locale: localeSchema,
 });
 
 export const agentGameResponseSchema = z
   .object({
     ok: z.boolean(),
-    schema_version: z.literal('2.0'),
+    schema_version: z.literal('3.0'),
     server_time: z.iso.datetime(),
     locale: localeSchema,
     next_poll_after_seconds: z.number().int().positive().optional(),
@@ -206,6 +165,7 @@ export const agentGameResponseSchema = z
         .optional(),
       journal: journalViewSchema.optional(),
       plan: planViewSchema.nullable().optional(),
+      plan_saved: planReceiptSchema.optional(),
       journals: z
         .object({
           entries: z.array(journalViewSchema),
@@ -229,13 +189,16 @@ export const agentGameResponseSchema = z
         .array(
           z.object({
             public_id: publicIdSchema,
-            display_name_ref: z.string(),
             job_id: jobSchema,
             job_name: z.string(),
+            user_content: z.object({ display_name: z.string() }),
           }),
         )
         .optional(),
       character: characterViewSchema.optional(),
+      created: z.object({ public_id: publicIdSchema }).optional(),
+      next_step: nextStepSchema.optional(),
+      profile_saved: profileReceiptSchema.optional(),
       options: optionsSchema.optional(),
       inventory: z.array(itemSchema).optional(),
       capacity: z
@@ -255,22 +218,19 @@ export const agentGameResponseSchema = z
           paid: z.number().int().nonnegative(),
         })
         .optional(),
-      activity: activityViewSchema.nullable().optional(),
-      position: positionSchema.nullable().optional(),
-      map: z
-        .object({
-          content_version: z.string(),
-          locations: z.array(mapLocationViewSchema),
-          routes: z.array(routeSchema),
-          available_route_ids: z.array(z.string()),
-          resources: z.array(resourceViewSchema).optional(),
-        })
-        .optional(),
+      activity: agentRunningActivitySchema.nullable().optional(),
+      last_result: agentLastResultSchema.optional(),
+      position: positionSchema.optional(),
+      map: mapViewSchema.optional(),
+      look: lookViewSchema.optional(),
+      route: routeViewSchema.optional(),
     }),
-    user_content: z.array(userContentSchema),
     error: z
       .object({
-        code: gameErrorCodeSchema,
+        message: z.string(),
+        fields: z
+          .array(z.object({ path: z.string(), message: z.string() }))
+          .optional(),
         retry_after_seconds: z.number().optional(),
       })
       .optional(),

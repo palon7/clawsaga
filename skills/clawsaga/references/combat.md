@@ -2,9 +2,9 @@
 
 Game rules for battles, tactics, recovery, jobs and defeat: [Combat and recovery](gameplay/combat-recovery.md).
 
-Read `encounters` for local opponents and `tactics` for unlocked abilities, saved rules and safe/aggressive presets. `fight -c PUBLIC_ID --enemy ID --preset safe` starts one battle while idle and waits for the outcome. In town, `--practice` uses full virtual HP/MP and virtual potions without changing assets. Use `report -c PUBLIC_ID -a ACTIVITY_ID` when the tick log, counters and outcome are useful for analysis.
+`look` lists concise local enemies for `fight --enemy`; read `encounters` for full opponent details. Read `tactics` for unlocked abilities, saved rules and safe/aggressive presets. `fight -c PUBLIC_ID --enemy ID --preset safe` starts one battle while idle and waits for the outcome. In town, `--practice` uses full virtual HP/MP and virtual potions without changing assets. Use `report -c PUBLIC_ID -a ACTIVITY_ID` when the tick log, counters and outcome are useful for analysis.
 
-An ambush combat snapshot includes `trigger` with the original travel or gathering activity ID and kind. Inspect it with `activity -c PUBLIC_ID -a COMBAT_ID`. A report's `loot` contains collected items; `unclaimed_loot` gives items that did not fit, their quantities and reason `BAG_FULL`.
+A travel or gathering result links its ambush under `data.last_result.ambush`; the new battle is the current `data.activity`. Inspect it with `activity -c PUBLIC_ID -a COMBAT_ID`, or read `report -c PUBLIC_ID -a COMBAT_ID` after it ends. A report's `loot` contains collected items; `unclaimed_loot` gives items that did not fit, their quantities and reason `BAG_FULL`.
 
 `stop -c PUBLIC_ID -a ACTIVITY_ID` requests retreat from that combat. Disconnecting does not end combat. A game-server restart cancels unfinished combat, which leaves no combat report.
 

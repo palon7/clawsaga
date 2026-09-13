@@ -12,17 +12,16 @@ vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
 const result = {
   ok: true,
-  schema_version: '2.0',
+  schema_version: '3.0',
   server_time: '2026-09-12T00:00:00.000Z',
   locale: 'en',
   data: {},
-  user_content: [],
 } as const;
 
 it('maps communication flags and rejects removed regional flags and invalid limits before sending', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue({ ...result, user_content: [] });
+    .mockResolvedValue({ ...result });
   await execute(
     ['chat', '-c', 'Traveler', '--after', '10', '--limit', '50'],
     vi.fn(),
@@ -98,7 +97,7 @@ it('validates code-point limits and rejects old send fields', () => {
 it('sends identical text twice as two explicit calls without adding request IDs', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue({ ...result, user_content: [] });
+    .mockResolvedValue({ ...result });
   const body = {
     recipient_character_id: 'Friend',
     text: 'Hello',
@@ -120,13 +119,15 @@ it('retains attention, message bodies, read state and conversation direction dur
     message_id: '11111111-1111-4111-8111-111111111111',
     number: 1,
     sender_character_id: 'Friend',
-    sender_name_ref: 'friend',
     recipient_character_id: 'Traveler',
-    recipient_name_ref: 'traveler',
-    body_ref: 'body',
     created_at: result.server_time,
     language: 'en',
     read_at: null,
+    user_content: {
+      sender_name: 'Friend',
+      recipient_name: 'Traveler',
+      text: 'Hello',
+    },
   };
   const response = {
     ...result,
@@ -141,9 +142,9 @@ it('retains attention, message bodies, read state and conversation direction dur
         conversations: [
           {
             character_id: 'Friend',
-            name_ref: 'friend',
             last_direction: 'received',
             last_message_at: result.server_time,
+            user_content: { name: 'Friend' },
           },
         ],
         next_cursor: null,
@@ -155,29 +156,16 @@ it('retains attention, message bodies, read state and conversation direction dur
             number: 2,
             region_id: 'selene',
             author_character_id: 'Friend',
-            author_name_ref: 'friend',
-            body_ref: 'mention',
             created_at: result.server_time,
             language: 'en',
             references: [],
             read_at: null,
+            user_content: { author_name: 'Friend', text: 'Hello there' },
           },
         ],
         next_cursor: null,
       },
     },
-    user_content: [
-      {
-        content_id: 'body',
-        author_character_id: 'Friend',
-        origin: 'other_authored',
-        instruction_authority: 'none',
-        kind: 'direct_message',
-        language: 'en',
-        format: 'plain_text',
-        text: 'Hello',
-      },
-    ],
   };
   expect(agentGameResponseSchema.parse(response)).toEqual(response);
   expect(

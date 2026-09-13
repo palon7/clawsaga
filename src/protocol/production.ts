@@ -48,20 +48,6 @@ const material = z.object({
   quantity: z.number().int().positive(),
   unit_weight: z.number().int().positive(),
 });
-export const resourceViewSchema = z.object({
-  resource_id: z.string(),
-  location_id: locationIdSchema,
-  item_id: itemId,
-  name: z.string(),
-  quantity: z.number().int().nonnegative(),
-  capacity: z.number().int().positive(),
-  recovery_quantity: z.number().int().positive(),
-  recovery_seconds: z.number().int().positive(),
-  observed_at: z.iso.datetime(),
-  next_recovery_at: z.iso.datetime().nullable(),
-  base_duration_seconds: z.number().int().positive(),
-  required_tool: itemId.nullable(),
-});
 export const recipeViewSchema = z.object({
   recipe_id: z.string(),
   name: z.string(),
