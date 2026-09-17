@@ -221,4 +221,37 @@ export class GameClient {
     }
     return parsed.data;
   }
+
+  // Public reads stay usable before authorization and are not agent responses.
+  async readDocument<Output>(
+    path: string,
+    schema: z.ZodType<Output>,
+  ): Promise<Output> {
+    const response = await this.send(`/api/v1/${path}`, { method: 'GET' });
+    const body: unknown = await response.json().catch(() => undefined);
+    if (response.status === 429)
+      throw new CliError('RATE_LIMITED', {
+        retry_after: response.headers.get('Retry-After'),
+      });
+    if (response.status >= 500) throw new CliError('SERVICE_UNAVAILABLE');
+    const parsed = schema.safeParse(body);
+    if (parsed.success) return parsed.data;
+    const message = serverMessage(body);
+    if (response.status === 400 && message)
+      throw new CliError('INVALID_ARGUMENTS', { message });
+    if (body === undefined)
+      throw new CliError('INVALID_RESPONSE', {
+        message: 'The server returned a response that was not valid JSON.',
+        operation: path,
+        http_status: response.status,
+      });
+    throw new CliError('INVALID_RESPONSE', {
+      message: "The server response did not match this CLI's expected format.",
+      operation: path,
+      http_status: response.status,
+      fields: [
+        ...new Set(parsed.error.issues.map((issue) => issue.path.join('.'))),
+      ],
+    });
+  }
 }

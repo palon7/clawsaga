@@ -13,6 +13,8 @@ import {
   getRouteSchema,
   getOnboardingOptionsSchema,
   listCharactersSchema,
+  searchCharactersSchema,
+  resolveCharacterSchema,
   travelSchema,
   updateProfileSchema,
   gatherSchema,
@@ -22,11 +24,16 @@ import {
   getShopSchema,
   buySchema,
   equipSchema,
+  repairSchema,
+  agentResumeResponseSchema,
+  guideResponseSchema,
   type AgentGameResponse,
+  type AgentResumeResponse,
+  type GuideResponse,
 } from './protocol.js';
 import { GameClient, serverOrigin } from './client.js';
 import { CliError } from './errors.js';
-import { withCommandHints } from './hints.js';
+import { withRenderedHints } from './hints.js';
 import metadata from '../package.json' with { type: 'json' };
 import { adventureCommands } from './adventure-commands.js';
 import {
@@ -43,14 +50,50 @@ const commands: Record<string, CommandDefinition> = {
     schema: helloSchema,
     flags: [],
     help: 'Read initial context once when starting or resuming a conversation. Do not use after activities, replies or waits; use returned results. For an unknown activity outcome, use activity instead.',
-    examples: ['clawsaga hello -c Aster'],
+    examples: ['clawsaga hello -c m7Qp2_aR9L-x'],
   },
   characters: {
     path: 'characters',
     schema: listCharactersSchema,
     flags: [],
     requiresCharacter: false,
-    help: 'List your characters.',
+    help: 'List your owned characters to choose who to play.',
+  },
+  'search-characters': {
+    path: 'characters/search',
+    schema: searchCharactersSchema,
+    flags: [
+      ['--name <name>', 'Literal, case-sensitive name substring', true],
+      [
+        '--discriminator <four digits>',
+        'Exact four-digit discriminator for an exact name match',
+      ],
+      ['--cursor <character id>', 'Last Character ID from next_cursor'],
+      ['--limit <number>', 'Results per page: 1–50 (default 20)'],
+    ],
+    requiresCharacter: false,
+    help: 'Find public character identities by name, or by exact name plus discriminator. Returns Character ID, name and discriminator only; use the returned Character ID to send a direct message.',
+    examples: [
+      'clawsaga search-characters --name El',
+      'clawsaga search-characters --name Elwen --discriminator 0427',
+    ],
+  },
+  'resolve-character': {
+    path: 'characters/resolve',
+    schema: resolveCharacterSchema,
+    flags: [
+      ['--name <name>', 'Exact character name', true],
+      [
+        '--discriminator <four digits>',
+        'Exact four-digit discriminator, when several characters share the name',
+      ],
+    ],
+    requiresCharacter: false,
+    help: 'Resolve one of your own characters to its Character ID by exact name, optionally with the discriminator. Use the returned Character ID for every other command.',
+    examples: [
+      'clawsaga resolve-character --name Aster',
+      'clawsaga resolve-character --name Aster --discriminator 0427',
+    ],
   },
   options: {
     path: 'onboarding-options',
@@ -78,11 +121,10 @@ const commands: Record<string, CommandDefinition> = {
     schema: createCharacterSchema,
     flags: [jsonFlag],
     requiresCharacter: false,
-    help: 'Create an agreed character. The response gives the public ID and the next hello step.',
+    help: 'Create an agreed character. The server returns the Character ID, name, discriminator and the next hello step. Repeating the request creates another character.',
     examples: ['clawsaga create -i character.json'],
     inputExample: {
       display_name: 'Aster',
-      public_id: 'Aster',
       job_id: 'mage',
       preferred_locale: 'en',
       persona: 'A curious apprentice who records discoveries.',
@@ -147,8 +189,12 @@ const commands: Record<string, CommandDefinition> = {
       ['--recipe <id>', 'Recipe ID from recipes', true],
       ['--max-fee-per-lot <gold>', 'Maximum fee for each lot', true],
       ['--count <number>', 'Lots, one at a time (default 1)'],
+      [
+        '--request <uuid>',
+        'Retry one lot with the same ID after an uncertain craft',
+      ],
     ],
-    help: 'Craft while idle; wait for each completion. The whole --count repetition must finish before starting another main activity for this character.',
+    help: 'Craft while idle; wait for each completion. Each --count lot gets a new request ID; --request retries one lot and needs --count 1. The whole repetition must finish before starting another main activity for this character.',
   },
   stop: {
     path: 'character/activity/stop',
@@ -199,12 +245,21 @@ const commands: Record<string, CommandDefinition> = {
     flags: [['--equipment <uuid>', 'Equipped inventory entry id', true]],
     help: 'Return equipment to carried inventory while idle.',
   },
+  repair: {
+    path: 'character/equipment/repair',
+    schema: repairSchema,
+    flags: [['--equipment <uuid>', 'Inventory entry id to repair', true]],
+    help: 'Repair owned equipment at a town smithy while idle.',
+  },
 };
 
 const optionsSchema = z.object({
   server: z.string(),
   contentLanguage: z.enum(['ja', 'en']).optional(),
   character: z.string().optional(),
+  name: z.string().optional(),
+  discriminator: z.string().optional(),
+  cursor: z.string().optional(),
   to: z.string().optional(),
   full: z.boolean().optional(),
   people: z.boolean().optional(),
@@ -224,7 +279,7 @@ const optionsSchema = z.object({
   practice: z.boolean().optional(),
   job: z.string().optional(),
   drop: z.string().optional(),
-  template: z.string().optional(),
+  offer: z.string().optional(),
   quest: z.string().optional(),
   journal: z.string().optional(),
   query: z.string().optional(),
@@ -233,6 +288,7 @@ const optionsSchema = z.object({
   limit: z.string().optional(),
   before: z.string().optional(),
   after: z.string().optional(),
+  topic: z.string().optional(),
 });
 type Values = z.infer<typeof optionsSchema>;
 
@@ -271,6 +327,10 @@ async function commandInput(
   const input: Record<string, unknown> = {};
   if (values.contentLanguage) input.locale = values.contentLanguage;
   if (values.character) input.character_id = values.character;
+  if (values.name !== undefined) input.name = values.name;
+  if (values.discriminator !== undefined)
+    input.discriminator = values.discriminator;
+  if (values.cursor !== undefined) input.cursor = values.cursor;
   if (values.to) input.to = values.to;
   if (values.full) input.full = true;
   if (values.people) input.people = true;
@@ -290,7 +350,7 @@ async function commandInput(
   if (values.practice) input.practice = values.practice;
   if (values.job) input.job_id = values.job;
   if (values.drop) input.drop_id = values.drop;
-  if (values.template) input.template_id = values.template;
+  if (values.offer) input.offer_id = values.offer;
   if (values.quest) input.quest_id = values.quest;
   if (values.journal) input.journal_id = values.journal;
   if (values.query) input.query = values.query;
@@ -409,7 +469,7 @@ function programHelp(): StructuredHelp {
     examples: [
       'clawsaga options -l en',
       'clawsaga create -i character.json',
-      'clawsaga hello -c Aster',
+      'clawsaga hello -c m7Qp2_aR9L-x',
     ],
     commands: [
       ...Object.entries(commands).map(([name, definition]) => ({
@@ -452,11 +512,15 @@ export async function execute(
 ) {
   let helpTarget = 'clawsaga';
   let helpCommand = 'clawsaga --help';
-  let executedCommand = '';
+  let executedCharacter: string | undefined;
   let schemaHelpResult:
     { input_schema: Record<string, unknown>; input_kind: string } | undefined;
   let result:
-    AgentGameResponse | { ok: boolean; authenticated: boolean } | undefined;
+    | AgentGameResponse
+    | GuideResponse
+    | AgentResumeResponse
+    | { ok: boolean; authenticated: boolean }
+    | undefined;
   const program = new Command('clawsaga')
     .description('Play ClawSaga. Requires Node.js 22.12.0 or later.')
     .version(metadata.version)
@@ -471,7 +535,7 @@ export async function execute(
         'Game content language for this call',
       ).choices(['ja', 'en']),
     )
-    .addOption(new Option('-c, --character <id>', 'Public character ID'))
+    .addOption(new Option('-c, --character <id>', 'Character ID'))
     .exitOverride()
     .configureHelp({
       showGlobalOptions: true,
@@ -508,6 +572,43 @@ export async function execute(
     });
   schemaCommand.on('--help', () => {
     helpTarget = 'schema';
+  });
+  const guideCommand = program
+    .command('guide')
+    .description(
+      'Read the English game guide served by the game server. Without --topic, list the topics and what each covers.',
+    )
+    .option('--topic <topic>', 'Topic to read, chosen from the topic list');
+  guideCommand.on('--help', () => {
+    helpTarget = 'clawsaga guide';
+    helpCommand = 'clawsaga guide --help';
+  });
+  guideCommand.action(async () => {
+    helpCommand = 'clawsaga guide --help';
+    const values = optionsSchema.parse(guideCommand.optsWithGlobals());
+    result = await clientFor(values).readDocument(
+      values.topic === undefined
+        ? 'guide'
+        : `guide?topic=${encodeURIComponent(values.topic)}`,
+      guideResponseSchema,
+    );
+  });
+  const resumeCommand = program
+    .command('resume')
+    .description(
+      'Read the operating guide to follow when starting or resuming play.',
+    );
+  resumeCommand.on('--help', () => {
+    helpTarget = 'clawsaga resume';
+    helpCommand = 'clawsaga resume --help';
+  });
+  resumeCommand.action(async () => {
+    helpCommand = 'clawsaga resume --help';
+    const values = optionsSchema.parse(resumeCommand.optsWithGlobals());
+    result = await clientFor(values).readDocument(
+      'guide/resume',
+      agentResumeResponseSchema,
+    );
   });
   const login = program
     .command('auth')
@@ -548,9 +649,9 @@ export async function execute(
       helpTarget = `clawsaga ${name}`;
     });
     command.action(async () => {
-      executedCommand = name;
       helpCommand = `clawsaga ${name} --help`;
       const values = optionsSchema.parse(command.optsWithGlobals());
+      executedCharacter = values.character;
       if (definition.requiresCharacter !== false && !values.character)
         throw new CliError('INVALID_ARGUMENTS', {
           fields: ['character'],
@@ -564,9 +665,13 @@ export async function execute(
           message: `Required option '${flags}' was not provided.`,
         });
       }
-      if (name === 'buy' && !values.request) values.request = randomUUID();
+      const requestedId = values.request;
+      if ((name === 'buy' || name === 'craft') && !values.request)
+        values.request = randomUUID();
       const inputValues =
-        name === 'characters' || name === 'options'
+        name === 'characters' ||
+        name === 'resolve-character' ||
+        name === 'options'
           ? {
               ...values,
               contentLanguage: values.contentLanguage ?? ('en' as const),
@@ -584,12 +689,19 @@ export async function execute(
             fields: ['count'],
             message: '--count must be a positive safe integer.',
           });
+        if (name === 'craft' && requestedId !== undefined && count !== 1)
+          throw new CliError('INVALID_ARGUMENTS', {
+            fields: ['request'],
+            message:
+              '--request retries a single lot; use --count 1 or omit --request.',
+          });
         result = await repeatActivity(
           client,
           definition.path,
           input,
           { character: values.character, locale: values.contentLanguage },
           count,
+          name === 'craft' ? { requestIdPerLot: true } : undefined,
         );
         return;
       }
@@ -643,7 +755,7 @@ export async function execute(
   if (schemaHelpResult) return { ok: true, ...schemaHelpResult };
   if (!result) throw new CliError('INVALID_COMMAND');
   return 'schema_version' in result
-    ? withCommandHints(executedCommand, result)
+    ? withRenderedHints(result, executedCharacter)
     : result;
 }
 
@@ -658,14 +770,22 @@ function structuredHelp(target: string): StructuredHelp {
   return definition ? commandHelp(name, definition) : programHelp();
 }
 
+function requestIdOf(input: unknown) {
+  return input !== null && typeof input === 'object'
+    ? (input as { request_id?: string }).request_id
+    : undefined;
+}
+
 export async function repeatActivity(
   client: GameClient,
   path: string,
   input: unknown,
   values: { character: string | undefined; locale?: 'ja' | 'en' | undefined },
   count: number,
+  options?: { requestIdPerLot?: boolean },
 ) {
   let confirmed = 0;
+  let lastRequestId: string | undefined;
   const produced: Record<string, number> = {};
   const summary = (stoppedReason: string) => ({
     requested_count: count,
@@ -678,15 +798,31 @@ export async function repeatActivity(
     ok: false as const,
     error: {
       message: 'The repetition ended before all requested attempts completed.',
+      ...(lastRequestId === undefined ? {} : { request_id: lastRequestId }),
     },
     repetition: summary(stoppedReason),
   });
   while (confirmed < count) {
+    // Craft lots are separate requests. The validated input carries the first
+    // lot's ID (from --request or generated); later lots get a new one.
+    const requestId =
+      options?.requestIdPerLot && confirmed > 0
+        ? randomUUID()
+        : requestIdOf(input);
+    lastRequestId = requestId;
+    const lotInput =
+      requestId === undefined || input === null || typeof input !== 'object'
+        ? input
+        : { ...input, request_id: requestId };
     try {
-      const started = await client.invoke(path, input);
+      const started = await client.invoke(path, lotInput);
       if (!started.ok)
         return { ...started, repetition: summary('start_rejected') };
-      const completed = await waitForActivity(client, values, started);
+      // A replayed request whose accepted activity already ended answers with
+      // its stored result, even while a newer activity is running.
+      const completed = started.data.last_result
+        ? started
+        : await waitForActivity(client, values, started);
       if (!completed.ok)
         return { ...completed, repetition: summary('activity_failed') };
       const result = completed.data.last_result;
@@ -713,6 +849,7 @@ export async function repeatActivity(
       if (error instanceof CliError)
         throw new CliError(error.code, {
           ...error.detail,
+          ...(requestId === undefined ? {} : { request_id: requestId }),
           repetition: summary('unknown'),
         });
       throw error;

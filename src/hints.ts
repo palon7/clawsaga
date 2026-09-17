@@ -1,50 +1,35 @@
-import type { AgentGameResponse } from './protocol.js';
+import type { AgentGameResponse, AgentHint } from './protocol.js';
 
-export function withCommandHints(
-  command: string,
+// The server decides which suggestion a result earns; the CLI renders it with
+// its own command names and flags. Rendered text keeps the contract's note
+// form so the printed response still validates against the shared schema.
+const command: Record<
+  string,
+  (args: Record<string, string>, character?: string) => string
+> = {
+  hello: (args) => `Run \`hello -c ${args.character_id}\`.`,
+  get_activity: (args, character) =>
+    `Run \`activity -a ${args.activity_id}${character ? ` -c ${character}` : ''}\`.`,
+  equip_item: (args, character) =>
+    `Run \`equip --equipment ${args.equipment_id}${character ? ` -c ${character}` : ''}\`.`,
+};
+
+function renderHint(hint: AgentHint, character?: string): string {
+  if ('note' in hint) return hint.note;
+  const render = command[hint.operation];
+  if (!render || !hint.arguments) return `Use the ${hint.operation} operation.`;
+  return render(hint.arguments, character);
+}
+
+export function withRenderedHints(
   response: AgentGameResponse,
-): AgentGameResponse & { hints?: string[] } {
-  if (!response.ok) return response;
-
-  const lastResult = response.data.last_result;
-  const ambush =
-    lastResult && 'ambush' in lastResult ? lastResult.ambush : undefined;
-  if (ambush)
-    return {
-      ...response,
-      hints: [
-        `The activity succeeded and combat is active. Inspect the battle with activity -a ${ambush.activity_id} using the same -c character, or use report for its summary.`,
-      ],
-    };
-
-  let hints: string[];
-  switch (command) {
-    case 'create':
-      if (!response.data.created) return response;
-      hints = [
-        `Run hello -c ${response.data.created.public_id} to start playing.`,
-      ];
-      break;
-    case 'hello':
-      hints = [
-        'Save goals spanning several activities with plan-set; update the remaining steps when they change.',
-        'When ending play, use end to save a journal entry and choose the activity policy.',
-      ];
-      break;
-    case 'buy':
-      if (!response.data.purchase) return response;
-      hints = [
-        `Purchased equipment is in your bag. To use it, run equip with --equipment ${response.data.purchase.equipment_id} and the same -c character.`,
-      ];
-      break;
-    case 'change-job':
-      hints = [
-        'Changing job puts your previous weapon in the bag. Equip a compatible weapon before fighting.',
-      ];
-      break;
-    default:
-      return response;
-  }
-
-  return { ...response, hints };
+  character?: string,
+): AgentGameResponse {
+  const { hints, ...rest } = response;
+  return hints?.length
+    ? {
+        ...rest,
+        hints: hints.map((hint) => ({ note: renderHint(hint, character) })),
+      }
+    : rest;
 }

@@ -1,22 +1,43 @@
 import { z } from 'zod';
-import { itemIdSchema, localeSchema, publicIdSchema } from './ids.js';
+import {
+  itemIdSchema,
+  localeSchema,
+  characterIdSchema,
+  discriminatorSchema,
+} from './ids.js';
+import { chatChannelSchema } from './social.js';
 
 export const locationIdSchema = z.enum([
-  'selene',
-  'dolgan',
+  'ashfield',
+  'blackoak',
   'corvent',
-  'mossway',
-  'silverthread_lake',
-  'openpit',
-  'south_road',
   'crossroads',
+  'darras',
+  'dolgan',
+  'hollowdell',
+  'hollowdell_road',
+  'korholm',
+  'laures_centre',
+  'laures_deep',
+  'laures_outerwall',
+  'laures_westgate',
+  'mossway',
+  'north_road',
+  'old_imperial_road',
+  'openpit',
+  'river_side',
+  'selene',
+  'silverthread_lake',
+  'south_road',
+  'undercroft',
+  'whitecliff',
 ]);
 export type LocationId = z.infer<typeof locationIdSchema>;
 
 export const locationViewSchema = z.object({
   id: locationIdSchema,
   name: z.string(),
-  kind: z.enum(['town', 'field', 'camp']),
+  kind: z.enum(['town', 'field', 'dungeon', 'camp']),
 });
 const mapConnectionSchema = z.object({
   to: locationIdSchema,
@@ -48,13 +69,15 @@ export const lookEnemySchema = z.object({
 });
 export const lookViewSchema = z.object({
   location: locationViewSchema,
+  chat: chatChannelSchema,
   resources: z.array(lookResourceSchema),
   enemies: z.array(lookEnemySchema),
   facilities: z.array(facilitySchema),
   people: z
     .array(
       z.object({
-        public_id: publicIdSchema,
+        character_id: characterIdSchema,
+        discriminator: discriminatorSchema,
         lang: localeSchema,
         user_content: z.object({ display_name: z.string() }),
       }),
@@ -76,7 +99,8 @@ export const ambushReferenceSchema = z.object({
   enemy_id: z.string(),
 });
 export const presentCharacterSchema = z.object({
-  public_id: publicIdSchema,
+  character_id: characterIdSchema,
+  discriminator: discriminatorSchema,
   lang: localeSchema,
   user_content: z.object({ display_name: z.string() }),
 });
@@ -114,7 +138,7 @@ export const travelActivityViewSchema = z
 export type Position = z.infer<typeof positionSchema>;
 
 const common = {
-  character_id: publicIdSchema.describe('The public character ID.'),
+  character_id: characterIdSchema.describe('The immutable Character ID.'),
   locale: localeSchema.optional(),
 };
 export const getMapSchema = z

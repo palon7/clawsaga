@@ -28,7 +28,7 @@ it('posts one aside with no follow-up read and preserves the receipt', async () 
     .mockResolvedValue(receipt);
   expect(
     await execute(
-      ['monologue', '-c', 'AsideHero', '-i', 'aside.json'],
+      ['monologue', '-c', 'AsideHero000', '-i', 'aside.json'],
       vi.fn(),
     ),
   ).toEqual(receipt);
@@ -38,7 +38,7 @@ it('posts one aside with no follow-up read and preserves the receipt', async () 
     JSON.stringify({ text: 'a'.repeat(1001), language: 'en' }),
   );
   await expect(
-    execute(['monologue', '-c', 'AsideHero', '-i', 'aside.json'], vi.fn()),
+    execute(['monologue', '-c', 'AsideHero000', '-i', 'aside.json'], vi.fn()),
   ).rejects.toThrow();
   expect(invoke).toHaveBeenCalledTimes(1);
 });

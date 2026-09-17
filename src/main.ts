@@ -6,7 +6,7 @@ try {
     process.stderr.write(`${JSON.stringify(value)}\n`),
   );
   process.stdout.write(`${JSON.stringify(result)}\n`);
-  process.exitCode = result.ok ? 0 : 1;
+  process.exitCode = 'ok' in result && !result.ok ? 1 : 0;
 } catch (error) {
   process.stdout.write(`${JSON.stringify(cliFailure(error))}\n`);
   process.exitCode = 1;

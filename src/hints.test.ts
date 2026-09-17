@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
-import { withCommandHints } from './hints.js';
+import { withRenderedHints } from './hints.js';
 import type { AgentGameResponse } from './protocol.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -14,60 +14,103 @@ const response: AgentGameResponse = {
   data: {},
 };
 
-it.each([
-  { args: ['hello'], expected: 'plan-set' },
-  { args: ['change-job', '--job', 'mage'], expected: 'compatible weapon' },
-  {
-    args: ['buy', '--item', 'basic_pickaxe', '--max-payment', '100'],
-    expected: '--equipment 11111111-1111-4111-8111-111111111111',
-  },
-])(
-  'adds English hints to $args without another request',
-  async ({ args, expected }) => {
-    const serverResponse: AgentGameResponse = {
+it('renders server hints with CLI command syntax and keeps notes as written', () => {
+  expect(
+    withRenderedHints({
       ...response,
-      data:
-        args[0] === 'buy'
-          ? {
-              purchase: {
-                request_id: '22222222-2222-4222-8222-222222222222',
-                item_id: 'basic_pickaxe',
-                equipment_id: '11111111-1111-4111-8111-111111111111',
-                paid: 100,
-              },
-            }
-          : {},
-    };
-    const invoke = vi
-      .spyOn(GameClient.prototype, 'invoke')
-      .mockResolvedValue(serverResponse);
-    const result = await execute(
-      [...args, '-c', 'HintHero', '-l', 'ja'],
-      vi.fn(),
-    );
-    expect(result).toMatchObject({
-      ...serverResponse,
-      hints: expect.arrayContaining([expect.stringContaining(expected)]),
-    });
-    expect(serverResponse).not.toHaveProperty('hints');
-    expect(invoke).toHaveBeenCalledTimes(1);
-  },
-);
-
-it('provides an executable hello example after create', () => {
-  const created: AgentGameResponse = {
-    ...response,
-    data: {
-      created: { public_id: 'Aster' },
-      next_step: { operation: 'hello', arguments: { character_id: 'Aster' } },
+      hints: [
+        { operation: 'hello', arguments: { character_id: 'm7Qp2_aR9L-x' } },
+        { operation: 'get_activity', arguments: { activity_id: 'a1b2c3d4' } },
+        {
+          operation: 'equip_item',
+          arguments: { equipment_id: '11111111-1111-4111-8111-111111111111' },
+        },
+        { note: 'Changing job puts your previous weapon in the bag.' },
+      ],
+    }).hints,
+  ).toEqual([
+    { note: 'Run `hello -c m7Qp2_aR9L-x`.' },
+    { note: 'Run `activity -a a1b2c3d4`.' },
+    {
+      note: 'Run `equip --equipment 11111111-1111-4111-8111-111111111111`.',
     },
-  };
-  expect(withCommandHints('create', created).hints).toEqual([
-    'Run hello -c Aster to start playing.',
+    { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
 });
 
-it('leaves failures and ordinary reads unchanged', async () => {
+it('adds the invoked character to hints for character commands', () => {
+  expect(
+    withRenderedHints(
+      {
+        ...response,
+        hints: [
+          { operation: 'get_activity', arguments: { activity_id: 'a1b2c3d4' } },
+          {
+            operation: 'equip_item',
+            arguments: {
+              equipment_id: '11111111-1111-4111-8111-111111111111',
+            },
+          },
+        ],
+      },
+      'HintHero0000',
+    ).hints,
+  ).toEqual([
+    { note: 'Run `activity -a a1b2c3d4 -c HintHero0000`.' },
+    {
+      note: 'Run `equip --equipment 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
+    },
+  ]);
+});
+
+it('names an operation it cannot render instead of guessing one', () => {
+  expect(
+    withRenderedHints({
+      ...response,
+      hints: [{ operation: 'some_future_operation' }],
+    }).hints,
+  ).toEqual([{ note: 'Use the some_future_operation operation.' }]);
+});
+
+it('renders hints from the result without another request', async () => {
+  const serverResponse: AgentGameResponse = {
+    ...response,
+    hints: [
+      {
+        operation: 'equip_item',
+        arguments: { equipment_id: '11111111-1111-4111-8111-111111111111' },
+      },
+    ],
+  };
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(serverResponse);
+  const result = await execute(
+    [
+      'buy',
+      '--item',
+      'basic_pickaxe',
+      '--max-payment',
+      '100',
+      '-c',
+      'HintHero0000',
+      '-l',
+      'ja',
+    ],
+    vi.fn(),
+  );
+  expect(result).toMatchObject({
+    hints: [
+      {
+        note: 'Run `equip --equipment 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
+      },
+    ],
+  });
+  expect(serverResponse.hints).toHaveLength(1);
+  expect(invoke).toHaveBeenCalledTimes(1);
+});
+
+it('leaves failures and results without hints unchanged', async () => {
   const failure: AgentGameResponse = {
     ...response,
     ok: false,
@@ -76,7 +119,11 @@ it('leaves failures and ordinary reads unchanged', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(failure);
-  expect(await execute(['hello', '-c', 'HintHero'], vi.fn())).toEqual(failure);
+  expect(await execute(['hello', '-c', 'HintHero0000'], vi.fn())).toEqual(
+    failure,
+  );
   invoke.mockResolvedValue(response);
-  expect(await execute(['map', '-c', 'HintHero'], vi.fn())).toEqual(response);
+  expect(await execute(['map', '-c', 'HintHero0000'], vi.fn())).toEqual(
+    response,
+  );
 });
