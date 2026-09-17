@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const localeSchema = z.enum(['ja', 'en']);
 export const countrySchema = z.enum(['verden', 'eisen', 'ordelia']);
 export const jobSchema = z.enum(['warrior', 'rogue', 'mage', 'priest', 'bard']);
-export const publicIdSchema = z.string().regex(/^[A-Za-z]{3,20}$/);
+export const characterIdSchema = z.string().regex(/^[A-Za-z0-9_-]{12}$/);
+export const discriminatorSchema = z.string().regex(/^[0-9]{4}$/);
 export const uuidSchema = z.uuid();
 export const timestampSchema = z.iso.datetime();
 export const itemIdSchema = z.enum([
@@ -29,6 +30,16 @@ export const itemIdSchema = z.enum([
   'wolf_jerky',
   'metal_repair_kit',
   'basic_pickaxe',
+  'silver_ore',
+  'silver_ingot',
+  'silver_repair_kit',
+  'iron_shield',
+  'silver_sword',
+  'silver_dagger',
+  'silver_staff',
+  'silver_mace',
+  'silver_lyre',
+  'silver_shield',
 ]);
 export type ItemId = z.infer<typeof itemIdSchema>;
 export type JobId = z.infer<typeof jobSchema>;

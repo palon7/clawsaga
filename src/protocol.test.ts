@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 import { agentGameResponseSchema } from './protocol.js';
 import { combatReportSchema, useItemSchema } from './protocol/combat.js';
+import {
+  agentCombatResultSchema,
+  agentRestResultSchema,
+} from './protocol/activity.js';
 import { itemIdSchema } from './protocol/ids.js';
 import { recipeViewSchema } from './protocol/production.js';
 import { lookResourceSchema } from './protocol/movement.js';
@@ -19,7 +23,8 @@ it('accepts the compact profile receipt', () => {
 
 it('requires a position in character responses', () => {
   const character = {
-    public_id: 'Aster',
+    character_id: 'Aster0000000',
+    discriminator: '0001',
     preferred_locale: 'en',
     job_id: 'mage',
     job_name: 'Mage',
@@ -105,7 +110,8 @@ it('accepts characters discovered in a completed travel result', () => {
         end_reason: 'COMPLETED',
         characters: [
           {
-            public_id: 'Alicia',
+            character_id: 'Alicia000000',
+            discriminator: '0002',
             lang: 'ja',
             user_content: { display_name: 'アリシア' },
           },
@@ -117,7 +123,8 @@ it('accepts characters discovered in a completed travel result', () => {
     kind: 'travel',
     characters: [
       {
-        public_id: 'Alicia',
+        character_id: 'Alicia000000',
+        discriminator: '0002',
         lang: 'ja',
         user_content: { display_name: 'アリシア' },
       },
@@ -162,6 +169,26 @@ it('accepts wolf meat and wolf jerky in inventory responses', () => {
   ).toBe(true);
 });
 
+it('accepts non-standard qualities on individual items', () => {
+  expect(
+    agentGameResponseSchema.safeParse({
+      ok: true,
+      schema_version: '3.0',
+      server_time: '2026-09-12T00:00:00.000Z',
+      locale: 'en',
+      data: {
+        inventory: [
+          { ...inventoryItem('iron_sword', 'Iron Sword'), quality: 'fine' },
+          {
+            ...inventoryItem('iron_dagger', 'Iron Dagger'),
+            quality: 'superior',
+          },
+        ],
+      },
+    }).success,
+  ).toBe(true);
+});
+
 it('accepts wolf meat loot and the wolf jerky recipe', () => {
   expect(
     combatReportSchema.safeParse({
@@ -174,6 +201,7 @@ it('accepts wolf meat loot and the wolf jerky recipe', () => {
       healing: 0,
       potions_used: 0,
       experience_gained: 5,
+      gold_gained: 2,
       loot: [{ item_id: 'wolf_meat', name: 'Wolf Meat', quantity: 1 }],
       unclaimed_loot: [],
       rules: [],
@@ -214,6 +242,81 @@ it('accepts wolf meat loot and the wolf jerky recipe', () => {
   ).toBe(true);
 });
 
+it('requires a confirmed summary on a settled combat or rest result', () => {
+  const activityId = '11111111-1111-4111-8111-111111111111';
+  const ended = {
+    activity_id: activityId,
+    status: 'ENDED',
+    ended_at: '2026-09-12T00:00:10.000Z',
+  };
+  const settled = {
+    ...ended,
+    kind: 'combat',
+    end_reason: 'VICTORY',
+    enemy_id: 'wolf',
+    enemy_name: 'Wolf',
+    practice: false,
+    summary: {
+      experience: { job_id: 'mage', awarded: 10 },
+      gold_gained: 2,
+      loot: [{ item_id: 'wolf_meat', name: 'Wolf Meat', quantity: 1 }],
+      unclaimed_loot: [],
+      potions_used: 0,
+    },
+  };
+  expect(agentCombatResultSchema.safeParse(settled).success).toBe(true);
+  const { summary: _summary, ...withoutSummary } = settled;
+  expect(agentCombatResultSchema.safeParse(withoutSummary).success).toBe(false);
+
+  const cancelled = {
+    ...ended,
+    kind: 'combat',
+    end_reason: 'CANCELLED',
+    summary: null,
+  };
+  expect(agentCombatResultSchema.safeParse(cancelled).success).toBe(true);
+  expect(
+    agentCombatResultSchema.safeParse({ ...settled, end_reason: 'CANCELLED' })
+      .success,
+  ).toBe(false);
+
+  const rest = {
+    ...ended,
+    kind: 'rest',
+    end_reason: 'COMPLETED',
+    summary: { hp: 100, mp: 100, weakened_until: null },
+  };
+  expect(agentRestResultSchema.safeParse(rest).success).toBe(true);
+  expect(
+    agentRestResultSchema.safeParse({ ...rest, summary: undefined }).success,
+  ).toBe(false);
+});
+
+it('accepts the compact character status alongside other data', () => {
+  expect(
+    agentGameResponseSchema.safeParse({
+      ok: true,
+      schema_version: '3.0',
+      server_time: '2026-09-12T00:00:00.000Z',
+      locale: 'en',
+      data: {
+        status: {
+          character_id: 'Aster0000000',
+          job_id: 'mage',
+          hp: 90,
+          max_hp: 100,
+          mp: 40,
+          max_mp: 100,
+          gold: 100,
+          level: 2,
+          experience: 60,
+          weakened_until: null,
+        },
+      },
+    }).success,
+  ).toBe(true);
+});
+
 it('accepts gathered nuts as a look resource', () => {
   expect(
     lookResourceSchema.safeParse({
@@ -233,38 +336,45 @@ it('accepts gathered nuts as a look resource', () => {
 it('uses only cooked recovery foods and rejects raw ingredients', () => {
   for (const item_id of ['healing_potion', 'travel_ration', 'wolf_jerky']) {
     expect(
-      useItemSchema.safeParse({ character_id: 'Traveler', item_id }).success,
+      useItemSchema.safeParse({ character_id: 'Traveler0000', item_id })
+        .success,
     ).toBe(true);
   }
   for (const item_id of ['wolf_meat', 'food', 'herb']) {
     expect(
-      useItemSchema.safeParse({ character_id: 'Traveler', item_id }).success,
+      useItemSchema.safeParse({ character_id: 'Traveler0000', item_id })
+        .success,
     ).toBe(false);
   }
 });
 
-it('accepts only the exact hello next step in a create response', () => {
+it('accepts operation and note hints and rejects other shapes', () => {
   const result = {
     ok: true,
     schema_version: '3.0',
     server_time: '2026-09-12T00:00:00.000Z',
     locale: 'en',
-    data: {
-      created: { public_id: 'Aster' },
-      next_step: { operation: 'hello', arguments: { character_id: 'Aster' } },
-    },
+    data: {},
   };
-  expect(agentGameResponseSchema.safeParse(result).success).toBe(true);
-  for (const next_step of [
-    { operation: 'goodbye', arguments: { character_id: 'Aster' } },
-    { operation: 'hello', arguments: { character_id: 'Aster', extra: 'x' } },
-    { operation: 'hello', arguments: { character_id: 'A' } },
-    { operation: 'hello', arguments: {} },
+  expect(
+    agentGameResponseSchema.safeParse({
+      ...result,
+      hints: [
+        { operation: 'hello', arguments: { character_id: 'Aster0000000' } },
+        { note: 'Save a goal spanning several activities in the plan.' },
+      ],
+    }).success,
+  ).toBe(true);
+  for (const hints of [
+    [{ operation: 'hello', arguments: { character_id: 7 } }],
+    [{ operation: 'hello', note: 'Two forms at once.' }],
+    [{ note: '' }],
+    [{ arguments: { character_id: 'Aster0000000' } }],
   ]) {
     expect(
       agentGameResponseSchema.safeParse({
         ...result,
-        data: { ...result.data, next_step },
+        hints,
       }).success,
     ).toBe(false);
   }

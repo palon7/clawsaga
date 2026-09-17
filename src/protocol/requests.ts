@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { unicodeTextSchema } from './text.js';
-import { localeSchema, jobSchema, publicIdSchema } from './ids.js';
+import {
+  localeSchema,
+  jobSchema,
+  characterIdSchema,
+  discriminatorSchema,
+} from './ids.js';
 
 export const displayNameSchema = unicodeTextSchema
   .transform((s) => s.trim().normalize('NFC'))
@@ -19,7 +24,7 @@ const presentation = {
 };
 
 const target = {
-  character_id: publicIdSchema.describe('The public character ID.'),
+  character_id: characterIdSchema.describe('The immutable Character ID.'),
 };
 
 export const includeSchema = z.enum(['profile', 'inventory']);
@@ -50,8 +55,43 @@ export const createCharacterSchema = z
     persona: personaSchema.optional(),
     preferred_locale: localeSchema,
     display_name: displayNameSchema,
-    public_id: publicIdSchema,
     job_id: jobSchema,
+  })
+  .strict();
+
+const searchNameSchema = unicodeTextSchema
+  .transform((s) => s.trim().normalize('NFC'))
+  .refine(
+    (s) =>
+      [...s].length >= 1 &&
+      [...s].length <= 32 &&
+      !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(s),
+    'Use 1–32 characters without line breaks or control characters.',
+  );
+
+export const searchCharactersSchema = z
+  .object({
+    ...presentation,
+    name: searchNameSchema,
+    discriminator: discriminatorSchema.optional(),
+    cursor: characterIdSchema.optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.discriminator && [...value.name].length < 3)
+      context.addIssue({
+        code: 'custom',
+        path: ['name'],
+        message: 'Use 3–32 characters for an exact name search.',
+      });
+  });
+
+export const resolveCharacterSchema = z
+  .object({
+    ...presentation,
+    name: displayNameSchema,
+    discriminator: discriminatorSchema.optional(),
   })
   .strict();
 
@@ -62,3 +102,5 @@ export type GetCharacterInput = z.infer<typeof getCharacterSchema>;
 
 export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type SearchCharactersInput = z.infer<typeof searchCharactersSchema>;
+export type ResolveCharacterInput = z.infer<typeof resolveCharacterSchema>;

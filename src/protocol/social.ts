@@ -2,13 +2,14 @@ import { z } from 'zod';
 import { unicodeTextSchema } from './text.js';
 import {
   localeSchema,
-  publicIdSchema,
+  characterIdSchema,
+  discriminatorSchema,
   timestampSchema,
   uuidSchema,
 } from './ids.js';
 
 const target = {
-  character_id: publicIdSchema,
+  character_id: characterIdSchema,
   locale: localeSchema.optional(),
 };
 const cursor = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
@@ -78,13 +79,38 @@ export const planReceiptSchema = z.object({
   language: localeSchema,
   updated_at: timestampSchema,
 });
-export const regionIdSchema = z.enum([
-  'selene',
-  'dolgan',
+export const chatChannelIdSchema = z.enum([
+  'ashfield',
+  'blackoak',
   'corvent',
   'crossroads',
+  'darras',
+  'dolgan',
+  'hollowdell',
+  'hollowdell_road',
+  'korholm',
+  'laures_centre',
+  'laures_deep',
+  'laures_outerwall',
+  'laures_westgate',
+  'mossway',
+  'north_road',
+  'old_imperial_road',
+  'openpit',
+  'river_side',
+  'selene',
+  'silverthread_lake',
+  'south_road',
+  'undercroft',
+  'whitecliff',
 ]);
-export type RegionId = z.infer<typeof regionIdSchema>;
+export type ChatChannelId = z.infer<typeof chatChannelIdSchema>;
+export const chatChannelSchema = z
+  .object({
+    id: chatChannelIdSchema,
+    name: z.string(),
+  })
+  .meta({ id: 'ChatChannel' });
 const messagePage = {
   before: cursor.optional(),
   after: cursor.optional(),
@@ -113,38 +139,32 @@ export const getDirectMessagesSchema = z
   .object({
     ...target,
     ...messagePage,
-    with_character_id: publicIdSchema.optional(),
-    unread_only: z.boolean().optional(),
-  })
-  .strict();
-export const getMentionsSchema = z
-  .object({
-    ...target,
-    ...messagePage,
+    with_character_id: characterIdSchema.optional(),
     unread_only: z.boolean().optional(),
   })
   .strict();
 export const sendDirectMessageSchema = z
   .object({
     ...target,
-    recipient_character_id: publicIdSchema,
+    recipient_character_id: characterIdSchema,
     text: messageText(1000),
     language: localeSchema,
   })
   .strict();
 export const attentionSchema = z.object({
   unread_direct_messages: z.number().int().nonnegative(),
-  unread_mentions: z.number().int().nonnegative(),
-  regional_chat: z.object({
-    region_id: regionIdSchema,
+  chat: z.object({
+    channel_id: chatChannelIdSchema,
     new_messages: z.number().int().nonnegative(),
   }),
 });
 export const directMessageSchema = z.object({
   message_id: uuidSchema,
   number: cursor,
-  sender_character_id: publicIdSchema,
-  recipient_character_id: publicIdSchema,
+  sender_character_id: characterIdSchema,
+  sender_discriminator: discriminatorSchema,
+  recipient_character_id: characterIdSchema,
+  recipient_discriminator: discriminatorSchema,
   created_at: timestampSchema,
   language: localeSchema,
   read_at: timestampSchema.nullable().optional(),
@@ -155,7 +175,8 @@ export const directMessageSchema = z.object({
   }),
 });
 export const directConversationSchema = z.object({
-  character_id: publicIdSchema,
+  character_id: characterIdSchema,
+  discriminator: discriminatorSchema,
   last_direction: z.enum(['sent', 'received']),
   last_message_at: timestampSchema,
   user_content: z.object({ name: z.string() }),
@@ -177,8 +198,9 @@ export const chatMessageSchema = z
   .object({
     message_id: uuidSchema,
     number: cursor,
-    region_id: regionIdSchema,
-    author_character_id: publicIdSchema,
+    channel_id: chatChannelIdSchema,
+    author_character_id: characterIdSchema,
+    author_discriminator: discriminatorSchema,
     created_at: timestampSchema,
     language: localeSchema,
     references: z.array(contentReferenceSchema),

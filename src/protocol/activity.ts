@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { itemIdSchema } from './ids.js';
+import { itemIdSchema, jobSchema } from './ids.js';
 import {
   ambushReferenceSchema,
   locationViewSchema,
@@ -124,18 +124,50 @@ export const agentCraftResultSchema = z.object({
   output: agentMaterialSchema,
   fee_paid: z.number().int().nonnegative(),
 });
-export const agentCombatResultSchema = z.object({
+
+export const agentCombatSummarySchema = z.object({
+  experience: z.object({
+    job_id: jobSchema,
+    awarded: z.number().int().nonnegative(),
+  }),
+  gold_gained: z.number().int().nonnegative(),
+  loot: z.array(agentMaterialSchema),
+  unclaimed_loot: z.array(agentMaterialSchema),
+  potions_used: z.number().int().nonnegative(),
+});
+export type AgentCombatSummary = z.infer<typeof agentCombatSummarySchema>;
+
+export const agentRestSummarySchema = z.object({
+  hp: z.number().int().nonnegative(),
+  mp: z.number().int().min(0).max(100),
+  weakened_until: z.iso.datetime().nullable(),
+});
+export type AgentRestSummary = z.infer<typeof agentRestSummarySchema>;
+
+const agentSettledCombatResultSchema = z.object({
   ...ended,
   kind: z.literal('combat'),
-  end_reason: z.enum(['VICTORY', 'DEFEATED', 'RETREATED', 'CANCELLED']),
-  enemy_id: z.string().optional(),
-  enemy_name: z.string().optional(),
-  practice: z.boolean().optional(),
+  end_reason: z.enum(['VICTORY', 'DEFEATED', 'RETREATED']),
+  enemy_id: z.string(),
+  enemy_name: z.string(),
+  practice: z.boolean(),
+  summary: agentCombatSummarySchema,
 });
+const agentCancelledCombatResultSchema = z.object({
+  ...ended,
+  kind: z.literal('combat'),
+  end_reason: z.literal('CANCELLED'),
+  summary: z.null(),
+});
+export const agentCombatResultSchema = z.discriminatedUnion('end_reason', [
+  agentSettledCombatResultSchema,
+  agentCancelledCombatResultSchema,
+]);
 export const agentRestResultSchema = z.object({
   ...ended,
   kind: z.literal('rest'),
   end_reason: z.enum(['COMPLETED', 'STOPPED']),
+  summary: agentRestSummarySchema,
 });
 export const agentLastResultSchema = z.discriminatedUnion('kind', [
   agentTravelResultSchema,

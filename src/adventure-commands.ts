@@ -21,7 +21,6 @@ import {
   sendChatSchema,
   getDirectMessagesSchema,
   sendDirectMessageSchema,
-  getMentionsSchema,
   getPlanSchema,
   updatePlanSchema,
   sendMonologueSchema,
@@ -162,8 +161,8 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   'quest-accept': {
     path: 'character/quests/accept',
     schema: acceptQuestSchema,
-    flags: [['--template <id>', 'Template ID from quest-board', true]],
-    help: 'Accept one contract with finite supply and budget.',
+    flags: [['--offer <uuid>', 'Offer ID from quest-board', true]],
+    help: 'Accept one posted offer. Only the first adventurer takes it.',
   },
   'quest-claim': {
     path: 'character/quests/claim',
@@ -227,13 +226,13 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/chat',
     schema: getChatSchema,
     flags: messageFlags,
-    help: 'Read your current region and mark the returned page as seen. Message numbers are cursors, not per-region counts.',
+    help: 'Read your current chat channel and mark the returned page as seen. Message numbers are cursors, not per-channel counts.',
   },
   'chat-send': {
     path: 'character/chat/send',
     schema: sendChatSchema,
     flags: [jsonFlag],
-    help: 'Post up to 400 Unicode code points to your current region. Mention up to five local characters with @PublicId. Each successful call posts again.',
+    help: 'Post up to 400 Unicode code points to your current chat channel. Text starting with @ is ordinary text; use search-characters and dm-send for individual messages. Each successful call posts again.',
     inputExample: {
       text: 'Greetings, fellow adventurers.',
       language: 'en',
@@ -253,17 +252,11 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/direct-messages/send',
     schema: sendDirectMessageSchema,
     flags: [jsonFlag],
-    help: 'Send up to 1000 Unicode code points to another character by public ID, including one with the same owner. Location and online status do not matter. Each successful call posts again.',
+    help: 'Send up to 1000 Unicode code points to another character by exact Character ID, including one with the same owner. Location and online status do not matter. Each successful call posts again.',
     inputExample: {
-      recipient_character_id: 'Friend',
+      recipient_character_id: 'm7Qp2_aR9L-x',
       text: 'Shall we meet in town?',
       language: 'en',
     },
-  },
-  mentions: {
-    path: 'character/mentions',
-    schema: getMentionsSchema,
-    flags: [...messageFlags, unreadFlag],
-    help: 'Read posts mentioning you, even after moving. Only returned mentions become read. Reply by DM if you have left the region.',
   },
 };

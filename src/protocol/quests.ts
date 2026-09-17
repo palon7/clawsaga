@@ -3,7 +3,7 @@ import {
   itemIdSchema,
   jobSchema,
   localeSchema,
-  publicIdSchema,
+  characterIdSchema,
   timestampSchema,
   uuidSchema,
 } from './ids.js';
@@ -27,7 +27,7 @@ export const questObjectiveSchema = z
   .meta({ id: 'QuestObjective' });
 export type QuestObjective = z.infer<typeof questObjectiveSchema>;
 const target = {
-  character_id: publicIdSchema,
+  character_id: characterIdSchema,
   locale: localeSchema.optional(),
 };
 export const getQuestsSchema = z
@@ -35,7 +35,7 @@ export const getQuestsSchema = z
   .strict();
 export const getQuestBoardSchema = z.object(target).strict();
 export const acceptQuestSchema = z
-  .object({ ...target, template_id: combatIdSchema })
+  .object({ ...target, offer_id: uuidSchema })
   .strict();
 export const claimQuestSchema = z
   .object({ ...target, quest_id: uuidSchema })
@@ -44,7 +44,8 @@ export type AcceptQuestInput = z.infer<typeof acceptQuestSchema>;
 export type ClaimQuestInput = z.infer<typeof claimQuestSchema>;
 export const questOfferSchema = z
   .object({
-    template_id: combatIdSchema,
+    offer_id: uuidSchema,
+    family_id: combatIdSchema,
     name: z.string(),
     description: z.string(),
     town_id: locationIdSchema,
@@ -53,14 +54,15 @@ export const questOfferSchema = z
     reward_gold: z.number().int().nonnegative(),
     reward_experience: z.number().int().nonnegative(),
     duration_hours: z.number().int().positive(),
-    available_contracts: z.number().int().nonnegative(),
+    posted_at: timestampSchema,
+    expires_at: timestampSchema,
   })
   .meta({ id: 'QuestOffer' });
 export const questViewSchema = z
   .object({
     quest_id: uuidSchema,
     number: z.number().int().positive(),
-    template_id: combatIdSchema,
+    family_id: combatIdSchema,
     name: z.string(),
     town_id: locationIdSchema,
     objective: questObjectiveSchema,

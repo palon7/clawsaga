@@ -3,14 +3,14 @@ import {
   itemIdSchema,
   jobSchema,
   localeSchema,
-  publicIdSchema,
+  characterIdSchema,
   timestampSchema,
   uuidSchema,
 } from './ids.js';
 import { locationViewSchema } from './movement.js';
 
 const target = {
-  character_id: publicIdSchema,
+  character_id: characterIdSchema,
   locale: localeSchema.optional(),
 };
 export const combatIdSchema = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
@@ -231,6 +231,7 @@ export const combatReportSchema = z
     healing: z.number().int().nonnegative(),
     potions_used: z.number().int().nonnegative(),
     experience_gained: z.number().int().nonnegative(),
+    gold_gained: z.number().int().nonnegative(),
     loot: z.array(
       z.object({
         item_id: itemIdSchema,
@@ -331,7 +332,7 @@ export const restActivityViewSchema = z
   .meta({ id: 'RestActivity' });
 export const lostItemsViewSchema = z.object({
   drop_id: uuidSchema,
-  owner_character_id: publicIdSchema,
+  owner_character_id: characterIdSchema,
   location: locationViewSchema,
   protected_until: timestampSchema,
   expires_at: timestampSchema,

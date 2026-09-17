@@ -21,8 +21,8 @@ import {
 import { questOfferSchema, questViewSchema } from './quests.js';
 import {
   journalViewSchema,
+  chatChannelSchema,
   chatMessageSchema,
-  regionIdSchema,
   planViewSchema,
   planReceiptSchema,
   attentionSchema,
@@ -33,12 +33,14 @@ import { recipeViewSchema, shopViewSchema } from './production.js';
 import {
   localeSchema,
   jobSchema,
-  publicIdSchema,
+  characterIdSchema,
+  discriminatorSchema,
   skillIdSchema,
 } from './ids.js';
 
 export const characterViewSchema = z.object({
-  public_id: publicIdSchema,
+  character_id: characterIdSchema,
+  discriminator: discriminatorSchema,
   preferred_locale: localeSchema,
   job_id: jobSchema,
   job_name: z.string(),
@@ -80,6 +82,19 @@ export const characterViewSchema = z.object({
   }),
 });
 
+export const characterStatusSchema = z.object({
+  character_id: characterIdSchema,
+  job_id: jobSchema,
+  hp: z.number().int().nonnegative(),
+  max_hp: z.number().int().positive(),
+  mp: z.number().int().min(0).max(100),
+  max_mp: z.literal(100),
+  gold: z.number().int(),
+  level: z.number().int(),
+  experience: z.number().int(),
+  weakened_until: z.iso.datetime().nullable(),
+});
+
 const itemSchema = z.object({
   id: z.string(),
   definition_id: z.string(),
@@ -87,8 +102,20 @@ const itemSchema = z.object({
   quantity: z.number().int(),
   unit_weight: z.number().int().positive(),
   tradeable: z.boolean(),
-  slot: z.enum(['main_hand', 'body', 'gathering_tool']).nullable(),
-  quality: z.literal('standard').nullable(),
+  slot: z
+    .enum([
+      'main_hand',
+      'off_hand',
+      'body',
+      'head',
+      'leg',
+      'foot',
+      'hands',
+      'neck',
+      'gathering_tool',
+    ])
+    .nullable(),
+  quality: z.enum(['standard', 'fine', 'superior']).nullable(),
   durability: z.number().nullable(),
   max_durability: z.number().nullable(),
 });
@@ -107,12 +134,42 @@ export const optionsSchema = z.object({
   supported_locales: z.array(localeSchema),
 });
 
-export const nextStepSchema = z
-  .object({
-    operation: z.literal('hello'),
-    arguments: z.object({ character_id: publicIdSchema }).strict(),
-  })
-  .strict();
+// The server names the next operation; the CLI renders it with its own
+// command names and flags.
+export const agentHintSchema = z.union([
+  z
+    .object({
+      operation: z.string().min(1),
+      arguments: z.record(z.string(), z.string()).optional(),
+    })
+    .strict(),
+  z.object({ note: z.string().min(1) }).strict(),
+]);
+
+export type AgentHint = z.infer<typeof agentHintSchema>;
+
+const guideTopicSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+});
+
+export const guideResponseSchema = z.object({
+  locale: z.literal('en'),
+  guide: z.object({
+    topics: z.array(guideTopicSchema),
+    section: guideTopicSchema.extend({ body: z.string().min(1) }).optional(),
+  }),
+});
+
+export const agentResumeResponseSchema = z.object({
+  locale: z.literal('en'),
+  resume: z.object({ title: z.string().min(1), body: z.string().min(1) }),
+});
+
+export type GuideResponse = z.infer<typeof guideResponseSchema>;
+
+export type AgentResumeResponse = z.infer<typeof agentResumeResponseSchema>;
 
 export const profileReceiptSchema = z.object({
   preferred_locale: localeSchema,
@@ -126,19 +183,12 @@ export const agentGameResponseSchema = z
     locale: localeSchema,
     next_poll_after_seconds: z.number().int().positive().optional(),
     attention: attentionSchema.optional(),
+    hints: z.array(agentHintSchema).optional(),
     data: z.object({
       direct_messages: z
         .object({
           messages: z.array(directMessageSchema),
           conversations: z.array(directConversationSchema),
-          next_cursor: z.number().int().positive().nullable(),
-        })
-        .optional(),
-      mentions: z
-        .object({
-          messages: z.array(
-            chatMessageSchema.extend({ read_at: z.iso.datetime().nullable() }),
-          ),
           next_cursor: z.number().int().positive().nullable(),
         })
         .optional(),
@@ -174,7 +224,7 @@ export const agentGameResponseSchema = z
         .optional(),
       chat: z
         .object({
-          region_id: regionIdSchema,
+          channel: chatChannelSchema,
           messages: z.array(chatMessageSchema),
           next_cursor: z.number().int().positive().nullable(),
         })
@@ -188,7 +238,8 @@ export const agentGameResponseSchema = z
       characters: z
         .array(
           z.object({
-            public_id: publicIdSchema,
+            character_id: characterIdSchema,
+            discriminator: discriminatorSchema,
             job_id: jobSchema,
             job_name: z.string(),
             user_content: z.object({ display_name: z.string() }),
@@ -196,8 +247,27 @@ export const agentGameResponseSchema = z
         )
         .optional(),
       character: characterViewSchema.optional(),
-      created: z.object({ public_id: publicIdSchema }).optional(),
-      next_step: nextStepSchema.optional(),
+      status: characterStatusSchema.optional(),
+      created: z
+        .object({
+          character_id: characterIdSchema,
+          discriminator: discriminatorSchema,
+          user_content: z.object({ display_name: z.string() }),
+        })
+        .optional(),
+      search_results: z
+        .object({
+          characters: z.array(
+            z.object({
+              character_id: characterIdSchema,
+              discriminator: discriminatorSchema,
+              language: localeSchema,
+              user_content: z.object({ display_name: z.string() }),
+            }),
+          ),
+          next_cursor: characterIdSchema.nullable(),
+        })
+        .optional(),
       profile_saved: profileReceiptSchema.optional(),
       options: optionsSchema.optional(),
       inventory: z.array(itemSchema).optional(),

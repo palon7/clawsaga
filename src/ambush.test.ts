@@ -103,7 +103,15 @@ it.each([
       );
     }
     const result = await execute(
-      ['gather', '-c', 'Traveler', '--item', 'herb', '--count', String(count)],
+      [
+        'gather',
+        '-c',
+        'Traveler0000',
+        '--item',
+        'herb',
+        '--count',
+        String(count),
+      ],
       vi.fn(),
     );
     const completedAll = before + 1 === count;
@@ -139,7 +147,7 @@ it.each([
       const [url, options] = request.mock.calls[index * 2 + 1]!;
       expect(new URL(String(url)).pathname).toBe('/api/v1/character/activity');
       expect(JSON.parse(String(options?.body))).toEqual({
-        character_id: 'Traveler',
+        character_id: 'Traveler0000',
         activity_id: sourceId,
       });
     }
@@ -184,7 +192,7 @@ it('returns arrival with the ambush result and the active combat', async () => {
     }),
   );
   expect(
-    await execute(['travel', '-c', 'Traveler', '--to', 'mossway'], vi.fn()),
+    await execute(['travel', '-c', 'Traveler0000', '--to', 'mossway'], vi.fn()),
   ).toMatchObject({
     ok: true,
     data: {
@@ -202,7 +210,7 @@ it('returns arrival with the ambush result and the active combat', async () => {
   });
   expect(request).toHaveBeenCalledTimes(2);
   expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body))).toEqual({
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     activity_id: travelId,
   });
 });
@@ -221,13 +229,14 @@ it('preserves look enemies, the active combat and unclaimed loot', async () => {
     response({
       look: {
         location: field,
+        chat: { id: 'selene', name: 'Selene' },
         resources: [],
         enemies: lookEnemies,
         facilities: [],
       },
     }),
   );
-  expect(await execute(['look', '-c', 'Traveler'], vi.fn())).toMatchObject({
+  expect(await execute(['look', '-c', 'Traveler0000'], vi.fn())).toMatchObject({
     data: { look: { location: field, enemies: lookEnemies } },
   });
   request.mockResolvedValueOnce(
@@ -250,7 +259,7 @@ it('preserves look enemies, the active combat and unclaimed loot', async () => {
     }),
   );
   expect(
-    await execute(['encounters', '-c', 'Traveler'], vi.fn()),
+    await execute(['encounters', '-c', 'Traveler0000'], vi.fn()),
   ).toMatchObject({
     data: { encounters: spawns },
   });
@@ -259,7 +268,7 @@ it('preserves look enemies, the active combat and unclaimed loot', async () => {
     response({ activity: runningCombat(combatId) }, true),
   );
   expect(
-    await execute(['activity', '-c', 'Traveler', '-a', combatId], vi.fn()),
+    await execute(['activity', '-c', 'Traveler0000', '-a', combatId], vi.fn()),
   ).toMatchObject({
     data: { activity: { activity_id: combatId, status: 'RUNNING' } },
   });
@@ -283,6 +292,7 @@ it('preserves look enemies, the active combat and unclaimed loot', async () => {
         healing: 0,
         potions_used: 0,
         experience_gained: 12,
+        gold_gained: 2,
         loot: [],
         unclaimed_loot: unclaimed,
         rules: [],
@@ -291,7 +301,7 @@ it('preserves look enemies, the active combat and unclaimed loot', async () => {
     }),
   );
   expect(
-    await execute(['report', '-c', 'Traveler', '-a', combatId], vi.fn()),
+    await execute(['report', '-c', 'Traveler0000', '-a', combatId], vi.fn()),
   ).toMatchObject({
     data: { combat_report: { loot: [], unclaimed_loot: unclaimed } },
   });

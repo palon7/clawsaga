@@ -2,7 +2,7 @@ import { z } from 'zod';
 import {
   itemIdSchema as itemId,
   localeSchema,
-  publicIdSchema,
+  characterIdSchema,
   skillIdSchema,
 } from './ids.js';
 import {
@@ -12,7 +12,7 @@ import {
 } from './movement.js';
 
 const common = {
-  character_id: publicIdSchema,
+  character_id: characterIdSchema,
   locale: localeSchema.optional(),
 };
 export const gatherSchema = z.object({ ...common, item_id: itemId }).strict();
@@ -23,7 +23,8 @@ export const craftSchema = z
   .object({
     ...common,
     recipe_id: z.string().min(1).max(128),
-    max_fee_per_lot: z.number().int().nonnegative(),
+    max_fee_per_lot: z.number().int().min(0).max(2_147_483_647),
+    request_id: z.uuid(),
   })
   .strict();
 export const stopActivitySchema = z
@@ -39,6 +40,9 @@ export const buySchema = z
   })
   .strict();
 export const equipSchema = z
+  .object({ ...common, equipment_id: z.uuid() })
+  .strict();
+export const repairSchema = z
   .object({ ...common, equipment_id: z.uuid() })
   .strict();
 

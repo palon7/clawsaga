@@ -51,6 +51,26 @@ it('uses one selected origin for authorization and game commands, with explicit 
   expect(origins).toHaveLength(4);
 });
 
+it('resolves a named character to a Character ID without -c or a JSON body', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  await execute(['resolve-character', '--name', 'Aster'], vi.fn());
+  expect(invoke).toHaveBeenCalledWith('characters/resolve', {
+    locale: 'en',
+    name: 'Aster',
+  });
+  await execute(
+    ['resolve-character', '--name', 'Aster', '--discriminator', '0427'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith('characters/resolve', {
+    locale: 'en',
+    name: 'Aster',
+    discriminator: '0427',
+  });
+});
+
 it('parses nested auth commands and rejects irrelevant or incomplete options before any request', async () => {
   const login = vi
     .spyOn(GameClient.prototype, 'login')
@@ -66,13 +86,13 @@ it('parses nested auth commands and rejects irrelevant or incomplete options bef
   expect(login).toHaveBeenCalledTimes(1);
   for (const args of [
     ['hello'],
-    ['hello', '--character', 'Traveler', '--route', 'route'],
+    ['hello', '--character', 'Traveler0000', '--route', 'route'],
     ['hello', '--character'],
     ['hello', '-c'],
-    ['hello', '-c', 'Traveler', '-r', 'route'],
+    ['hello', '-c', 'Traveler0000', '-r', 'route'],
     ['auth', 'login', '--input', 'settings.json'],
     ['characters', 'unexpected'],
-    ['hello', '--character', 'Traveler', '--content-language', 'fr'],
+    ['hello', '--character', 'Traveler0000', '--content-language', 'fr'],
   ])
     await expect(execute(args, vi.fn())).rejects.toMatchObject({
       code: 'INVALID_ARGUMENTS',
@@ -114,22 +134,22 @@ it('keeps English help available without authorization and separates content lan
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
   await execute(
-    ['--server', 'https://example.com', 'hello', '--character', 'Traveler'],
+    ['--server', 'https://example.com', 'hello', '--character', 'Traveler0000'],
     vi.fn(),
   );
   expect(invoke).toHaveBeenLastCalledWith('character/hello', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
   });
-  await execute(['-c', 'Traveler', 'hello'], vi.fn());
+  await execute(['-c', 'Traveler0000', 'hello'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('character/hello', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
   });
   await execute(
-    ['hello', '-s', 'https://example.com', '-c', 'Traveler', '-l', 'ja'],
+    ['hello', '-s', 'https://example.com', '-c', 'Traveler0000', '-l', 'ja'],
     vi.fn(),
   );
   expect(invoke).toHaveBeenLastCalledWith('character/hello', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     locale: 'ja',
   });
 });
@@ -176,7 +196,7 @@ it('generates structured help examples from the command definitions without auth
   )) as unknown as {
     help: { examples: string[] };
   };
-  expect(helloHelp.help.examples).toContain('clawsaga hello -c Aster');
+  expect(helloHelp.help.examples).toContain('clawsaga hello -c m7Qp2_aR9L-x');
   const routeHelp = (await execute(
     ['route', '--help'],
     vi.fn(),
@@ -186,16 +206,26 @@ it('generates structured help examples from the command definitions without auth
   );
 });
 
+it('passes a Character ID that begins with a dash without treating it as an option', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  await execute(['hello', '-c', '-AbC123xyz_9'], vi.fn());
+  expect(invoke).toHaveBeenLastCalledWith('character/hello', {
+    character_id: '-AbC123xyz_9',
+  });
+});
+
 it('accepts comma-separated include sections while help lists each choice', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
   await execute(
-    ['character', '-c', 'Aster', '--include', 'profile,inventory'],
+    ['character', '-c', 'Aster0000000', '--include', 'profile,inventory'],
     vi.fn(),
   );
   expect(invoke).toHaveBeenLastCalledWith('character', {
-    character_id: 'Aster',
+    character_id: 'Aster0000000',
     include: ['profile', 'inventory'],
   });
   const help = (await execute(['character', '--help'], vi.fn())) as unknown as {
@@ -215,7 +245,15 @@ it('rejects a command option value outside its request schema enum', async () =>
   const invoke = vi.spyOn(GameClient.prototype, 'invoke');
   await expect(
     execute(
-      ['fight', '-c', 'Aster', '--enemy', 'wolf', '--preset', 'reckless'],
+      [
+        'fight',
+        '-c',
+        'Aster0000000',
+        '--enemy',
+        'wolf',
+        '--preset',
+        'reckless',
+      ],
       vi.fn(),
     ),
   ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
@@ -229,7 +267,7 @@ it('returns the parser reason and command-specific help without sending a reques
       [
         'equip',
         '-c',
-        'Traveler',
+        'Traveler0000',
         '--equipment',
         '00000000-0000-4000-8000-000000000001',
         '--item',
@@ -301,11 +339,11 @@ it('validates JSON examples and keeps character and locale outside the body', as
     expect(inputExample).toBeDefined();
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(inputExample));
     const args = [name, '-i', 'body.json', '-l', 'ja'];
-    if (name !== 'create') args.push('-c', 'Traveler');
+    if (name !== 'create') args.push('-c', 'Traveler0000');
     await execute(args, vi.fn());
     expect(invoke.mock.lastCall?.[1]).toMatchObject({
       locale: 'ja',
-      ...(name === 'create' ? {} : { character_id: 'Traveler' }),
+      ...(name === 'create' ? {} : { character_id: 'Traveler0000' }),
     });
     const schema = await execute(['schema', name], vi.fn());
     expect(schema).toMatchObject({ input_kind: 'json_body' });
@@ -315,12 +353,12 @@ it('validates JSON examples and keeps character and locale outside the body', as
     expect(schema.input_schema.properties).not.toHaveProperty('locale');
   }
   invoke.mockClear();
-  for (const extra of [{ character_id: 'SomeoneElse' }, { locale: 'en' }]) {
+  for (const extra of [{ character_id: 'SomeoneElse0' }, { locale: 'en' }]) {
     vi.mocked(readFile).mockResolvedValue(
       JSON.stringify({ text: '', language: 'en', ...extra }),
     );
     await expect(
-      execute(['plan-set', '-c', 'Traveler', '-i', 'body.json'], vi.fn()),
+      execute(['plan-set', '-c', 'Traveler0000', '-i', 'body.json'], vi.fn()),
     ).rejects.toMatchObject({
       code: 'INVALID_ARGUMENTS',
       detail: {
@@ -333,9 +371,9 @@ it('validates JSON examples and keeps character and locale outside the body', as
   vi.mocked(readFile).mockResolvedValue(
     JSON.stringify({ text: '', language: 'en' }),
   );
-  await execute(['plan-set', '-c', 'Traveler', '-i', 'body.json'], vi.fn());
+  await execute(['plan-set', '-c', 'Traveler0000', '-i', 'body.json'], vi.fn());
   expect(invoke).toHaveBeenCalledWith('character/plan/update', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     text: '',
     language: 'en',
   });
@@ -347,13 +385,16 @@ it('rejects invalid Unicode in journal searches before making a request', async 
     .mockResolvedValue(initial);
   for (const query of ['\u0000', '\ud800', '\udfff']) {
     await expect(
-      execute(['journal', '-c', 'Traveler', '--query', query], vi.fn()),
+      execute(['journal', '-c', 'Traveler0000', '--query', query], vi.fn()),
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
   }
   expect(invoke).not.toHaveBeenCalled();
-  await execute(['journal', '-c', 'Traveler', '--query', '𠮷野🧙'], vi.fn());
+  await execute(
+    ['journal', '-c', 'Traveler0000', '--query', '𠮷野🧙'],
+    vi.fn(),
+  );
   expect(invoke).toHaveBeenCalledWith('character/journal', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     query: '𠮷野🧙',
   });
 });
@@ -403,7 +444,7 @@ it('waits the server interval and queries only the accepted activity until compl
     .mockResolvedValueOnce(completed);
   const notify = vi.fn();
   const pending = execute(
-    ['travel', '-c', 'Traveler', '--to', 'openpit', '-l', 'en'],
+    ['travel', '-c', 'Traveler0000', '--to', 'openpit', '-l', 'en'],
     notify,
   );
   await vi.advanceTimersByTimeAsync(4999);
@@ -412,11 +453,11 @@ it('waits the server interval and queries only the accepted activity until compl
   await vi.advanceTimersByTimeAsync(1);
   expect(invoke).toHaveBeenCalledTimes(2);
   await vi.advanceTimersByTimeAsync(10000);
-  expect(await pending).toBe(completed);
+  expect(await pending).toEqual(completed);
   expect(invoke).toHaveBeenCalledTimes(3);
   expect(notify).not.toHaveBeenCalled();
   expect(invoke).toHaveBeenLastCalledWith('character/activity', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     activity_id: initial.data.activity!.activity_id,
     locale: 'en',
   });
@@ -426,19 +467,19 @@ it('sends map scope, look people and route or travel destinations', async () => 
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
-  await execute(['map', '-c', 'Traveler', '--full'], vi.fn());
+  await execute(['map', '-c', 'Traveler0000', '--full'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('world/map', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     full: true,
   });
-  await execute(['look', '-c', 'Traveler', '--people'], vi.fn());
+  await execute(['look', '-c', 'Traveler0000', '--people'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('character/look', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     people: true,
   });
-  await execute(['route', '-c', 'Traveler', '--to', 'openpit'], vi.fn());
+  await execute(['route', '-c', 'Traveler0000', '--to', 'openpit'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('character/route', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     to: 'openpit',
   });
   invoke.mockResolvedValueOnce({
@@ -446,9 +487,9 @@ it('sends map scope, look people and route or travel destinations', async () => 
     ok: false,
     error: { message: 'That destination is not adjacent.' },
   });
-  await execute(['travel', '-c', 'Traveler', '--to', 'mossway'], vi.fn());
+  await execute(['travel', '-c', 'Traveler0000', '--to', 'mossway'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('character/travel', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     to: 'mossway',
   });
 });
@@ -460,7 +501,7 @@ it('stops on lost authorization and preserves the accepted ID without restarting
     .mockRejectedValue(new CliError('AUTH_REQUIRED'));
   const pending = waitForActivity(
     new GameClient('https://example.com'),
-    { character: 'Traveler' },
+    { character: 'Traveler0000' },
     initial,
   );
   const assertion = expect(pending).rejects.toMatchObject({
@@ -479,7 +520,7 @@ it('reports wait contract failures without resubmitting accepted activities', as
   await expect(
     waitForActivity(
       client,
-      { character: 'Traveler' },
+      { character: 'Traveler0000' },
       {
         ...initial,
         next_poll_after_seconds: undefined,
@@ -496,7 +537,7 @@ it('reports wait contract failures without resubmitting accepted activities', as
 
   invoke.mockResolvedValue({ ...initial, data: { activity: null } });
   const mismatched = expect(
-    waitForActivity(client, { character: 'Traveler' }, initial),
+    waitForActivity(client, { character: 'Traveler0000' }, initial),
   ).rejects.toMatchObject({
     code: 'INVALID_RESPONSE',
     detail: {
@@ -517,7 +558,7 @@ it('reports wait contract failures without resubmitting accepted activities', as
     }),
   );
   const invalid = expect(
-    waitForActivity(client, { character: 'Traveler' }, initial),
+    waitForActivity(client, { character: 'Traveler0000' }, initial),
   ).rejects.toMatchObject({
     code: 'INVALID_RESPONSE',
     detail: {
@@ -570,6 +611,7 @@ it('waits for an accepted fight and returns a cancellation without starting anot
         status: 'ENDED',
         end_reason: 'CANCELLED',
         ended_at: '2026-09-09T00:00:10.000Z',
+        summary: null,
       },
     },
   };
@@ -581,7 +623,7 @@ it('waits for an accepted fight and returns a cancellation without starting anot
     [
       'fight',
       '-c',
-      'Traveler',
+      'Traveler0000',
       '--enemy',
       'wolf',
       '--practice',
@@ -598,7 +640,7 @@ it('waits for an accepted fight and returns a cancellation without starting anot
     [
       'character/combat/start',
       {
-        character_id: 'Traveler',
+        character_id: 'Traveler0000',
         enemy_id: 'wolf',
         practice: true,
         preset: 'safe',
@@ -607,7 +649,7 @@ it('waits for an accepted fight and returns a cancellation without starting anot
     [
       'character/activity',
       {
-        character_id: 'Traveler',
+        character_id: 'Traveler0000',
         activity_id: battle.data.activity!.activity_id,
       },
     ],
@@ -619,9 +661,9 @@ it('validates quest identifiers and cursors before sending requests', async () =
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
   for (const args of [
-    ['quest-claim', '-c', 'Traveler', '--quest', 'not-a-uuid'],
-    ['quests', '-c', 'Traveler', '--before', '1.5'],
-    ['quest-accept', '-c', 'Traveler'],
+    ['quest-claim', '-c', 'Traveler0000', '--quest', 'not-a-uuid'],
+    ['quests', '-c', 'Traveler0000', '--before', '1.5'],
+    ['quest-accept', '-c', 'Traveler0000'],
   ]) {
     await expect(execute(args, vi.fn())).rejects.toMatchObject({
       code: 'INVALID_ARGUMENTS',
@@ -629,12 +671,18 @@ it('validates quest identifiers and cursors before sending requests', async () =
   }
   expect(invoke).not.toHaveBeenCalled();
   await execute(
-    ['quest-accept', '-c', 'Traveler', '--template', 'selene_herbs'],
+    [
+      'quest-accept',
+      '-c',
+      'Traveler0000',
+      '--offer',
+      '11111111-1111-4111-8111-111111111111',
+    ],
     vi.fn(),
   );
   expect(invoke).toHaveBeenCalledWith('character/quests/accept', {
-    character_id: 'Traveler',
-    template_id: 'selene_herbs',
+    character_id: 'Traveler0000',
+    offer_id: '11111111-1111-4111-8111-111111111111',
   });
 });
 
@@ -642,15 +690,15 @@ it('uses cooked recovery foods and rejects raw ingredients before sending', asyn
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
-  await execute(['use', '-c', 'Traveler', '--item', 'wolf_jerky'], vi.fn());
+  await execute(['use', '-c', 'Traveler0000', '--item', 'wolf_jerky'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('character/item/use', {
-    character_id: 'Traveler',
+    character_id: 'Traveler0000',
     item_id: 'wolf_jerky',
   });
   invoke.mockClear();
   for (const item_id of ['wolf_meat', 'food', 'herb']) {
     await expect(
-      execute(['use', '-c', 'Traveler', '--item', item_id], vi.fn()),
+      execute(['use', '-c', 'Traveler0000', '--item', item_id], vi.fn()),
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
   }
   expect(invoke).not.toHaveBeenCalled();
