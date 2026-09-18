@@ -26,14 +26,18 @@ import {
   equipSchema,
   repairSchema,
   agentResumeResponseSchema,
+  changelogResponseSchema,
   guideResponseSchema,
   type AgentGameResponse,
   type AgentResumeResponse,
+  type ChangelogResponse,
   type GuideResponse,
 } from './protocol.js';
 import { GameClient, serverOrigin } from './client.js';
 import { CliError } from './errors.js';
 import { withRenderedHints } from './hints.js';
+import { changelogNote, updateNote, withNotes } from './notices.js';
+import { fetchPublishedVersion, isNewerVersion } from './update-check.js';
 import metadata from '../package.json' with { type: 'json' };
 import { adventureCommands } from './adventure-commands.js';
 import {
@@ -109,12 +113,12 @@ const commands: Record<string, CommandDefinition> = {
     flags: [
       [
         '--include <sections>',
-        'Comma-separated profile,inventory',
+        'Comma-separated profile,inventory; the response omits both unless named',
         false,
         ['profile', 'inventory'],
       ],
     ],
-    help: 'Read a character.',
+    help: 'Read a character. Add --include inventory for the carried items and --include profile for the persona.',
   },
   create: {
     path: 'character/create',
@@ -476,6 +480,20 @@ function programHelp(): StructuredHelp {
         name,
         description: definition.help,
       })),
+      {
+        name: 'guide [--topic <topic>]',
+        description:
+          'Read the English game guide. Without --topic, list the topics.',
+      },
+      {
+        name: 'resume',
+        description:
+          'Read the operating guide to follow when starting or resuming play.',
+      },
+      {
+        name: 'changelog',
+        description: 'Read the server changelog, newest first.',
+      },
       { name: 'schema <command>', description: 'Read a command input schema.' },
       {
         name: 'auth login',
@@ -509,9 +527,13 @@ function schemaHelp(): StructuredHelp {
 export async function execute(
   args: string[],
   notify: (value: unknown) => void,
+  options: { request?: typeof fetch } = {},
 ) {
+  const request = options.request ?? fetch;
   let helpTarget = 'clawsaga';
   let helpCommand = 'clawsaga --help';
+  let executedCommand: string | undefined;
+  let publishedVersion: Promise<string | undefined> | undefined;
   let executedCharacter: string | undefined;
   let schemaHelpResult:
     { input_schema: Record<string, unknown>; input_kind: string } | undefined;
@@ -519,6 +541,7 @@ export async function execute(
     | AgentGameResponse
     | GuideResponse
     | AgentResumeResponse
+    | ChangelogResponse
     | { ok: boolean; authenticated: boolean }
     | undefined;
   const program = new Command('clawsaga')
@@ -576,9 +599,13 @@ export async function execute(
   const guideCommand = program
     .command('guide')
     .description(
-      'Read the English game guide served by the game server. Without --topic, list the topics and what each covers.',
+      'Read the English game guide served by the game server. Without --topic or --query, list the topics and what each covers.',
     )
-    .option('--topic <topic>', 'Topic to read, chosen from the topic list');
+    .option('--topic <topic>', 'Topic to read, chosen from the topic list')
+    .option(
+      '--query <text>',
+      'Search every topic; separate alternatives with |',
+    );
   guideCommand.on('--help', () => {
     helpTarget = 'clawsaga guide';
     helpCommand = 'clawsaga guide --help';
@@ -586,10 +613,12 @@ export async function execute(
   guideCommand.action(async () => {
     helpCommand = 'clawsaga guide --help';
     const values = optionsSchema.parse(guideCommand.optsWithGlobals());
+    const search = new URLSearchParams();
+    if (values.topic !== undefined) search.set('topic', values.topic);
+    if (values.query !== undefined) search.set('query', values.query);
+    const suffix = search.size === 0 ? '' : `?${search}`;
     result = await clientFor(values).readDocument(
-      values.topic === undefined
-        ? 'guide'
-        : `guide?topic=${encodeURIComponent(values.topic)}`,
+      `guide${suffix}`,
       guideResponseSchema,
     );
   });
@@ -608,6 +637,21 @@ export async function execute(
     result = await clientFor(values).readDocument(
       'guide/resume',
       agentResumeResponseSchema,
+    );
+  });
+  const changelogCommand = program
+    .command('changelog')
+    .description('Read the server changelog, newest first.');
+  changelogCommand.on('--help', () => {
+    helpTarget = 'clawsaga changelog';
+    helpCommand = 'clawsaga changelog --help';
+  });
+  changelogCommand.action(async () => {
+    helpCommand = 'clawsaga changelog --help';
+    const values = optionsSchema.parse(changelogCommand.optsWithGlobals());
+    result = await clientFor(values).readDocument(
+      `changelog?locale=${values.contentLanguage ?? 'en'}`,
+      changelogResponseSchema,
     );
   });
   const login = program
@@ -650,6 +694,9 @@ export async function execute(
     });
     command.action(async () => {
       helpCommand = `clawsaga ${name} --help`;
+      executedCommand = name;
+      // 更新確認は外部への取得なので、ゲーム要求と並行して始める。
+      if (name === 'hello') publishedVersion = fetchPublishedVersion(request);
       const values = optionsSchema.parse(command.optsWithGlobals());
       executedCharacter = values.character;
       if (definition.requiresCharacter !== false && !values.character)
@@ -754,9 +801,23 @@ export async function execute(
   }
   if (schemaHelpResult) return { ok: true, ...schemaHelpResult };
   if (!result) throw new CliError('INVALID_COMMAND');
-  return 'schema_version' in result
-    ? withRenderedHints(result, executedCharacter)
-    : result;
+  if (!('schema_version' in result)) return result;
+  const rendered = withRenderedHints(result, executedCharacter);
+  if (executedCommand !== 'hello' || !rendered.ok) return rendered;
+  return withNotes(rendered, await helloNotes(rendered, publishedVersion));
+}
+
+async function helloNotes(
+  response: AgentGameResponse,
+  published: Promise<string | undefined> | undefined,
+): Promise<string[]> {
+  const notes: string[] = [];
+  if (response.data.changelog)
+    notes.push(changelogNote(response.data.changelog));
+  const latest = await published;
+  if (latest && isNewerVersion(latest, metadata.version))
+    notes.push(updateNote(metadata.version, latest));
+  return notes;
 }
 
 function structuredHelp(target: string): StructuredHelp {

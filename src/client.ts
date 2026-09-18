@@ -24,7 +24,7 @@ const serverMessageSchema = z.object({
 const schemaVersionSchema = z.object({ schema_version: z.string() });
 
 // Keep in step with the public agent contract the CLI bundles.
-const supportedSchemaVersion = { major: 3, minor: 0 };
+const supportedSchemaVersion = { major: 3, minor: 1 };
 
 function serverMessage(body: unknown): string | undefined {
   const parsed = serverMessageSchema.safeParse(body);

@@ -58,16 +58,16 @@ export const characterViewSchema = z.object({
   jobs: z.array(
     z.object({
       id: jobSchema,
-      level: z.number().int().min(1).max(20),
-      experience: z.number().int().min(0).max(19000),
+      level: z.number().int().min(1).max(10),
+      experience: z.number().int().min(0).max(4500),
     }),
   ),
   skills: z.array(
     z.object({
       id: skillIdSchema,
       name: z.string(),
-      level: z.number().int().min(1).max(20),
-      experience: z.number().int().min(0).max(19000),
+      level: z.number().int().min(1).max(10),
+      experience: z.number().int().min(0).max(4500),
       next_level_experience: z.number().int().positive().nullable(),
     }),
   ),
@@ -154,22 +154,47 @@ const guideTopicSchema = z.object({
   summary: z.string().min(1),
 });
 
+const guideMatchSchema = z.object({
+  topic_id: z.string().min(1),
+  title: z.string().min(1),
+  heading: z.string().min(1),
+  text: z.string().min(1),
+  topic_body_bytes: z.number().int().positive(),
+});
+
 export const guideResponseSchema = z.object({
-  locale: z.literal('en'),
   guide: z.object({
     topics: z.array(guideTopicSchema),
     section: guideTopicSchema.extend({ body: z.string().min(1) }).optional(),
+    matches: z.array(guideMatchSchema).optional(),
+    truncated: z.boolean().optional(),
   }),
 });
 
 export const agentResumeResponseSchema = z.object({
-  locale: z.literal('en'),
   resume: z.object({ title: z.string().min(1), body: z.string().min(1) }),
 });
 
 export type GuideResponse = z.infer<typeof guideResponseSchema>;
 
 export type AgentResumeResponse = z.infer<typeof agentResumeResponseSchema>;
+
+export const changelogEntrySchema = z.object({
+  id: z.number().int().positive(),
+  published_at: z.string().min(1),
+  title: z.string().min(1),
+  body: z.string().min(1),
+});
+
+export const changelogResponseSchema = z.object({
+  locale: localeSchema,
+  changelog: z.object({
+    entries: z.array(changelogEntrySchema),
+    next_cursor: z.number().int().positive().nullable(),
+  }),
+});
+
+export type ChangelogResponse = z.infer<typeof changelogResponseSchema>;
 
 export const profileReceiptSchema = z.object({
   preferred_locale: localeSchema,
@@ -178,9 +203,8 @@ export const profileReceiptSchema = z.object({
 export const agentGameResponseSchema = z
   .object({
     ok: z.boolean(),
-    schema_version: z.literal('3.0'),
+    schema_version: z.literal('3.1'),
     server_time: z.iso.datetime(),
-    locale: localeSchema,
     next_poll_after_seconds: z.number().int().positive().optional(),
     attention: attentionSchema.optional(),
     hints: z.array(agentHintSchema).optional(),
@@ -294,6 +318,9 @@ export const agentGameResponseSchema = z
       map: mapViewSchema.optional(),
       look: lookViewSchema.optional(),
       route: routeViewSchema.optional(),
+      changelog: z
+        .object({ published_at: z.string().min(1), title: z.string().min(1) })
+        .optional(),
     }),
     error: z
       .object({

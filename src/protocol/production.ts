@@ -50,7 +50,6 @@ const material = z.object({
   item_id: itemId,
   name: z.string(),
   quantity: z.number().int().positive(),
-  unit_weight: z.number().int().positive(),
 });
 export const recipeViewSchema = z.object({
   recipe_id: z.string(),
@@ -63,7 +62,6 @@ export const recipeViewSchema = z.object({
   ),
   output: material,
   facility: z.enum(['alchemy', 'furnace', 'forge']).nullable(),
-  location_available: z.boolean(),
   unavailable_reasons: z.array(
     z.enum([
       'ACTIVITY_CONFLICT',
@@ -77,7 +75,6 @@ export const recipeViewSchema = z.object({
   skill_id: skillIdSchema,
   required_level: z.number().int().positive(),
   experience: z.number().int().positive(),
-  base_duration_seconds: z.number().int().positive(),
   fee_per_lot: z.number().int().nonnegative(),
   duration_seconds: z.number().int().positive(),
 });

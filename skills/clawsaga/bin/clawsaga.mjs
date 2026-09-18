@@ -24295,8 +24295,7 @@ var repairSchema = external_exports.object({ ...common2, equipment_id: external_
 var material = external_exports.object({
   item_id: itemIdSchema,
   name: external_exports.string(),
-  quantity: external_exports.number().int().positive(),
-  unit_weight: external_exports.number().int().positive()
+  quantity: external_exports.number().int().positive()
 });
 var recipeViewSchema = external_exports.object({
   recipe_id: external_exports.string(),
@@ -24309,7 +24308,6 @@ var recipeViewSchema = external_exports.object({
   ),
   output: material,
   facility: external_exports.enum(["alchemy", "furnace", "forge"]).nullable(),
-  location_available: external_exports.boolean(),
   unavailable_reasons: external_exports.array(
     external_exports.enum([
       "ACTIVITY_CONFLICT",
@@ -24323,7 +24321,6 @@ var recipeViewSchema = external_exports.object({
   skill_id: skillIdSchema,
   required_level: external_exports.number().int().positive(),
   experience: external_exports.number().int().positive(),
-  base_duration_seconds: external_exports.number().int().positive(),
   fee_per_lot: external_exports.number().int().nonnegative(),
   duration_seconds: external_exports.number().int().positive()
 });
@@ -24887,16 +24884,16 @@ var characterViewSchema = external_exports.object({
   jobs: external_exports.array(
     external_exports.object({
       id: jobSchema,
-      level: external_exports.number().int().min(1).max(20),
-      experience: external_exports.number().int().min(0).max(19e3)
+      level: external_exports.number().int().min(1).max(10),
+      experience: external_exports.number().int().min(0).max(4500)
     })
   ),
   skills: external_exports.array(
     external_exports.object({
       id: skillIdSchema,
       name: external_exports.string(),
-      level: external_exports.number().int().min(1).max(20),
-      experience: external_exports.number().int().min(0).max(19e3),
+      level: external_exports.number().int().min(1).max(10),
+      experience: external_exports.number().int().min(0).max(4500),
       next_level_experience: external_exports.number().int().positive().nullable()
     })
   ),
@@ -24967,25 +24964,44 @@ var guideTopicSchema = external_exports.object({
   title: external_exports.string().min(1),
   summary: external_exports.string().min(1)
 });
+var guideMatchSchema = external_exports.object({
+  topic_id: external_exports.string().min(1),
+  title: external_exports.string().min(1),
+  heading: external_exports.string().min(1),
+  text: external_exports.string().min(1),
+  topic_body_bytes: external_exports.number().int().positive()
+});
 var guideResponseSchema = external_exports.object({
-  locale: external_exports.literal("en"),
   guide: external_exports.object({
     topics: external_exports.array(guideTopicSchema),
-    section: guideTopicSchema.extend({ body: external_exports.string().min(1) }).optional()
+    section: guideTopicSchema.extend({ body: external_exports.string().min(1) }).optional(),
+    matches: external_exports.array(guideMatchSchema).optional(),
+    truncated: external_exports.boolean().optional()
   })
 });
 var agentResumeResponseSchema = external_exports.object({
-  locale: external_exports.literal("en"),
   resume: external_exports.object({ title: external_exports.string().min(1), body: external_exports.string().min(1) })
+});
+var changelogEntrySchema = external_exports.object({
+  id: external_exports.number().int().positive(),
+  published_at: external_exports.string().min(1),
+  title: external_exports.string().min(1),
+  body: external_exports.string().min(1)
+});
+var changelogResponseSchema = external_exports.object({
+  locale: localeSchema,
+  changelog: external_exports.object({
+    entries: external_exports.array(changelogEntrySchema),
+    next_cursor: external_exports.number().int().positive().nullable()
+  })
 });
 var profileReceiptSchema = external_exports.object({
   preferred_locale: localeSchema
 });
 var agentGameResponseSchema = external_exports.object({
   ok: external_exports.boolean(),
-  schema_version: external_exports.literal("3.0"),
+  schema_version: external_exports.literal("3.1"),
   server_time: external_exports.iso.datetime(),
-  locale: localeSchema,
   next_poll_after_seconds: external_exports.number().int().positive().optional(),
   attention: attentionSchema.optional(),
   hints: external_exports.array(agentHintSchema).optional(),
@@ -25072,7 +25088,8 @@ var agentGameResponseSchema = external_exports.object({
     position: positionSchema.optional(),
     map: mapViewSchema.optional(),
     look: lookViewSchema.optional(),
-    route: routeViewSchema.optional()
+    route: routeViewSchema.optional(),
+    changelog: external_exports.object({ published_at: external_exports.string().min(1), title: external_exports.string().min(1) }).optional()
   }),
   error: external_exports.object({
     message: external_exports.string(),
@@ -25228,7 +25245,7 @@ var serverMessageSchema = external_exports.object({
   error: external_exports.object({ message: external_exports.string() }).optional()
 });
 var schemaVersionSchema = external_exports.object({ schema_version: external_exports.string() });
-var supportedSchemaVersion = { major: 3, minor: 0 };
+var supportedSchemaVersion = { major: 3, minor: 1 };
 function serverMessage(body) {
   const parsed = serverMessageSchema.safeParse(body);
   return parsed.success ? parsed.data.error?.message : void 0;
@@ -25453,10 +25470,25 @@ function withRenderedHints(response, character) {
   } : rest;
 }
 
+// src/notices.ts
+function withNotes(response, notes) {
+  if (notes.length === 0) return response;
+  return {
+    ...response,
+    hints: [...response.hints ?? [], ...notes.map((note) => ({ note }))]
+  };
+}
+function changelogNote(headline) {
+  return `Server changes were published on ${headline.published_at}: ${headline.title}. Read them with \`changelog\`.`;
+}
+function updateNote(current, published) {
+  return `This CLI is ${current}; ${published} is published. Update with \`npx skills update clawsaga\`.`;
+}
+
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.7",
+  version: "0.1.8",
   homepage: "https://clawsaga.net",
   repository: "github:palon7/clawsaga",
   license: "MIT",
@@ -25488,6 +25520,37 @@ var package_default = {
     vitest: "5.0.0"
   }
 };
+
+// src/update-check.ts
+var publishedPackageUrl = "https://raw.githubusercontent.com/palon7/clawsaga/master/package.json";
+var publishedPackageSchema = external_exports.object({ version: external_exports.string().min(1) });
+async function fetchPublishedVersion(request = fetch, timeoutMs = 2e3) {
+  try {
+    const response = await request(publishedPackageUrl, {
+      redirect: "error",
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    if (!response.ok) return void 0;
+    const parsed = publishedPackageSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.version : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function isNewerVersion(published, current) {
+  const publishedParts = versionParts(published);
+  const currentParts = versionParts(current);
+  if (!publishedParts || !currentParts) return false;
+  for (const index of [0, 1, 2]) {
+    const difference = publishedParts[index] - currentParts[index];
+    if (difference !== 0) return difference > 0;
+  }
+  return false;
+}
+function versionParts(version2) {
+  const matched = /^(\d+)\.(\d+)\.(\d+)$/.exec(version2.trim());
+  return matched ? matched.slice(1).map(Number) : void 0;
+}
 
 // src/command-definition.ts
 var globalOptions = [
@@ -25819,12 +25882,12 @@ var commands = {
     flags: [
       [
         "--include <sections>",
-        "Comma-separated profile,inventory",
+        "Comma-separated profile,inventory; the response omits both unless named",
         false,
         ["profile", "inventory"]
       ]
     ],
-    help: "Read a character."
+    help: "Read a character. Add --include inventory for the carried items and --include profile for the persona."
   },
   create: {
     path: "character/create",
@@ -26135,6 +26198,18 @@ function programHelp() {
         name,
         description: definition.help
       })),
+      {
+        name: "guide [--topic <topic>]",
+        description: "Read the English game guide. Without --topic, list the topics."
+      },
+      {
+        name: "resume",
+        description: "Read the operating guide to follow when starting or resuming play."
+      },
+      {
+        name: "changelog",
+        description: "Read the server changelog, newest first."
+      },
       { name: "schema <command>", description: "Read a command input schema." },
       {
         name: "auth login",
@@ -26161,9 +26236,12 @@ function schemaHelp() {
     examples: ["clawsaga schema create", "clawsaga schema gather"]
   };
 }
-async function execute(args, notify) {
+async function execute(args, notify, options = {}) {
+  const request = options.request ?? fetch;
   let helpTarget = "clawsaga";
   let helpCommand = "clawsaga --help";
+  let executedCommand;
+  let publishedVersion;
   let executedCharacter;
   let schemaHelpResult;
   let result;
@@ -26205,8 +26283,11 @@ async function execute(args, notify) {
     helpTarget = "schema";
   });
   const guideCommand = program2.command("guide").description(
-    "Read the English game guide served by the game server. Without --topic, list the topics and what each covers."
-  ).option("--topic <topic>", "Topic to read, chosen from the topic list");
+    "Read the English game guide served by the game server. Without --topic or --query, list the topics and what each covers."
+  ).option("--topic <topic>", "Topic to read, chosen from the topic list").option(
+    "--query <text>",
+    "Search every topic; separate alternatives with |"
+  );
   guideCommand.on("--help", () => {
     helpTarget = "clawsaga guide";
     helpCommand = "clawsaga guide --help";
@@ -26214,8 +26295,12 @@ async function execute(args, notify) {
   guideCommand.action(async () => {
     helpCommand = "clawsaga guide --help";
     const values = optionsSchema2.parse(guideCommand.optsWithGlobals());
+    const search = new URLSearchParams();
+    if (values.topic !== void 0) search.set("topic", values.topic);
+    if (values.query !== void 0) search.set("query", values.query);
+    const suffix = search.size === 0 ? "" : `?${search}`;
     result = await clientFor(values).readDocument(
-      values.topic === void 0 ? "guide" : `guide?topic=${encodeURIComponent(values.topic)}`,
+      `guide${suffix}`,
       guideResponseSchema
     );
   });
@@ -26232,6 +26317,19 @@ async function execute(args, notify) {
     result = await clientFor(values).readDocument(
       "guide/resume",
       agentResumeResponseSchema
+    );
+  });
+  const changelogCommand = program2.command("changelog").description("Read the server changelog, newest first.");
+  changelogCommand.on("--help", () => {
+    helpTarget = "clawsaga changelog";
+    helpCommand = "clawsaga changelog --help";
+  });
+  changelogCommand.action(async () => {
+    helpCommand = "clawsaga changelog --help";
+    const values = optionsSchema2.parse(changelogCommand.optsWithGlobals());
+    result = await clientFor(values).readDocument(
+      `changelog?locale=${values.contentLanguage ?? "en"}`,
+      changelogResponseSchema
     );
   });
   const login = program2.command("auth").description("Manage authorization").command("login").description("Request human approval using a device code").configureOutput({
@@ -26267,6 +26365,8 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
     });
     command2.action(async () => {
       helpCommand = `clawsaga ${name} --help`;
+      executedCommand = name;
+      if (name === "hello") publishedVersion = fetchPublishedVersion(request);
       const values = optionsSchema2.parse(command2.optsWithGlobals());
       executedCharacter = values.character;
       if (definition.requiresCharacter !== false && !values.character)
@@ -26356,7 +26456,19 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
   }
   if (schemaHelpResult) return { ok: true, ...schemaHelpResult };
   if (!result) throw new CliError("INVALID_COMMAND");
-  return "schema_version" in result ? withRenderedHints(result, executedCharacter) : result;
+  if (!("schema_version" in result)) return result;
+  const rendered = withRenderedHints(result, executedCharacter);
+  if (executedCommand !== "hello" || !rendered.ok) return rendered;
+  return withNotes(rendered, await helloNotes(rendered, publishedVersion));
+}
+async function helloNotes(response, published) {
+  const notes = [];
+  if (response.data.changelog)
+    notes.push(changelogNote(response.data.changelog));
+  const latest = await published;
+  if (latest && isNewerVersion(latest, package_default.version))
+    notes.push(updateNote(package_default.version, latest));
+  return notes;
 }
 function structuredHelp(target5) {
   if (target5 === "clawsaga") return programHelp();
