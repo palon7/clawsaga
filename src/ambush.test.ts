@@ -18,8 +18,7 @@ const endedAt = '2026-09-12T00:00:45.000Z';
 function response(data: Record<string, unknown>, running = false) {
   return Response.json({
     ok: true,
-    schema_version: '3.0',
-    locale: 'en',
+    schema_version: '3.1',
     server_time: endedAt,
     ...(running ? { next_poll_after_seconds: 1 } : {}),
     data,

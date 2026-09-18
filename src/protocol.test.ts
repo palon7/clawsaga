@@ -13,9 +13,8 @@ it('accepts the compact profile receipt', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.0',
+      schema_version: '3.1',
       server_time: '2026-09-12T00:00:00.000Z',
-      locale: 'en',
       data: { profile_saved: { preferred_locale: 'en' } },
     }).success,
   ).toBe(true);
@@ -46,9 +45,8 @@ it('requires a position in character responses', () => {
   };
   const response = {
     ok: true,
-    schema_version: '3.0',
+    schema_version: '3.1',
     server_time: '2026-09-12T00:00:00.000Z',
-    locale: 'en',
     data: { character },
   };
   expect(agentGameResponseSchema.safeParse(response).success).toBe(true);
@@ -64,9 +62,8 @@ it('requires a position in character responses', () => {
 it('rejects responses whose status and error disagree', () => {
   const result = {
     ok: true,
-    schema_version: '3.0',
+    schema_version: '3.1',
     server_time: '2026-09-12T00:00:00.000Z',
-    locale: 'en',
     data: {},
   };
   expect(
@@ -97,9 +94,8 @@ it('rejects responses whose status and error disagree', () => {
 it('accepts characters discovered in a completed travel result', () => {
   const response = agentGameResponseSchema.parse({
     ok: true,
-    schema_version: '3.0',
+    schema_version: '3.1',
     server_time: '2026-09-12T00:00:15.000Z',
-    locale: 'en',
     data: {
       last_result: {
         kind: 'travel',
@@ -156,9 +152,8 @@ it('accepts wolf meat and wolf jerky in inventory responses', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.0',
+      schema_version: '3.1',
       server_time: '2026-09-12T00:00:00.000Z',
-      locale: 'en',
       data: {
         inventory: [
           inventoryItem('wolf_meat', 'Wolf Meat'),
@@ -173,9 +168,8 @@ it('accepts non-standard qualities on individual items', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.0',
+      schema_version: '3.1',
       server_time: '2026-09-12T00:00:00.000Z',
-      locale: 'en',
       data: {
         inventory: [
           { ...inventoryItem('iron_sword', 'Iron Sword'), quality: 'fine' },
@@ -218,7 +212,6 @@ it('accepts wolf meat loot and the wolf jerky recipe', () => {
           item_id: 'wolf_meat',
           name: 'Wolf Meat',
           quantity: 2,
-          unit_weight: 1,
           owned_quantity: 0,
           missing_quantity: 2,
         },
@@ -227,15 +220,12 @@ it('accepts wolf meat loot and the wolf jerky recipe', () => {
         item_id: 'wolf_jerky',
         name: 'Wolf Jerky',
         quantity: 1,
-        unit_weight: 1,
       },
       facility: null,
-      location_available: true,
       unavailable_reasons: [],
       skill_id: 'cooking',
       required_level: 1,
       experience: 9,
-      base_duration_seconds: 90,
       fee_per_lot: 0,
       duration_seconds: 90,
     }).success,
@@ -296,9 +286,8 @@ it('accepts the compact character status alongside other data', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.0',
+      schema_version: '3.1',
       server_time: '2026-09-12T00:00:00.000Z',
-      locale: 'en',
       data: {
         status: {
           character_id: 'Aster0000000',
@@ -351,9 +340,8 @@ it('uses only cooked recovery foods and rejects raw ingredients', () => {
 it('accepts operation and note hints and rejects other shapes', () => {
   const result = {
     ok: true,
-    schema_version: '3.0',
+    schema_version: '3.1',
     server_time: '2026-09-12T00:00:00.000Z',
-    locale: 'en',
     data: {},
   };
   expect(

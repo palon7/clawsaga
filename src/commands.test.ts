@@ -10,6 +10,8 @@ vi.mock('node:timers/promises', () => ({
     new Promise((resolve) => setTimeout(resolve, delay)),
 }));
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
+// 更新確認は公開リポジトリへ取りに行くため、単体試験では必ず失敗させて無効化する。
+vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -401,8 +403,7 @@ it('rejects invalid Unicode in journal searches before making a request', async 
 
 const initial: AgentGameResponse = {
   ok: true,
-  schema_version: '3.0',
-  locale: 'en',
+  schema_version: '3.1',
   server_time: '2026-09-09T00:00:00.000Z',
   next_poll_after_seconds: 5,
   data: {
@@ -702,4 +703,80 @@ it('uses cooked recovery foods and rejects raw ingredients before sending', asyn
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
   }
   expect(invoke).not.toHaveBeenCalled();
+});
+
+it('reads the server changelog without a character', async () => {
+  const read = vi
+    .spyOn(GameClient.prototype, 'readDocument')
+    .mockResolvedValue({
+      locale: 'en',
+      changelog: { entries: [], next_cursor: null },
+    });
+  expect(await execute(['changelog'], vi.fn())).toMatchObject({
+    locale: 'en',
+    changelog: { entries: [], next_cursor: null },
+  });
+  expect(read).toHaveBeenCalledWith('changelog?locale=en', expect.anything());
+});
+
+it('adds the changelog and update notices to hello only', async () => {
+  const hello: AgentGameResponse = {
+    ...initial,
+    data: {
+      ...initial.data,
+      changelog: { published_at: '2026-09-18', title: 'Rest tuning' },
+    },
+  };
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(hello);
+  const request = (() =>
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ version: '9.9.9' }),
+    })) as unknown as typeof fetch;
+
+  expect(
+    await execute(['hello', '-c', 'Traveler0000'], vi.fn(), { request }),
+  ).toMatchObject({
+    hints: [
+      { note: expect.stringContaining('Rest tuning') },
+      { note: expect.stringContaining('npx skills update clawsaga') },
+    ],
+  });
+
+  // 見出しを返しても、hello以外の応答には案内を足さない。
+  invoke.mockResolvedValue(hello);
+  expect(await execute(['characters'], vi.fn(), { request })).toEqual(hello);
+});
+
+it('keeps hello quiet when the published version is not newer', async () => {
+  vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue(initial);
+  const request = (() =>
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ version: '0.1.7' }),
+    })) as unknown as typeof fetch;
+  const result = await execute(['hello', '-c', 'Traveler0000'], vi.fn(), {
+    request,
+  });
+  expect(result).not.toHaveProperty('hints');
+});
+
+it('reads the guide index, one topic or a search from the document route', async () => {
+  const read = vi
+    .spyOn(GameClient.prototype, 'readDocument')
+    .mockResolvedValue({ guide: { topics: [] } } as never);
+  await execute(['guide'], vi.fn());
+  expect(read).toHaveBeenLastCalledWith('guide', expect.anything());
+  await execute(['guide', '--topic', 'overview'], vi.fn());
+  expect(read).toHaveBeenLastCalledWith(
+    'guide?topic=overview',
+    expect.anything(),
+  );
+  await execute(['guide', '--query', 'ambush|potion'], vi.fn());
+  expect(read).toHaveBeenLastCalledWith(
+    'guide?query=ambush%7Cpotion',
+    expect.anything(),
+  );
 });

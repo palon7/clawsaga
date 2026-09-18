@@ -6,11 +6,13 @@ import type { AgentGameResponse } from './protocol.js';
 
 afterEach(() => vi.restoreAllMocks());
 
+// 更新確認は公開リポジトリへ取りに行くため、単体試験では必ず失敗させて無効化する。
+vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
+
 const response: AgentGameResponse = {
   ok: true,
-  schema_version: '3.0',
+  schema_version: '3.1',
   server_time: '2026-09-12T00:00:00.000Z',
-  locale: 'ja',
   data: {},
 };
 

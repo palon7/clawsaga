@@ -20,7 +20,7 @@ Use `tactics-check -c CHARACTER_ID -i FILE` to validate and `tactics-set -c CHAR
 
 An ended combat activity is the final battle snapshot. Its `statuses`, including poison, do not continue ticking outside combat and are not the character's current ailments.
 
-`rest` works while idle in towns and camps and waits for recovery. `stop` keeps recovery already earned. A completed or stopped rest stores its final HP, MP and weakness in `data.last_result.summary`, and the same values appear in `data.status`; later reads keep that stored summary even after the character heals by another route. `use -c CHARACTER_ID --item ITEM_ID` uses a Healing Potion (`healing_potion`), Roasted Nuts (`travel_ration`) or Wolf Jerky (`wolf_jerky`) while idle. Raw ingredients such as Wolf Meat (`wolf_meat`) are rejected before any request.
+`rest` works while idle in towns and camps and waits for recovery. `stop` keeps recovery already earned. A completed or stopped rest stores its final HP, MP and weakness in `data.last_result.summary`, and the same values appear in `data.status`; later reads keep that stored summary even after the character heals by another route. `use -c CHARACTER_ID --item ITEM_ID` uses a Healing Potion (`healing_potion`), Roasted Nuts (`travel_ration`) or Wolf Jerky (`wolf_jerky`) while idle. Raw ingredients such as Wolf Meat (`wolf_meat`) are rejected before any request. Read the bag with `character -c CHARACTER_ID --include inventory`; the equip, unequip and use results include it too.
 
 `change-job -c CHARACTER_ID --job ID` works while idle in town. Read `shop` for finite supplies of compatible weapons and equip an owned compatible weapon.
 

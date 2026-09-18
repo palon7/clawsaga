@@ -192,8 +192,7 @@ it('reports 5xx and unreadable responses without exposing response contents', as
     {
       response: Response.json({
         ok: true,
-        schema_version: '3.0',
-        locale: 'en',
+        schema_version: '3.1',
         server_time: '2026-09-11T00:00:00.000Z',
         next_poll_after_seconds: 'private upstream details',
         data: {},
@@ -231,7 +230,6 @@ it('reports UPDATE_REQUIRED only when the server schema is newer', async () => {
       ok: true,
       schema_version: '4.0',
       server_time: '2026-09-11T00:00:00.000Z',
-      locale: 'en',
       data: {},
     }),
   );

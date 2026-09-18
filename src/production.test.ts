@@ -52,8 +52,7 @@ const gatherId = '11111111-1111-4111-8111-111111111111';
 function running(): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.0',
-    locale: 'en',
+    schema_version: '3.1',
     server_time: '2026-09-09T00:00:00.000Z',
     next_poll_after_seconds: 1,
     data: {
@@ -75,8 +74,7 @@ function completed(
 ): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.0',
-    locale: 'en',
+    schema_version: '3.1',
     server_time: '2026-09-09T00:00:45.000Z',
     data: {
       activity: null,
@@ -287,8 +285,7 @@ const craftId = '22222222-2222-4222-8222-222222222222';
 function runningCraft(id = craftId): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.0',
-    locale: 'en',
+    schema_version: '3.1',
     server_time: '2026-09-09T00:00:00.000Z',
     next_poll_after_seconds: 1,
     data: {
@@ -309,8 +306,7 @@ function runningCraft(id = craftId): AgentGameResponse {
 function completedCraft(id = craftId): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.0',
-    locale: 'en',
+    schema_version: '3.1',
     server_time: '2026-09-09T00:02:00.000Z',
     data: {
       activity: null,
@@ -429,8 +425,7 @@ function replayedCraftResult(
 ): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.0',
-    locale: 'en',
+    schema_version: '3.1',
     server_time: '2026-09-09T00:03:00.000Z',
     data: {
       activity: null,
