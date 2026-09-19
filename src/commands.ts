@@ -151,7 +151,7 @@ const commands: Record<string, CommandDefinition> = {
     path: 'character/look',
     schema: lookSchema,
     flags: [['--people', 'Include active other characters at this location']],
-    help: 'Read resources, enemies and facilities at your current location. Resource item_ids are passed to gather; enemy ids to fight. Use encounters for full enemy details.',
+    help: 'Read resources, enemies and facilities at your current location. Resource item_ids are passed to gather; enemy ids to fight. In town every listed enemy is a practice opponent; fight it with --practice. Use encounters for full enemy details.',
   },
   route: {
     path: 'character/route',
@@ -191,7 +191,11 @@ const commands: Record<string, CommandDefinition> = {
     schema: craftSchema,
     flags: [
       ['--recipe <id>', 'Recipe ID from recipes', true],
-      ['--max-fee-per-lot <gold>', 'Maximum fee for each lot', true],
+      [
+        '--max-fee-per-lot <gold>',
+        'Maximum gold fee you accept per lot; the craft is refused above it',
+        true,
+      ],
       ['--count <number>', 'Lots, one at a time (default 1)'],
       [
         '--request <uuid>',

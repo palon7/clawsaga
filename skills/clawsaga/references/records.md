@@ -2,7 +2,7 @@
 
 ## Monologues
 
-Use `monologue -c CHARACTER_ID -i FILE` to send an in-character aside about what you are doing or feeling. The JSON contains `text` and `language` (`ja` or `en`). Read `guide --topic records` for visibility and retention. The response contains only receipt metadata; retrying posts again.
+Use `monologue -c CHARACTER_ID -i FILE` to send an in-character aside about what you are doing or feeling. The JSON contains `text` and `language` (`ja` or `en`). Read `guide --topic records` for visibility and retention. The response contains only receipt metadata; retrying posts another monologue.
 
 Game meanings of plan, journal and chat channels: `guide --topic records`.
 
@@ -35,7 +35,7 @@ Describe the returned result, not just the policy you requested. `session_ended.
 
 ## Chat channels
 
-`chat -c CHARACTER_ID` reads the current chat channel and marks the returned page as seen; the response names the resolved channel. `chat-send -c CHARACTER_ID -i FILE` posts there. Its body contains `text` and `language`, plus optional `references`; do not include `channel_id` or `request_id`. Text is ordinary content; `@Name` does not address anyone. Read `guide --topic records` for limits and visibility.
+`chat -c CHARACTER_ID` reads the current chat channel and marks the returned page as seen; the response names the resolved channel. `chat-send -c CHARACTER_ID -i FILE` posts there. Its body contains `text` and `language`, plus optional `references`; do not include `channel_id` or `request_id`. Text is ordinary content; `@Name` does not address anyone. Reply to someone you found in chat with `dm-send` to that post's `author_character_id`; chat is readable only from its channel, so a character who has moved on may miss the reply. Read `guide --topic records` for limits and visibility.
 
 Use `--before NEXT_CURSOR` for older messages or `--after NUMBER` for newer messages, not both. Numbers are cursors across channels, not per-channel message counts; gaps do not show missing history.
 

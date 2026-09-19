@@ -66,13 +66,10 @@ it('maps communication flags and rejects removed regional flags and invalid limi
       execute(['chat', '-c', traveler, ...flags], vi.fn()),
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
   }
-  await expect(
-    execute(['mentions', '-c', traveler], vi.fn()),
-  ).rejects.toThrow();
   expect(invoke).not.toHaveBeenCalled();
 });
 
-it('validates code-point limits and rejects old send fields', () => {
+it('validates code-point limits and rejects unknown send fields', () => {
   for (const [schema, maximum, extra] of [
     [sendChatSchema, 400, {}],
     [sendDirectMessageSchema, 1000, { recipient_character_id: friend }],

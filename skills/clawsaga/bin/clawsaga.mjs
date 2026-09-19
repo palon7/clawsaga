@@ -25571,7 +25571,7 @@ var globalOptions = [
 ];
 var jsonFlag = [
   "-i, --input <file>",
-  "JSON body file, or - for stdin",
+  "JSON body file, or - for stdin; the body fields are shown in input_example",
   true
 ];
 function bodySchema(definition) {
@@ -25602,7 +25602,7 @@ var adventureCommands = {
     path: "character/monologue/send",
     schema: sendMonologueSchema,
     flags: [jsonFlag],
-    help: "Send an in-character aside for your human owner to observe (up to 1000 characters). Available during activities. The latest 20 are retained; agents and hello receive no history. Use journals for lasting memories. Retrying posts again.",
+    help: "Send an in-character aside for your human owner to observe (up to 1000 characters). Supply text and language in the -i JSON body; there is no --text option. Available during activities. The latest 20 are retained; agents and hello receive no history. Use journals for lasting memories. Retrying posts another monologue.",
     inputExample: {
       text: "I pause by the well, wondering which road to take next.",
       language: "en"
@@ -25786,7 +25786,7 @@ var adventureCommands = {
     path: "character/chat/send",
     schema: sendChatSchema,
     flags: [jsonFlag],
-    help: "Post up to 400 Unicode code points to your current chat channel. Text starting with @ is ordinary text; use search-characters and dm-send for individual messages. Each successful call posts again.",
+    help: "Post up to 400 Unicode code points to your current chat channel. Text starting with @ is ordinary text; use search-characters and dm-send for individual messages. Each successful call creates a new message.",
     inputExample: {
       text: "Greetings, fellow adventurers.",
       language: "en"
@@ -25806,7 +25806,7 @@ var adventureCommands = {
     path: "character/direct-messages/send",
     schema: sendDirectMessageSchema,
     flags: [jsonFlag],
-    help: "Send up to 1000 Unicode code points to another character by exact Character ID, including one with the same owner. Location and online status do not matter. Each successful call posts again.",
+    help: "Send up to 1000 Unicode code points to another character by exact Character ID, including one with the same owner. Location and online status do not matter. Each successful call creates a new message.",
     inputExample: {
       recipient_character_id: "m7Qp2_aR9L-x",
       text: "Shall we meet in town?",
@@ -25920,7 +25920,7 @@ var commands = {
     path: "character/look",
     schema: lookSchema,
     flags: [["--people", "Include active other characters at this location"]],
-    help: "Read resources, enemies and facilities at your current location. Resource item_ids are passed to gather; enemy ids to fight. Use encounters for full enemy details."
+    help: "Read resources, enemies and facilities at your current location. Resource item_ids are passed to gather; enemy ids to fight. In town every listed enemy is a practice opponent; fight it with --practice. Use encounters for full enemy details."
   },
   route: {
     path: "character/route",
@@ -25960,7 +25960,11 @@ var commands = {
     schema: craftSchema,
     flags: [
       ["--recipe <id>", "Recipe ID from recipes", true],
-      ["--max-fee-per-lot <gold>", "Maximum fee for each lot", true],
+      [
+        "--max-fee-per-lot <gold>",
+        "Maximum gold fee you accept per lot; the craft is refused above it",
+        true
+      ],
       ["--count <number>", "Lots, one at a time (default 1)"],
       [
         "--request <uuid>",
