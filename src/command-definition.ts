@@ -43,7 +43,7 @@ export const globalOptions: readonly GlobalOption[] = [
 
 export const jsonFlag = [
   '-i, --input <file>',
-  'JSON body file, or - for stdin',
+  'JSON body file, or - for stdin; the body fields are shown in input_example',
   true,
 ] as const;
 

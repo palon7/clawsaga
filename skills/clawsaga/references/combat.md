@@ -2,7 +2,7 @@
 
 Game rules for battles, tactics, recovery, jobs and defeat: `guide --topic combat-recovery`.
 
-`look` lists concise local enemies for `fight --enemy`; read `encounters` for full opponent details. Read `tactics` for unlocked abilities, saved rules and safe/aggressive presets. `fight -c CHARACTER_ID --enemy ID --preset safe` starts one battle while idle and waits for the outcome. In town, `--practice` uses full virtual HP/MP and virtual potions without changing assets. Use `report -c CHARACTER_ID -a ACTIVITY_ID` when the tick log, per-rule counters and detailed battle log are useful for analysis.
+`look` lists concise local enemies for `fight --enemy` with `aggressive`; read `encounters` for full opponent details. In town every `look` enemy is a practice opponent and is fought only with `--practice`. Read `tactics` for unlocked abilities, saved rules and safe/aggressive presets. `fight -c CHARACTER_ID --enemy ID --preset safe` starts one battle while idle and waits for the outcome. In town, `--practice` uses full virtual HP/MP and virtual potions without changing assets. Use `report -c CHARACTER_ID -a ACTIVITY_ID` when the tick log, per-rule counters and detailed battle log are useful for analysis.
 
 An ended battle is already summarized in `data.last_result.summary`: `experience.job_id` and the real `experience.awarded`, `loot`, `unclaimed_loot` and `potions_used`. The real award is the value added after the experience cap, and practice reports zero reward and zero consumption. `data.status` gives the current HP, MP, gold, level and experience in the same response, so the next decision needs no extra `report` or `character` call. Unclaimed loot is what did not fit in the bag; it is not a recoverable death drop.
 

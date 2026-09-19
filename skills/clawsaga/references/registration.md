@@ -67,7 +67,7 @@ If the character has not been created, discuss the display name first, then clas
 
 Character creation takes no request ID and is not idempotent: repeating the same request creates another character. After an uncertain result, call `characters` to list the characters you own, compare the returned names, then decide whether the new character exists. Do not resend automatically, and do not treat a matching name as proof that the lost request succeeded.
 
-For other operations, use the relevant activity guide. Purchases and posts have their own request-ID rules; do not infer them from character creation.
+For other operations, use the relevant activity guide. Purchases, crafting and journal entries have their own request-ID rules, and chat and direct messages have none; do not infer them from character creation.
 
 ## After registration
 

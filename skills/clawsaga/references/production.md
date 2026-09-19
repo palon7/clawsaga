@@ -14,10 +14,27 @@ If travel or gathering returns `data.last_result.ambush`, the activity succeeded
 
 ## Gathering and crafting
 
-`gather -c CHARACTER_ID --item ITEM_ID --count N` performs N attempts at your current location. Choose `ITEM_ID` from `look.resources[].item_id`; gathering takes no location argument. `craft -c CHARACTER_ID --recipe RECIPE_ID --max-fee-per-lot GOLD --count N` performs N lots. Both counts default to one. Each starts one activity and waits for successful completion before the next. Counts have no gameplay cap and are not guaranteed yields. Wait for the whole command before starting another main activity for that character.
+`gather -c CHARACTER_ID --item ITEM_ID --count N` performs N attempts at your current location. Choose `ITEM_ID` from `look.resources[].item_id`; gathering takes no location argument. `craft -c CHARACTER_ID --recipe RECIPE_ID --max-fee-per-lot GOLD --count N` performs N lots, where `--recipe` and `--max-fee-per-lot` are required. Both counts default to one. Each starts one activity and waits for successful completion before the next. Counts have no gameplay cap and are not guaranteed yields. Wait for the whole command before starting another main activity for that character.
 
 `recipes` returns each recipe's requirements **per lot**: `inputs[].quantity`, `owned_quantity`, `missing_quantity` and `unavailable_reasons`. Availability is observed at the time of the response and is checked again when crafting starts. `--max-fee-per-lot` limits each lot's fee, not total spending over the repetition. `guide --topic travel-production` explains the per-lot calculation for several lots.
 
 `craft` also generates a request ID for each lot unless `--request` supplies one. After an uncertain craft, retain the reported ID and repeat that one lot with `--request ID` and the same recipe and fee limit; the same ID returns the accepted activity, or its result in `data.last_result` when that activity already finished, instead of consuming the materials and fee again. The same ID with a different recipe or fee limit is rejected. `--request` targets one lot, so use `--count 1` (the default); a `--count` repetition sends each lot as a separate request with its own new ID. `buy` and `craft` keep their request ID records until the character is deleted.
 
-Every `gather` and `craft` result carries a top-level `repetition` field next to `ok` and `data`; it is not `data.repetition`, and the server's single per-lot result stays in `data.last_result`. When the CLI cannot read a result at all, the same summary is reported as the failure's `error.repetition` instead. The final `repetition` summary distinguishes the requested count, confirmed completions, produced items and the stopping reason (`count_reached`, `ambush`, `activity_stopped`, `activity_failed`, `start_rejected` or `unknown`). An ambush or a `RESOURCE_DEPLETED`/`CAPACITY_EXCEEDED`/`STOPPED` result ends repetition after counting any successful harvest. If `completed_count` is less than `requested_count`, `ok` is false and the CLI exits nonzero while preserving the confirmed results. An ambush on the final requested attempt keeps `ok` true because the requested count completed. A rejected start keeps the server failure envelope (`start_rejected`), a failed activity result keeps `activity_failed`, and an unreadable result is marked `unknown`; none are retried automatically. Read the battle and decide the remaining work after it ends. A stopped CLI leaves its accepted activity running. An uncertain result reports the affected lot's `request_id` so it can be retried with `--request`. `stop -c CHARACTER_ID -a ACTIVITY_ID` stops gathering or crafting; crafting returns its escrow. Use `activity` to obtain the running ID when you need to stop it.
+### Repetition results
+
+Every `gather` and `craft` result carries a top-level `repetition` field next to `ok` and `data`. It is not `data.repetition`; the server's single per-lot result stays in `data.last_result`. When the CLI cannot read a result at all, the same summary is reported as the failure's `error.repetition` instead.
+
+The final `repetition` summary distinguishes the requested count, confirmed completions, produced items and the stopping reason:
+
+- `count_reached`, `ambush`, `activity_stopped`, `activity_failed`, `start_rejected` or `unknown`.
+- An ambush or a `RESOURCE_DEPLETED`/`CAPACITY_EXCEEDED`/`STOPPED` result ends repetition after counting any successful harvest.
+- A rejected start keeps the server failure envelope (`start_rejected`), a failed activity result keeps `activity_failed`, and an unreadable result is marked `unknown`. None are retried automatically.
+
+If `completed_count` is less than `requested_count`, `ok` is false and the CLI exits nonzero while preserving the confirmed results. An ambush on the final requested attempt keeps `ok` true because the requested count completed.
+
+Handling the outcome:
+
+- After an ambush, read the battle and decide the remaining work after it ends.
+- An uncertain result reports the affected lot's `request_id` so it can be retried with `--request`.
+- A stopped CLI leaves its accepted activity running.
+- `stop -c CHARACTER_ID -a ACTIVITY_ID` stops gathering or crafting; crafting returns its escrow. Use `activity` to obtain the running ID when you need to stop it.
