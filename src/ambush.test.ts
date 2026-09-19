@@ -18,7 +18,7 @@ const endedAt = '2026-09-12T00:00:45.000Z';
 function response(data: Record<string, unknown>, running = false) {
   return Response.json({
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: endedAt,
     ...(running ? { next_poll_after_seconds: 1 } : {}),
     data,
@@ -70,6 +70,8 @@ it.each([
   { count: 1, before: 0 },
   { count: 5, before: 1 },
   { count: 2, before: 1 },
+  { count: 10, before: 2 },
+  { count: 10, before: 9 },
 ])(
   'counts the ambushed harvest and ends --count $count after $before earlier harvests',
   async ({ count, before }) => {
@@ -305,4 +307,180 @@ it('preserves look enemies, the active combat and unclaimed loot', async () => {
     data: { combat_report: { loot: [], unclaimed_loot: unclaimed } },
   });
   expect(request).toHaveBeenCalledTimes(4);
+});
+
+function endedGather(activityId: string, ambushId?: string) {
+  return {
+    kind: 'gather',
+    activity_id: activityId,
+    status: 'ENDED',
+    end_reason: 'COMPLETED',
+    ended_at: endedAt,
+    output: { item_id: 'herb', name: 'Wolf Mint', quantity: 1 },
+    ...(ambushId
+      ? { ambush: { activity_id: ambushId, enemy_id: 'wolf' } }
+      : {}),
+  };
+}
+
+function notes(result: unknown) {
+  return (result as { hints?: { note: string }[] }).hints?.map(
+    (hint) => hint.note,
+  );
+}
+
+it('keeps the confirmed harvests and names the running ambush combat', async () => {
+  const request = requests();
+  const ambushId = randomUUID();
+  for (let index = 0; index < 4; index += 1) {
+    const activityId = randomUUID();
+    const ambushed = index === 3;
+    request.mockResolvedValueOnce(
+      response({ activity: runningGather(activityId) }, true),
+    );
+    request.mockResolvedValueOnce(
+      response({
+        activity: ambushed ? runningCombat(ambushId) : null,
+        last_result: endedGather(activityId, ambushed ? ambushId : undefined),
+      }),
+    );
+  }
+  const result = await execute(
+    ['gather', '-c', 'Traveler0000', '--item', 'herb', '--count', '10'],
+    vi.fn(),
+  );
+  expect(result).toMatchObject({
+    ok: false,
+    repetition: {
+      requested_count: 10,
+      completed_count: 4,
+      produced: { herb: 4 },
+      stopped_reason: 'ambush',
+    },
+  });
+  expect(notes(result)).toEqual([
+    `The gather result is confirmed and combat ${ambushId} is the current activity; continue or stop that battle instead of repeating the finished activity.`,
+    '4 of 10 attempts are confirmed and their output is kept; the repetition stopped before the rest.',
+  ]);
+});
+
+it('keeps the final ambush harvest successful and only names the running combat', async () => {
+  const request = requests();
+  const ambushId = randomUUID();
+  for (let index = 0; index < 4; index += 1) {
+    const activityId = randomUUID();
+    const ambushed = index === 3;
+    request.mockResolvedValueOnce(
+      response({ activity: runningGather(activityId) }, true),
+    );
+    request.mockResolvedValueOnce(
+      response({
+        activity: ambushed ? runningCombat(ambushId) : null,
+        last_result: endedGather(activityId, ambushed ? ambushId : undefined),
+      }),
+    );
+  }
+  const result = await execute(
+    ['gather', '-c', 'Traveler0000', '--item', 'herb', '--count', '4'],
+    vi.fn(),
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    repetition: {
+      requested_count: 4,
+      completed_count: 4,
+      produced: { herb: 4 },
+      stopped_reason: 'ambush',
+    },
+  });
+  expect(result).not.toHaveProperty('error');
+  expect(notes(result)).toEqual([
+    `The gather result is confirmed and combat ${ambushId} is the current activity; continue or stop that battle instead of repeating the finished activity.`,
+  ]);
+});
+
+it('describes an ambush that already ended as a past result', async () => {
+  const request = requests();
+  const activityId = randomUUID();
+  const ambushId = randomUUID();
+  request.mockResolvedValueOnce(
+    response({ activity: runningGather(activityId) }, true),
+  );
+  request.mockResolvedValueOnce(
+    response({
+      activity: null,
+      last_result: endedGather(activityId, ambushId),
+    }),
+  );
+  expect(
+    notes(
+      await execute(
+        ['gather', '-c', 'Traveler0000', '--item', 'herb'],
+        vi.fn(),
+      ),
+    ),
+  ).toEqual([
+    `An ambush happened after the confirmed gather result, which stands; that combat is not the current activity. Read its outcome with \`activity -a ${ambushId} -c Traveler0000\` if you have not seen it.`,
+  ]);
+});
+
+it('describes an ambush that ended before another activity without asserting it runs', async () => {
+  const request = requests();
+  const activityId = randomUUID();
+  const ambushId = randomUUID();
+  const nextId = randomUUID();
+  request.mockResolvedValueOnce(
+    response({ activity: runningGather(activityId) }, true),
+  );
+  request.mockResolvedValueOnce(
+    response({
+      activity: {
+        kind: 'travel',
+        activity_id: nextId,
+        from: field,
+        to: { id: 'dolgan', name: 'Dolgan', kind: 'town' },
+        started_at: startedAt,
+        arrives_at: endedAt,
+        duration_seconds: 45,
+        status: 'RUNNING',
+      },
+      last_result: endedGather(activityId, ambushId),
+    }),
+  );
+  expect(
+    notes(
+      await execute(
+        ['gather', '-c', 'Traveler0000', '--item', 'herb'],
+        vi.fn(),
+      ),
+    ),
+  ).toEqual([
+    `An ambush happened after the confirmed gather result, which stands; that combat is not the current activity. Read its outcome with \`activity -a ${ambushId} -c Traveler0000\` if you have not seen it.`,
+    `A different travel activity (${nextId}) is running now.`,
+  ]);
+});
+
+it('adds a recovery hint when a wait outcome is unknown', async () => {
+  const request = requests();
+  const activityId = randomUUID();
+  request.mockResolvedValueOnce(
+    response({ activity: runningGather(activityId) }, true),
+  );
+  request.mockRejectedValueOnce(new TypeError('socket hang up'));
+  await expect(
+    execute(['gather', '-c', 'Traveler0000', '--item', 'herb'], vi.fn()),
+  ).rejects.toMatchObject({
+    code: 'NETWORK_ERROR',
+    detail: {
+      activity_id: activityId,
+      outcome: 'unknown',
+      hint: expect.stringContaining(`activity -a ${activityId}`),
+    },
+  });
+  // The start is sent once; the CLI never re-sends the activity.
+  expect(
+    request.mock.calls.filter(
+      ([url]) => new URL(String(url)).pathname === '/api/v1/character/gather',
+    ),
+  ).toHaveLength(1);
 });

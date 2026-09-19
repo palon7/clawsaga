@@ -25,7 +25,11 @@ import {
   updatePlanSchema,
   sendMonologueSchema,
 } from './protocol.js';
-import { jsonFlag, type CommandDefinition } from './command-definition.js';
+import {
+  jsonFlag,
+  noWaitFlag,
+  type CommandDefinition,
+} from './command-definition.js';
 const beforeFlag = [
   '--before <number>',
   'Exclusive older-page cursor from next_cursor; null means no older page',
@@ -48,9 +52,9 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/monologue/send',
     schema: sendMonologueSchema,
     flags: [jsonFlag],
-    help: 'Send an in-character aside for your human owner to observe (up to 1000 characters). Supply text and language in the -i JSON body; there is no --text option. Available during activities. The latest 20 are retained; agents and hello receive no history. Use journals for lasting memories. Retrying posts another monologue.',
+    help: 'Show your owner a meaningful decision, discovery, setback or changed plan in the Web activity feed. Replying to your human in the agent conversation does not post one; routine polls and harvests need no narration. Up to 1000 characters. Supply text and language in the -i JSON body; there is no --text option. Available during activities. The latest 20 are retained; agents and hello receive no history. Use journals for lasting memories. Retrying posts another monologue.',
     inputExample: {
-      text: 'I pause by the well, wondering which road to take next.',
+      text: 'I will prepare healing supplies before choosing the next route.',
       language: 'en',
     },
   },
@@ -87,8 +91,13 @@ export const adventureCommands: Record<string, CommandDefinition> = {
       ['--enemy <id>', 'Enemy ID from encounters', true],
       ['--preset <id>', 'Preset name', false, ['safe', 'aggressive']],
       ['--practice', 'Practice in town without rewards or losses'],
+      noWaitFlag,
     ],
     help: 'Start one battle while idle and wait for its outcome before starting another main activity.',
+    examples: [
+      'clawsaga fight -c m7Qp2_aR9L-x --enemy wolf',
+      'clawsaga fight -c m7Qp2_aR9L-x --enemy wolf --no-wait',
+    ],
   },
   report: {
     path: 'character/combat/report',
@@ -105,8 +114,12 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   rest: {
     path: 'character/rest',
     schema: restSchema,
-    flags: [],
+    flags: [noWaitFlag],
     help: 'Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early.',
+    examples: [
+      'clawsaga rest -c m7Qp2_aR9L-x',
+      'clawsaga rest -c m7Qp2_aR9L-x --no-wait',
+    ],
   },
   use: {
     path: 'character/item/use',
@@ -216,9 +229,9 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/plan/update',
     schema: updatePlanSchema,
     flags: [jsonFlag],
-    help: 'Replace the private plan (up to 2000 characters). Empty text clears it. Available during activities; journal history and quests are unchanged.',
+    help: 'Save the goal, next step, when to reconsider and unfinished promises. Replaces the entire private plan (up to 2000 characters), so preserve other commitments. Empty text clears it. Available during activities; journal history and quests are unchanged.',
     inputExample: {
-      text: 'Goal: craft a healing potion.\n- Gather the missing herbs.\n- Return to town and craft one lot.',
+      text: 'Goal: prepare healing supplies.\nNext: gather missing herbs, then craft in town.\nReconsider: inspect any ambush before continuing.\nFollow-up: send Aster the route information I promised.',
       language: 'en',
     },
   },

@@ -45,14 +45,17 @@ it('accepts purchasable weapons in shop responses and purchase inputs', () => {
 vi.mock('node:timers/promises', () => ({
   setTimeout: () => Promise.resolve(),
 }));
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 const gatherId = '11111111-1111-4111-8111-111111111111';
 
 function running(): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-09T00:00:00.000Z',
     next_poll_after_seconds: 1,
     data: {
@@ -74,7 +77,7 @@ function completed(
 ): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-09T00:00:45.000Z',
     data: {
       activity: null,
@@ -173,32 +176,70 @@ it('waits for each accepted result before starting the next and stops on depleti
   ]);
 });
 
-it('preserves confirmed output on an uncertain later start without retrying it', async () => {
+it('preserves three confirmed harvests out of ten on an uncertain later start without retrying it', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValueOnce(running())
     .mockResolvedValueOnce(completed())
-    .mockRejectedValueOnce(new CliError('NETWORK_ERROR'));
+    .mockResolvedValueOnce(running())
+    .mockResolvedValueOnce(completed())
+    .mockResolvedValueOnce(running())
+    .mockResolvedValueOnce(completed())
+    .mockRejectedValueOnce(
+      new CliError('NETWORK_ERROR', { outcome: 'unknown' }),
+    );
   await expect(
     repeatActivity(
       new GameClient('https://example.com'),
       'character/gather',
       {},
       { character: 'Maker0000000' },
-      6,
+      10,
     ),
   ).rejects.toMatchObject({
     code: 'NETWORK_ERROR',
     detail: {
       repetition: {
-        requested_count: 6,
-        completed_count: 1,
-        produced: { herb: 1 },
+        requested_count: 10,
+        completed_count: 3,
+        produced: { herb: 3 },
         stopped_reason: 'unknown',
       },
     },
   });
-  expect(invoke).toHaveBeenCalledTimes(3);
+  expect(invoke).toHaveBeenCalledTimes(7);
+});
+
+it('keeps the confirmed harvests but claims no output when the next start is not sent', async () => {
+  vi.spyOn(GameClient.prototype, 'accessToken')
+    .mockResolvedValueOnce('test-token')
+    .mockResolvedValueOnce('test-token')
+    .mockRejectedValueOnce(new CliError('AUTH_REQUIRED'));
+  const request = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json(running()))
+    .mockResolvedValueOnce(Response.json(completed()));
+  vi.stubGlobal('fetch', request);
+  const error = await execute([...args, '--count', '2'], vi.fn()).catch(
+    (thrown: unknown) => thrown,
+  );
+  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+  // 2回目の開始はトークン取得で止まり、ゲーム要求は送っていない。
+  expect(error.code).toBe('AUTH_REQUIRED');
+  expect(error.detail).toMatchObject({
+    outcome: 'not_sent',
+    repetition: {
+      requested_count: 2,
+      completed_count: 1,
+      produced: { herb: 1 },
+      stopped_reason: 'start_rejected',
+    },
+  });
+  // 開始していない回を「成果が出たかもしれない」と案内しない。
+  expect(error.detail).not.toHaveProperty('hint');
+  expect(
+    request.mock.calls.map(([url]) => new URL(String(url)).pathname),
+  ).toEqual(['/api/v1/character/gather', '/api/v1/character/activity']);
 });
 
 it('keeps response diagnostics and the accepted activity when a repetition cannot read its result', async () => {
@@ -231,6 +272,59 @@ it('keeps response diagnostics and the accepted activity when a repetition canno
     'character/gather',
     'character/activity',
   ]);
+});
+
+it('keeps the confirmed output and server failure when a repetition wait fails', async () => {
+  const bodies: Array<Record<string, unknown>> = [];
+  const failed: AgentGameResponse = {
+    ok: false,
+    schema_version: '3.2',
+    server_time: '2026-09-09T00:02:00.000Z',
+    data: {},
+    error: { message: 'The activity was not found.' },
+  };
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockImplementation((path, body) => {
+      if (path === 'character/activity')
+        return Promise.resolve(bodies.length === 1 ? completedCraft() : failed);
+      bodies.push(body as Record<string, unknown>);
+      return Promise.resolve(runningCraft());
+    });
+  const result = await execute(
+    [
+      'craft',
+      '-c',
+      'Maker0000000',
+      '--recipe',
+      'metal_ingot',
+      '--max-fee-per-lot',
+      '2',
+      '--count',
+      '2',
+    ],
+    vi.fn(),
+  );
+  // 照会が失敗しただけなので、確定済みの成果とサーバー診断はそのまま残す。
+  expect(result).toMatchObject({
+    ok: false,
+    error: { message: 'The activity was not found.' },
+    repetition: {
+      requested_count: 2,
+      completed_count: 1,
+      produced: { metal_ingot: 1 },
+      stopped_reason: 'activity_failed',
+    },
+  });
+  // 失敗した回は受付済みで結果が未確認なので、その旨を案内する。
+  const notes = (result as { hints?: { note: string }[] }).hints?.map(
+    (hint) => hint.note,
+  );
+  expect(notes).toHaveLength(1);
+  expect(notes?.[0]).toContain('1 of 2 attempts are confirmed');
+  expect(notes?.[0]).toContain('is not confirmed');
+  expect(notes?.[0]).toContain('may have produced output');
+  expect(invoke).toHaveBeenCalledTimes(4);
 });
 
 it('rejects purchase limits above the server storage range before sending', async () => {
@@ -285,7 +379,7 @@ const craftId = '22222222-2222-4222-8222-222222222222';
 function runningCraft(id = craftId): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-09T00:00:00.000Z',
     next_poll_after_seconds: 1,
     data: {
@@ -306,7 +400,7 @@ function runningCraft(id = craftId): AgentGameResponse {
 function completedCraft(id = craftId): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-09T00:02:00.000Z',
     data: {
       activity: null,
@@ -425,7 +519,7 @@ function replayedCraftResult(
 ): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-09T00:03:00.000Z',
     data: {
       activity: null,
@@ -624,6 +718,299 @@ it('reports the current craft lot request ID when its result is unknown', async 
     },
   });
   expect(invoke).toHaveBeenCalledTimes(1);
+});
+
+it('returns one acceptance for --no-wait gather without polling or a repetition summary', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(running());
+  const notify = vi.fn();
+  const response = await execute([...args, '--no-wait'], notify);
+  expect(response).toMatchObject({ ok: true, data: running().data });
+  expect(response).not.toHaveProperty('repetition');
+  expect(invoke).toHaveBeenCalledTimes(1);
+  expect(invoke).toHaveBeenCalledWith('character/gather', {
+    character_id: 'Maker0000000',
+    item_id: 'herb',
+  });
+  expect(notify).not.toHaveBeenCalled();
+});
+
+it('rejects --no-wait with --count above one before any change', async () => {
+  const invoke = vi.spyOn(GameClient.prototype, 'invoke');
+  await expect(
+    execute([...args, '--no-wait', '--count', '2'], vi.fn()),
+  ).rejects.toMatchObject({
+    code: 'INVALID_ARGUMENTS',
+    detail: { fields: ['count'], help_command: 'clawsaga gather --help' },
+  });
+  await expect(
+    execute(
+      [
+        'craft',
+        '-c',
+        'Maker0000000',
+        '--recipe',
+        'metal_ingot',
+        '--max-fee-per-lot',
+        '2',
+        '--no-wait',
+        '--count',
+        '2',
+      ],
+      vi.fn(),
+    ),
+  ).rejects.toMatchObject({
+    code: 'INVALID_ARGUMENTS',
+    detail: { fields: ['count'], help_command: 'clawsaga craft --help' },
+  });
+  expect(invoke).not.toHaveBeenCalled();
+});
+
+it('sends one generated request ID for a --no-wait craft without a repetition summary', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(runningCraft());
+  const response = await execute(
+    [
+      'craft',
+      '-c',
+      'Maker0000000',
+      '--recipe',
+      'metal_ingot',
+      '--max-fee-per-lot',
+      '2',
+      '--no-wait',
+    ],
+    vi.fn(),
+  );
+  expect(response).toMatchObject({ ok: true, data: runningCraft().data });
+  expect(response).not.toHaveProperty('repetition');
+  expect(invoke).toHaveBeenCalledTimes(1);
+  expect(invoke.mock.calls[0]?.[0]).toBe('character/craft');
+  expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+    character_id: 'Maker0000000',
+    recipe_id: 'metal_ingot',
+    max_fee_per_lot: 2,
+    request_id: expect.any(String),
+  });
+});
+
+it('returns --no-wait results as receipts, keeping any already finished lot', async () => {
+  // A replayed craft whose lot already ended answers with the stored result
+  // even while an unrelated activity runs.
+  const response = replayedCraftResult();
+  response.data.activity = runningCraftActivity(
+    '77777777-7777-4777-8777-777777777777',
+  );
+  response.next_poll_after_seconds = 30;
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(response);
+  const result = await execute(
+    [
+      'craft',
+      '-c',
+      'Maker0000000',
+      '--recipe',
+      'metal_ingot',
+      '--max-fee-per-lot',
+      '2',
+      '--request',
+      '88888888-8888-4888-8888-888888888888',
+      '--no-wait',
+    ],
+    vi.fn(),
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    data: {
+      last_result: { kind: 'craft', activity_id: craftId, status: 'ENDED' },
+      activity: { activity_id: '77777777-7777-4777-8777-777777777777' },
+    },
+  });
+  expect(result).not.toHaveProperty('repetition');
+  // 冪等再送の終了結果は「開始した」ではなく、保存済みの過去結果として案内する。
+  const notes = (result as { hints?: { note: string }[] }).hints?.map(
+    (hint) => hint.note,
+  );
+  expect(notes).toEqual([
+    'This is the stored result of an earlier accepted craft activity, not a new start.',
+  ]);
+  expect(invoke).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the generated craft request ID and recovery hint when a --no-wait result is unknown', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockRejectedValue(new CliError('NETWORK_ERROR', { outcome: 'unknown' }));
+  const error = await execute(
+    [
+      'craft',
+      '-c',
+      'Maker0000000',
+      '--recipe',
+      'metal_ingot',
+      '--max-fee-per-lot',
+      '2',
+      '--no-wait',
+    ],
+    vi.fn(),
+  ).catch((thrown: unknown) => thrown);
+  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+  const hint = String(error.detail.hint);
+  expect(error.code).toBe('NETWORK_ERROR');
+  expect(error.detail.request_id).toEqual(expect.any(String));
+  expect(hint).toContain('may have produced output');
+  expect(hint).toContain('same recipe, fee limit');
+  expect(hint).toContain(`--request ${String(error.detail.request_id)}`);
+  expect(hint).toContain(
+    'Do not start another lot or resend the remaining count',
+  );
+  // 同一IDの再送は既に成立していても安全なので、未実行の証明を要求しない。
+  expect(hint).not.toContain('only if it did not take effect');
+  // 同一IDの再送が同じロットを照合するため、種類・時刻の突き合わせは求めない。
+  expect(hint).not.toContain('match its kind and time');
+  expect(invoke).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the generated craft request ID and recovery hint when a --no-wait reply cannot be read', async () => {
+  const invoke = vi.spyOn(GameClient.prototype, 'invoke').mockRejectedValue(
+    new CliError('INVALID_RESPONSE', {
+      message: "The server response did not match this CLI's expected format.",
+      operation: 'character/craft',
+      http_status: 200,
+      fields: ['data.activity'],
+    }),
+  );
+  const error = await execute(
+    [
+      'craft',
+      '-c',
+      'Maker0000000',
+      '--recipe',
+      'metal_ingot',
+      '--max-fee-per-lot',
+      '2',
+      '--no-wait',
+    ],
+    vi.fn(),
+  ).catch((thrown: unknown) => thrown);
+  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+  // 応答が読めない場合も、同じIDの再送で同じロットを照合できる。
+  expect(error.code).toBe('INVALID_RESPONSE');
+  expect(error.detail.outcome).toBe('unknown');
+  expect(error.detail.request_id).toEqual(expect.any(String));
+  const hint = String(error.detail.hint);
+  expect(hint).toContain('same recipe, fee limit');
+  expect(hint).toContain(`--request ${String(error.detail.request_id)}`);
+  expect(invoke).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the generated craft request ID and recovery hint when the server schema is newer', async () => {
+  vi.spyOn(GameClient.prototype, 'invoke').mockRejectedValue(
+    new CliError('UPDATE_REQUIRED', {
+      operation: 'character/craft',
+      http_status: 200,
+    }),
+  );
+  const error = await execute(
+    [
+      'craft',
+      '-c',
+      'Maker0000000',
+      '--recipe',
+      'metal_ingot',
+      '--max-fee-per-lot',
+      '2',
+      '--no-wait',
+    ],
+    vi.fn(),
+  ).catch((thrown: unknown) => thrown);
+  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+  // 更新後に開始し直すのではなく、同じIDでそのロットを照合できるようにする。
+  expect(error.code).toBe('UPDATE_REQUIRED');
+  expect(error.detail).toMatchObject({
+    operation: 'character/craft',
+    http_status: 200,
+    outcome: 'unknown',
+  });
+  expect(error.detail.request_id).toEqual(expect.any(String));
+  const hint = String(error.detail.hint);
+  expect(hint).toContain('same recipe, fee limit');
+  expect(hint).toContain(`--request ${String(error.detail.request_id)}`);
+});
+
+it('reconciles an uncertain purchase by its same request without craft steps', async () => {
+  vi.spyOn(GameClient.prototype, 'invoke').mockRejectedValue(
+    new CliError('NETWORK_ERROR', { outcome: 'unknown' }),
+  );
+  const error = await execute(
+    [
+      'buy',
+      '-c',
+      'Maker0000000',
+      '--item',
+      'basic_pickaxe',
+      '--max-payment',
+      '10',
+    ],
+    vi.fn(),
+  ).catch((thrown: unknown) => thrown);
+  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+  const hint = String(error.detail.hint);
+  expect(error.detail.request_id).toEqual(expect.any(String));
+  expect(hint).toContain('same arguments');
+  expect(hint).toContain(`--request ${String(error.detail.request_id)}`);
+  expect(hint).not.toContain('recipe');
+  expect(hint).not.toContain('remaining count');
+});
+
+it('reports each waited acceptance to stderr, with the craft request ID', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockImplementation((path) =>
+      Promise.resolve(path === 'character/activity' ? completed() : running()),
+    );
+  const notify = vi.fn();
+  await execute([...args, '--count', '2'], notify);
+  expect(notify).toHaveBeenCalledTimes(2);
+  expect(notify).toHaveBeenCalledWith({
+    event: 'activity_accepted',
+    activity_id: gatherId,
+    kind: 'gather',
+    started_at: '2026-09-09T00:00:00.000Z',
+    completes_at: '2026-09-09T00:00:45.000Z',
+    next_poll_after_seconds: 1,
+  });
+
+  const bodies: Array<Record<string, unknown>> = [];
+  invoke.mockReset().mockImplementation((path, body) => {
+    if (path === 'character/activity') return Promise.resolve(completedCraft());
+    bodies.push(body as Record<string, unknown>);
+    return Promise.resolve(runningCraft());
+  });
+  const craftNotify = vi.fn();
+  await execute(
+    [
+      'craft',
+      '-c',
+      'Maker0000000',
+      '--recipe',
+      'metal_ingot',
+      '--max-fee-per-lot',
+      '2',
+    ],
+    craftNotify,
+  );
+  expect(craftNotify).toHaveBeenCalledWith(
+    expect.objectContaining({
+      event: 'activity_accepted',
+      kind: 'craft',
+      next_poll_after_seconds: 1,
+      request_id: bodies[0]?.request_id,
+    }),
+  );
 });
 
 it('requires a request ID in the craft protocol schema', () => {

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CredentialStore, credentialPath } from './credentials.js';
 import { GameClient, serverOrigin } from './client.js';
+import { CliError } from './errors.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs/promises')>();
@@ -192,7 +193,7 @@ it('reports 5xx and unreadable responses without exposing response contents', as
     {
       response: Response.json({
         ok: true,
-        schema_version: '3.1',
+        schema_version: '3.2',
         server_time: '2026-09-11T00:00:00.000Z',
         next_poll_after_seconds: 'private upstream details',
         data: {},
@@ -225,18 +226,59 @@ it('reports UPDATE_REQUIRED only when the server schema is newer', async () => {
   await store.update((entries) => {
     entries[origin]!.expires_at = Date.now() + 3600_000;
   });
-  const request = vi.fn<typeof fetch>().mockResolvedValue(
-    Response.json({
-      ok: true,
-      schema_version: '4.0',
-      server_time: '2026-09-11T00:00:00.000Z',
-      data: {},
-    }),
-  );
-  const client = new GameClient(origin, store, request);
-  await expect(client.invoke('character/activity', {})).rejects.toMatchObject({
-    code: 'UPDATE_REQUIRED',
-  });
+  for (const schema_version of ['4.0', '3.3']) {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        ok: true,
+        schema_version,
+        server_time: '2026-09-11T00:00:00.000Z',
+        data: {},
+      }),
+    );
+    const client = new GameClient(origin, store, request);
+    const error = await client
+      .invoke('character/activity', {})
+      .catch((error: unknown) => error);
+    if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+    // The caller decides whether the operation had an outcome; the transport
+    // keeps the response diagnostics and adds no outcome of its own.
+    expect(error.code).toBe('UPDATE_REQUIRED');
+    expect(error.detail).toMatchObject({
+      operation: 'character/activity',
+      http_status: 200,
+    });
+    expect(error.detail).not.toHaveProperty('outcome');
+  }
+});
+
+it('marks a failure before the start as not sent, not as an unknown outcome', async () => {
+  const { store } = await fixture();
+  const requests = [
+    // The token refresh answered a body this CLI cannot read.
+    () =>
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          new Response('private upstream details', { status: 200 }),
+        ),
+    // The token refresh never reached the server.
+    () =>
+      vi.fn<typeof fetch>().mockRejectedValue(new TypeError('socket hang up')),
+  ];
+  for (const buildRequest of requests) {
+    const request = buildRequest();
+    const client = new GameClient(origin, store, request);
+    const error = await client
+      .invoke('character/travel', { to: 'mossway' })
+      .catch((error: unknown) => error);
+    if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+    expect(error.detail.outcome).toBe('not_sent');
+    // Only the token refresh was attempted; the game start was never sent.
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(String(request.mock.calls[0]?.[0])).toBe(
+      `${origin}/api/auth/oauth2/token`,
+    );
+  }
 });
 
 it('shows the server message for 401 and 429 responses', async () => {
