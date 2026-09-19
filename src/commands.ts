@@ -29,13 +29,18 @@ import {
   changelogResponseSchema,
   guideResponseSchema,
   type AgentGameResponse,
+  type AgentRunningActivity,
   type AgentResumeResponse,
   type ChangelogResponse,
   type GuideResponse,
 } from './protocol.js';
 import { GameClient, serverOrigin } from './client.js';
 import { CliError } from './errors.js';
-import { withRenderedHints } from './hints.js';
+import {
+  recoveryHint,
+  withRenderedHints,
+  type RepetitionSummary,
+} from './hints.js';
 import { changelogNote, updateNote, withNotes } from './notices.js';
 import { fetchPublishedVersion, isNewerVersion } from './update-check.js';
 import metadata from '../package.json' with { type: 'json' };
@@ -44,6 +49,7 @@ import {
   bodySchema,
   globalOptions,
   jsonFlag,
+  noWaitFlag,
   type CommandDefinition,
 } from './command-definition.js';
 
@@ -168,8 +174,15 @@ const commands: Record<string, CommandDefinition> = {
   travel: {
     path: 'character/travel',
     schema: travelSchema,
-    flags: [['--to <id>', 'Adjacent destination location ID', true]],
+    flags: [
+      ['--to <id>', 'Adjacent destination location ID', true],
+      noWaitFlag,
+    ],
     help: 'Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID.',
+    examples: [
+      'clawsaga travel -c m7Qp2_aR9L-x --to openpit',
+      'clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait',
+    ],
   },
   gather: {
     path: 'character/gather',
@@ -177,8 +190,13 @@ const commands: Record<string, CommandDefinition> = {
     flags: [
       ['--item <id>', 'Resource item ID from look', true],
       ['--count <number>', 'Attempts, one at a time (default 1)'],
+      noWaitFlag,
     ],
     help: 'Gather the selected item at your current location while idle; wait for each completion. An ambush keeps that harvest but ends --count repetition. Finish the whole command before starting another main activity.',
+    examples: [
+      'clawsaga gather -c m7Qp2_aR9L-x --item herb --count 3',
+      'clawsaga gather -c m7Qp2_aR9L-x --item herb --no-wait',
+    ],
   },
   recipes: {
     path: 'character/recipes',
@@ -201,8 +219,13 @@ const commands: Record<string, CommandDefinition> = {
         '--request <uuid>',
         'Retry one lot with the same ID after an uncertain craft',
       ],
+      noWaitFlag,
     ],
     help: 'Craft while idle; wait for each completion. Each --count lot gets a new request ID; --request retries one lot and needs --count 1. The whole repetition must finish before starting another main activity for this character.',
+    examples: [
+      'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --count 3',
+      'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --no-wait',
+    ],
   },
   stop: {
     path: 'character/activity/stop',
@@ -241,7 +264,7 @@ const commands: Record<string, CommandDefinition> = {
     flags: [
       [
         '--equipment <uuid>',
-        'Equipment ID from purchase.equipment_id or inventory[].id',
+        'Equipment ID from purchase.equipment_id or inventory[].equipment_id',
         true,
       ],
     ],
@@ -250,16 +273,37 @@ const commands: Record<string, CommandDefinition> = {
   unequip: {
     path: 'character/equipment/unequip',
     schema: equipSchema,
-    flags: [['--equipment <uuid>', 'Equipped inventory entry id', true]],
+    flags: [
+      [
+        '--equipment <uuid>',
+        'Equipment ID from inventory[].equipment_id',
+        true,
+      ],
+    ],
     help: 'Return equipment to carried inventory while idle.',
   },
   repair: {
     path: 'character/equipment/repair',
     schema: repairSchema,
-    flags: [['--equipment <uuid>', 'Inventory entry id to repair', true]],
+    flags: [
+      [
+        '--equipment <uuid>',
+        'Equipment ID from inventory[].equipment_id',
+        true,
+      ],
+    ],
     help: 'Repair owned equipment at a town smithy while idle.',
   },
 };
+
+// The commands that start a main activity and therefore accept --no-wait.
+const activityCommands = new Set([
+  'travel',
+  'gather',
+  'craft',
+  'fight',
+  'rest',
+]);
 
 const optionsSchema = z.object({
   server: z.string(),
@@ -281,6 +325,7 @@ const optionsSchema = z.object({
   maxFeePerLot: z.string().optional(),
   maxPayment: z.string().optional(),
   request: z.string().optional(),
+  wait: z.boolean().optional(),
   equipment: z.string().optional(),
   enemy: z.string().optional(),
   preset: z.string().optional(),
@@ -295,8 +340,14 @@ const optionsSchema = z.object({
   unreadOnly: z.boolean().optional(),
   limit: z.string().optional(),
   before: z.string().optional(),
+  beforeThread: z.string().optional(),
   after: z.string().optional(),
   topic: z.string().optional(),
+  category: z.string().optional(),
+  threadLanguage: z.string().optional(),
+  authoredBySelf: z.boolean().optional(),
+  participatedBySelf: z.boolean().optional(),
+  thread: z.string().optional(),
 });
 type Values = z.infer<typeof optionsSchema>;
 
@@ -305,7 +356,9 @@ async function readStdin() {
   let text = '';
   for await (const chunk of process.stdin) {
     text += String(chunk);
-    if (text.length > 32 * 1024) throw new CliError('INVALID_INPUT_FILE');
+    // ゲーム経路のJSON本文の境界に合わせる。10,000コードポイントの本文を
+    // 最悪のエスケープで送っても収まる。無制限にはしない。
+    if (text.length > 128 * 1024) throw new CliError('INVALID_INPUT_FILE');
   }
   return text;
 }
@@ -366,7 +419,13 @@ async function commandInput(
   if (values.unreadOnly) input.unread_only = true;
   if (values.limit !== undefined) input.limit = Number(values.limit);
   if (values.before) input.before = Number(values.before);
+  if (values.beforeThread) input.before = values.beforeThread;
   if (values.after) input.after = Number(values.after);
+  if (values.category) input.category = values.category;
+  if (values.threadLanguage) input.language = values.threadLanguage;
+  if (values.authoredBySelf) input.authored_by_self = true;
+  if (values.participatedBySelf) input.participated_by_self = true;
+  if (values.thread) input.thread_id = values.thread;
   return input;
 }
 
@@ -539,6 +598,8 @@ export async function execute(
   let executedCommand: string | undefined;
   let publishedVersion: Promise<string | undefined> | undefined;
   let executedCharacter: string | undefined;
+  let executedWait = true;
+  let executedActivity = false;
   let schemaHelpResult:
     { input_schema: Record<string, unknown>; input_kind: string } | undefined;
   let result:
@@ -703,6 +764,8 @@ export async function execute(
       if (name === 'hello') publishedVersion = fetchPublishedVersion(request);
       const values = optionsSchema.parse(command.optsWithGlobals());
       executedCharacter = values.character;
+      executedWait = values.wait !== false;
+      executedActivity = activityCommands.has(name);
       if (definition.requiresCharacter !== false && !values.character)
         throw new CliError('INVALID_ARGUMENTS', {
           fields: ['character'],
@@ -746,13 +809,32 @@ export async function execute(
             message:
               '--request retries a single lot; use --count 1 or omit --request.',
           });
+        if (!executedWait && count !== 1)
+          throw new CliError('INVALID_ARGUMENTS', {
+            fields: ['count'],
+            message:
+              '--no-wait starts one activity; use --count 1 or omit --count.',
+          });
+        if (!executedWait) {
+          try {
+            result = await client.invoke(definition.path, input);
+          } catch (error) {
+            if (name === 'craft' && error instanceof CliError)
+              throw new CliError(error.code, {
+                ...error.detail,
+                request_id: values.request,
+              });
+            throw error;
+          }
+          return;
+        }
         result = await repeatActivity(
           client,
           definition.path,
           input,
           { character: values.character, locale: values.contentLanguage },
           count,
-          name === 'craft' ? { requestIdPerLot: true } : undefined,
+          name === 'craft' ? { requestIdPerLot: true, notify } : { notify },
         );
         return;
       }
@@ -770,11 +852,12 @@ export async function execute(
         throw error;
       }
       result =
-        ['travel', 'fight', 'rest'].includes(name) && response.ok
+        activityCommands.has(name) && response.ok && executedWait
           ? await waitForActivity(
               client,
               { character: values.character, locale: values.contentLanguage },
               response,
+              notify,
             )
           : response;
     });
@@ -782,14 +865,34 @@ export async function execute(
   try {
     await program.parseAsync(args, { from: 'user' });
   } catch (error) {
-    if (
-      error instanceof CliError &&
-      ['INVALID_ARGUMENTS', 'INVALID_INPUT_FILE'].includes(error.code)
-    )
-      throw new CliError(error.code, {
-        ...error.detail,
-        help_command: helpCommand,
+    if (error instanceof CliError) {
+      const help = ['INVALID_ARGUMENTS', 'INVALID_INPUT_FILE'].includes(
+        error.code,
+      )
+        ? { help_command: helpCommand }
+        : {};
+      // 主活動の応答が読めない場合も、サーバーは受付済みかもしれない。
+      // 送信前の失敗は除き、受付応答を失った場合と同じ復旧手順を返す。
+      const detail =
+        executedActivity &&
+        !notSent(error) &&
+        (error.code === 'INVALID_RESPONSE' || error.code === 'UPDATE_REQUIRED')
+          ? { ...error.detail, outcome: 'unknown' }
+          : error.detail;
+      // A thrown error never reaches withRenderedHints, so carry the recovery
+      // guidance in the failure envelope itself.
+      const hint = recoveryHint(detail, {
+        character: executedCharacter,
+        activity: executedActivity,
+        craft: executedCommand === 'craft',
       });
+      if (Object.keys(help).length === 0 && !hint) throw error;
+      throw new CliError(error.code, {
+        ...detail,
+        ...help,
+        ...(hint ? { hint } : {}),
+      });
+    }
     if (!(error instanceof CommanderError)) throw error;
     if (error.code === 'commander.version')
       return { ok: true, version: metadata.version };
@@ -806,7 +909,9 @@ export async function execute(
   if (schemaHelpResult) return { ok: true, ...schemaHelpResult };
   if (!result) throw new CliError('INVALID_COMMAND');
   if (!('schema_version' in result)) return result;
-  const rendered = withRenderedHints(result, executedCharacter);
+  const rendered = withRenderedHints(result, executedCharacter, {
+    wait: executedWait,
+  });
   if (executedCommand !== 'hello' || !rendered.ok) return rendered;
   return withNotes(rendered, await helloNotes(rendered, publishedVersion));
 }
@@ -841,18 +946,52 @@ function requestIdOf(input: unknown) {
     : undefined;
 }
 
+// invoke marks a failure that happened before the game request was sent, so the
+// start cannot have taken effect.
+function notSent(error: CliError) {
+  return error.detail.outcome === 'not_sent';
+}
+
+// 受付診断。ホストがCLIを終了させても、この行から活動を再開せず回収できる。
+function acceptedActivityNote(
+  activity: AgentRunningActivity,
+  nextPollAfterSeconds: number | undefined,
+  requestId?: string,
+) {
+  return {
+    event: 'activity_accepted',
+    activity_id: activity.activity_id,
+    kind: activity.kind,
+    started_at: activity.started_at,
+    ...('completes_at' in activity
+      ? { completes_at: activity.completes_at }
+      : {}),
+    ...('arrives_at' in activity ? { arrives_at: activity.arrives_at } : {}),
+    ...('time_limit_at' in activity
+      ? { time_limit_at: activity.time_limit_at }
+      : {}),
+    ...(nextPollAfterSeconds === undefined
+      ? {}
+      : { next_poll_after_seconds: nextPollAfterSeconds }),
+    ...(requestId === undefined ? {} : { request_id: requestId }),
+  };
+}
+
 export async function repeatActivity(
   client: GameClient,
   path: string,
   input: unknown,
   values: { character: string | undefined; locale?: 'ja' | 'en' | undefined },
   count: number,
-  options?: { requestIdPerLot?: boolean },
+  options?: {
+    requestIdPerLot?: boolean;
+    notify?: (value: unknown) => void;
+  },
 ) {
   let confirmed = 0;
   let lastRequestId: string | undefined;
   const produced: Record<string, number> = {};
-  const summary = (stoppedReason: string) => ({
+  const summary = (stoppedReason: string): RepetitionSummary => ({
     requested_count: count,
     completed_count: confirmed,
     produced: { ...produced },
@@ -887,7 +1026,13 @@ export async function repeatActivity(
       // its stored result, even while a newer activity is running.
       const completed = started.data.last_result
         ? started
-        : await waitForActivity(client, values, started);
+        : await waitForActivity(
+            client,
+            values,
+            started,
+            options?.notify,
+            requestId,
+          );
       if (!completed.ok)
         return { ...completed, repetition: summary('activity_failed') };
       const result = completed.data.last_result;
@@ -915,7 +1060,8 @@ export async function repeatActivity(
         throw new CliError(error.code, {
           ...error.detail,
           ...(requestId === undefined ? {} : { request_id: requestId }),
-          repetition: summary('unknown'),
+          // 送信前の失敗は開始していないため、成果があった可能性を主張しない。
+          repetition: summary(notSent(error) ? 'start_rejected' : 'unknown'),
         });
       throw error;
     }
@@ -931,11 +1077,17 @@ export async function waitForActivity(
   client: GameClient,
   values: { character: string | undefined; locale?: 'ja' | 'en' | undefined },
   initial: AgentGameResponse,
+  notify?: (value: unknown) => void,
+  requestId?: string,
 ) {
   let result = initial;
-  const activityId = result.data.activity?.activity_id;
-  if (!activityId)
+  const activity = result.ok ? result.data.activity : undefined;
+  if (!activity)
     throw new CliError('INVALID_RESPONSE', { reason: 'missing_activity_id' });
+  const activityId = activity.activity_id;
+  notify?.(
+    acceptedActivityNote(activity, result.next_poll_after_seconds, requestId),
+  );
   while (result.data.activity?.activity_id === activityId) {
     const seconds = result.next_poll_after_seconds;
     if (!seconds)

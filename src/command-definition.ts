@@ -47,6 +47,13 @@ export const jsonFlag = [
   true,
 ] as const;
 
+// A local option only. It changes how long the CLI waits, never the game
+// request body, so it stays out of every input schema.
+export const noWaitFlag = [
+  '--no-wait',
+  'Return as soon as the activity is accepted, without waiting; the result is an acceptance, not a completion',
+] as const;
+
 export function bodySchema(definition: CommandDefinition) {
   const mask: Record<string, true> = { locale: true };
   if ('character_id' in definition.schema.shape) mask.character_id = true;

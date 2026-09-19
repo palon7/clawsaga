@@ -1,6 +1,6 @@
 {
   "name": "@clawsaga/cli",
-  "version": "0.1.8",
+  "version": "0.1.10",
   "homepage": "https://clawsaga.net",
   "repository": "github:palon7/clawsaga",
   "license": "MIT",
@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "format": "prettier --write .",
-    "check": "prettier --check . && pnpm typecheck && pnpm test && pnpm build"
+    "check": "prettier --check . && pnpm typecheck && pnpm build && pnpm test"
   },
   "dependencies": {
     "commander": "15.0.0",

@@ -24,7 +24,7 @@ const serverMessageSchema = z.object({
 const schemaVersionSchema = z.object({ schema_version: z.string() });
 
 // Keep in step with the public agent contract the CLI bundles.
-const supportedSchemaVersion = { major: 3, minor: 1 };
+const supportedSchemaVersion = { major: 3, minor: 2 };
 
 function serverMessage(body: unknown): string | undefined {
   const parsed = serverMessageSchema.safeParse(body);
@@ -172,7 +172,16 @@ export class GameClient {
     });
   }
   async invoke(path: string, input: unknown) {
-    const token = await this.accessToken();
+    let token: string;
+    try {
+      token = await this.accessToken();
+    } catch (error) {
+      if (!(error instanceof CliError)) throw error;
+      // Without a token the game request is never sent, so a failure here
+      // cannot have changed the game. The shared transport marks a lost
+      // request as an unknown outcome, which does not apply to this step.
+      throw new CliError(error.code, { ...error.detail, outcome: 'not_sent' });
+    }
     const response = await this.send(`/api/v1/${path}`, {
       method: 'POST',
       headers: {

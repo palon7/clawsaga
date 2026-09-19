@@ -13,11 +13,29 @@ it('accepts the compact profile receipt', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.1',
+      schema_version: '3.2',
       server_time: '2026-09-12T00:00:00.000Z',
       data: { profile_saved: { preferred_locale: 'en' } },
     }).success,
   ).toBe(true);
+});
+
+it('keeps the repair receipt from an equipment repair', () => {
+  const response = {
+    ok: true,
+    schema_version: '3.2',
+    server_time: '2026-09-12T00:00:00.000Z',
+    data: {
+      repair: {
+        equipment_id: '11111111-1111-4111-8111-111111111111',
+        durability: 50,
+        max_durability: 50,
+        kits_used: 1,
+        fee_paid: 3,
+      },
+    },
+  };
+  expect(agentGameResponseSchema.parse(response)).toEqual(response);
 });
 
 it('requires a position in character responses', () => {
@@ -45,7 +63,7 @@ it('requires a position in character responses', () => {
   };
   const response = {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-12T00:00:00.000Z',
     data: { character },
   };
@@ -62,7 +80,7 @@ it('requires a position in character responses', () => {
 it('rejects responses whose status and error disagree', () => {
   const result = {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-12T00:00:00.000Z',
     data: {},
   };
@@ -94,7 +112,7 @@ it('rejects responses whose status and error disagree', () => {
 it('accepts characters discovered in a completed travel result', () => {
   const response = agentGameResponseSchema.parse({
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-12T00:00:15.000Z',
     data: {
       last_result: {
@@ -128,18 +146,33 @@ it('accepts characters discovered in a completed travel result', () => {
   });
 });
 
-function inventoryItem(definition_id: string, name: string) {
+function stackRow(item_id: string, name: string) {
   return {
-    id: '00000000-0000-4000-8000-000000000001',
-    definition_id,
+    kind: 'stack',
+    item_id,
     name,
     quantity: 1,
     unit_weight: 1,
     tradeable: true,
+  };
+}
+
+function equipmentRow(
+  item_id: string,
+  name: string,
+  quality: 'standard' | 'fine' | 'superior' = 'standard',
+) {
+  return {
+    kind: 'equipment',
+    equipment_id: '00000000-0000-4000-8000-000000000001',
+    item_id,
+    name,
+    unit_weight: 1,
+    tradeable: true,
+    quality,
+    durability: 100,
+    max_durability: 100,
     slot: null,
-    quality: null,
-    durability: null,
-    max_durability: null,
   };
 }
 
@@ -152,12 +185,12 @@ it('accepts wolf meat and wolf jerky in inventory responses', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.1',
+      schema_version: '3.2',
       server_time: '2026-09-12T00:00:00.000Z',
       data: {
         inventory: [
-          inventoryItem('wolf_meat', 'Wolf Meat'),
-          inventoryItem('wolf_jerky', 'Wolf Jerky'),
+          stackRow('wolf_meat', 'Wolf Meat'),
+          stackRow('wolf_jerky', 'Wolf Jerky'),
         ],
       },
     }).success,
@@ -168,19 +201,42 @@ it('accepts non-standard qualities on individual items', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.1',
+      schema_version: '3.2',
       server_time: '2026-09-12T00:00:00.000Z',
       data: {
         inventory: [
-          { ...inventoryItem('iron_sword', 'Iron Sword'), quality: 'fine' },
-          {
-            ...inventoryItem('iron_dagger', 'Iron Dagger'),
-            quality: 'superior',
-          },
+          equipmentRow('iron_sword', 'Iron Sword', 'fine'),
+          equipmentRow('iron_dagger', 'Iron Dagger', 'superior'),
         ],
       },
     }).success,
   ).toBe(true);
+});
+
+it('rejects the flat inventory row that has no kind', () => {
+  expect(
+    agentGameResponseSchema.safeParse({
+      ok: true,
+      schema_version: '3.2',
+      server_time: '2026-09-12T00:00:00.000Z',
+      data: {
+        inventory: [
+          {
+            id: '00000000-0000-4000-8000-000000000001',
+            definition_id: 'wolf_meat',
+            name: 'Wolf Meat',
+            quantity: 1,
+            unit_weight: 1,
+            tradeable: true,
+            slot: null,
+            quality: null,
+            durability: null,
+            max_durability: null,
+          },
+        ],
+      },
+    }).success,
+  ).toBe(false);
 });
 
 it('accepts wolf meat loot and the wolf jerky recipe', () => {
@@ -286,7 +342,7 @@ it('accepts the compact character status alongside other data', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.1',
+      schema_version: '3.2',
       server_time: '2026-09-12T00:00:00.000Z',
       data: {
         status: {
@@ -340,7 +396,7 @@ it('uses only cooked recovery foods and rejects raw ingredients', () => {
 it('accepts operation and note hints and rejects other shapes', () => {
   const result = {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-12T00:00:00.000Z',
     data: {},
   };

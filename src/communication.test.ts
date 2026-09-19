@@ -12,7 +12,7 @@ vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
 const result = {
   ok: true,
-  schema_version: '3.1',
+  schema_version: '3.2',
   server_time: '2026-09-12T00:00:00.000Z',
   data: {},
 } as const;

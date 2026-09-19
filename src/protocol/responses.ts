@@ -28,6 +28,10 @@ import {
   attentionSchema,
   directMessageSchema,
   directConversationSchema,
+  boardThreadSchema,
+  boardThreadSummarySchema,
+  boardPostSchema,
+  boardQuotaSchema,
 } from './social.js';
 import { recipeViewSchema, shopViewSchema } from './production.js';
 import {
@@ -95,32 +99,42 @@ export const characterStatusSchema = z.object({
   weakened_until: z.iso.datetime().nullable(),
 });
 
-const itemSchema = z.object({
-  id: z.string(),
-  definition_id: z.string(),
-  name: z.string(),
-  quantity: z.number().int(),
-  unit_weight: z.number().int().positive(),
-  tradeable: z.boolean(),
-  slot: z
-    .enum([
-      'main_hand',
-      'off_hand',
-      'body',
-      'head',
-      'leg',
-      'foot',
-      'hands',
-      'neck',
-      'gathering_tool',
-    ])
-    .nullable(),
-  quality: z.enum(['standard', 'fine', 'superior']).nullable(),
-  durability: z.number().nullable(),
-  max_durability: z.number().nullable(),
-});
+const inventoryRowSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('stack'),
+    item_id: z.string(),
+    name: z.string(),
+    unit_weight: z.number().int().positive(),
+    tradeable: z.boolean(),
+    quantity: z.number().int().positive(),
+  }),
+  z.object({
+    kind: z.literal('equipment'),
+    equipment_id: z.uuid(),
+    item_id: z.string(),
+    name: z.string(),
+    unit_weight: z.number().int().positive(),
+    tradeable: z.boolean(),
+    quality: z.enum(['standard', 'fine', 'superior']),
+    durability: z.number().int().nonnegative(),
+    max_durability: z.number().int().positive(),
+    slot: z
+      .enum([
+        'main_hand',
+        'off_hand',
+        'body',
+        'head',
+        'leg',
+        'foot',
+        'hands',
+        'neck',
+        'gathering_tool',
+      ])
+      .nullable(),
+  }),
+]);
 
-export type InventoryItem = z.infer<typeof itemSchema>;
+export type InventoryItem = z.infer<typeof inventoryRowSchema>;
 
 export const optionsSchema = z.object({
   starting_location: locationViewSchema,
@@ -203,7 +217,7 @@ export const profileReceiptSchema = z.object({
 export const agentGameResponseSchema = z
   .object({
     ok: z.boolean(),
-    schema_version: z.literal('3.1'),
+    schema_version: z.literal('3.2'),
     server_time: z.iso.datetime(),
     next_poll_after_seconds: z.number().int().positive().optional(),
     attention: attentionSchema.optional(),
@@ -253,6 +267,15 @@ export const agentGameResponseSchema = z
           next_cursor: z.number().int().positive().nullable(),
         })
         .optional(),
+      board_thread: boardThreadSchema.optional(),
+      board_threads: z
+        .object({
+          threads: z.array(boardThreadSummarySchema),
+          next_cursor: z.uuid().nullable(),
+        })
+        .optional(),
+      board_post: boardPostSchema.optional(),
+      board_quota: boardQuotaSchema.optional(),
       session_ended: z
         .object({
           activity_policy: z.enum(['continue', 'stop_at_boundary']),
@@ -294,7 +317,7 @@ export const agentGameResponseSchema = z
         .optional(),
       profile_saved: profileReceiptSchema.optional(),
       options: optionsSchema.optional(),
-      inventory: z.array(itemSchema).optional(),
+      inventory: z.array(inventoryRowSchema).optional(),
       capacity: z
         .object({
           carried_weight: z.number().int().nonnegative(),
@@ -310,6 +333,15 @@ export const agentGameResponseSchema = z
           item_id: z.string(),
           equipment_id: z.uuid(),
           paid: z.number().int().nonnegative(),
+        })
+        .optional(),
+      repair: z
+        .object({
+          equipment_id: z.uuid(),
+          durability: z.number().int().nonnegative(),
+          max_durability: z.number().int().positive(),
+          kits_used: z.number().int().nonnegative(),
+          fee_paid: z.number().int().nonnegative(),
         })
         .optional(),
       activity: agentRunningActivitySchema.nullable().optional(),
