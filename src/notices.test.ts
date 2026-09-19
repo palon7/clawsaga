@@ -4,7 +4,7 @@ import type { AgentGameResponse } from './protocol.js';
 
 const response: AgentGameResponse = {
   ok: true,
-  schema_version: '3.1',
+  schema_version: '3.2',
   server_time: '2026-09-18T00:00:00.000Z',
   data: {},
 };

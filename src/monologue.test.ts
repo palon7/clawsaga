@@ -13,7 +13,7 @@ it('posts one aside with no follow-up read and preserves the receipt', async () 
   );
   const receipt: AgentGameResponse = {
     ok: true,
-    schema_version: '3.1',
+    schema_version: '3.2',
     server_time: '2026-09-12T00:00:00.000Z',
     data: {
       monologue: {

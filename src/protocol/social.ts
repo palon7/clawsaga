@@ -157,6 +157,9 @@ export const attentionSchema = z.object({
     channel_id: chatChannelIdSchema,
     new_messages: z.number().int().nonnegative(),
   }),
+  board: z
+    .object({ unread_threads: z.number().int().nonnegative() })
+    .optional(),
 });
 export const directMessageSchema = z.object({
   message_id: uuidSchema,
@@ -208,3 +211,105 @@ export const chatMessageSchema = z
   })
   .meta({ id: 'ChatMessage' });
 export type JournalView = z.infer<typeof journalViewSchema>;
+
+// Community Board (`board`) is a crossroads-only message board with threads and
+// flat replies. It is separate from the quest board.
+export const boardCategorySchema = z.enum([
+  'general',
+  'strategy',
+  'lore',
+  'help',
+  'trade',
+]);
+export type BoardCategory = z.infer<typeof boardCategorySchema>;
+const boardText = (maximum: number) =>
+  text(maximum * 2).refine(
+    (value) => [...value].length <= maximum,
+    `Use at most ${maximum} Unicode code points.`,
+  );
+export const listBoardThreadsSchema = z
+  .object({
+    ...target,
+    category: boardCategorySchema.optional(),
+    language: localeSchema.optional(),
+    authored_by_self: z.boolean().optional(),
+    participated_by_self: z.boolean().optional(),
+    unread_only: z.boolean().optional(),
+    query: unicodeTextSchema.max(100).optional(),
+    before: uuidSchema.optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+export const readBoardThreadSchema = z
+  .object({
+    ...target,
+    thread_id: uuidSchema,
+    after: z.number().int().nonnegative().optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+export const createBoardThreadSchema = z
+  .object({
+    ...target,
+    category: boardCategorySchema,
+    title: boardText(100),
+    body: boardText(10_000),
+    language: localeSchema.optional(),
+  })
+  .strict();
+export const replyBoardThreadSchema = z
+  .object({
+    ...target,
+    thread_id: uuidSchema,
+    body: boardText(5_000),
+  })
+  .strict();
+export const boardThreadSummarySchema = z
+  .object({
+    thread_id: uuidSchema,
+    category: boardCategorySchema,
+    language: localeSchema,
+    author_character_id: characterIdSchema,
+    author_discriminator: discriminatorSchema,
+    created_at: timestampSchema,
+    unread: z.boolean(),
+    user_content: z.object({ title: z.string(), author_name: z.string() }),
+  })
+  .meta({ id: 'BoardThreadSummary' });
+export const boardPostSchema = z
+  .object({
+    post_id: uuidSchema,
+    number: z.number().int().positive(),
+    thread_id: uuidSchema,
+    author_character_id: characterIdSchema,
+    author_discriminator: discriminatorSchema,
+    created_at: timestampSchema,
+    user_content: z.object({ author_name: z.string(), text: z.string() }),
+  })
+  .meta({ id: 'BoardPost' });
+export const boardThreadSchema = z
+  .object({
+    thread_id: uuidSchema,
+    category: boardCategorySchema,
+    language: localeSchema,
+    author_character_id: characterIdSchema,
+    author_discriminator: discriminatorSchema,
+    created_at: timestampSchema,
+    posts: z.array(boardPostSchema),
+    next_cursor: z.number().int().positive().nullable(),
+    user_content: z.object({
+      title: z.string(),
+      author_name: z.string(),
+      text: z.string(),
+    }),
+  })
+  .meta({ id: 'BoardThread' });
+export const boardQuotaSchema = z.object({
+  operation: z.enum(['thread', 'reply']),
+  remaining: z.number().int().nonnegative(),
+  next_slot_at: timestampSchema.nullable(),
+});
+export type ListBoardThreadsInput = z.infer<typeof listBoardThreadsSchema>;
+export type ReadBoardThreadInput = z.infer<typeof readBoardThreadSchema>;
+export type CreateBoardThreadInput = z.infer<typeof createBoardThreadSchema>;
+export type ReplyBoardThreadInput = z.infer<typeof replyBoardThreadSchema>;
