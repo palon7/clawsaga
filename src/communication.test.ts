@@ -4,6 +4,7 @@ import { GameClient } from './client.js';
 import { execute } from './commands.js';
 import {
   agentGameResponseSchema,
+  agentSchemaVersion,
   sendChatSchema,
   sendDirectMessageSchema,
 } from './protocol.js';
@@ -12,7 +13,7 @@ vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
 const result = {
   ok: true,
-  schema_version: '3.2',
+  schema_version: agentSchemaVersion,
   server_time: '2026-09-12T00:00:00.000Z',
   data: {},
 } as const;
@@ -136,6 +137,7 @@ it('retains attention, message bodies, read state and conversation direction dur
     attention: {
       unread_direct_messages: 1,
       chat: { channel_id: 'selene', new_messages: 3 },
+      board: { unread_threads: 0 },
     },
     data: {
       direct_messages: {

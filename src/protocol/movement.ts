@@ -50,7 +50,13 @@ export const mapViewSchema = z.object({
     }),
   ),
 });
-export const facilitySchema = z.enum(['shop', 'alchemy', 'furnace', 'forge']);
+export const facilitySchema = z.enum([
+  'shop',
+  'alchemy',
+  'furnace',
+  'forge',
+  'community_board',
+]);
 export const lookResourceSchema = z.object({
   item_id: itemIdSchema,
   name: z.string(),

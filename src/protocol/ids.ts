@@ -33,6 +33,7 @@ export const itemIdSchema = z.enum([
   'silver_ore',
   'silver_ingot',
   'silver_repair_kit',
+  'iron_armor',
   'iron_shield',
   'silver_sword',
   'silver_dagger',
@@ -43,6 +44,18 @@ export const itemIdSchema = z.enum([
 ]);
 export type ItemId = z.infer<typeof itemIdSchema>;
 export type JobId = z.infer<typeof jobSchema>;
+
+export const equipmentSlotSchema = z.enum([
+  'main_hand',
+  'off_hand',
+  'body',
+  'head',
+  'leg',
+  'foot',
+  'hands',
+  'neck',
+  'gathering_tool',
+]);
 
 export const skillIdSchema = z.enum([
   'mining',

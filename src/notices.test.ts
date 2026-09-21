@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest';
 import { changelogNote, updateNote, withNotes } from './notices.js';
-import type { AgentGameResponse } from './protocol.js';
+import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
 
 const response: AgentGameResponse = {
   ok: true,
-  schema_version: '3.2',
+  schema_version: agentSchemaVersion,
   server_time: '2026-09-18T00:00:00.000Z',
   data: {},
 };

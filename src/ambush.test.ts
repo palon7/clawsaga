@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
+import { agentSchemaVersion } from './protocol.js';
 
 vi.mock('node:timers/promises', () => ({
   setTimeout: () => Promise.resolve(),
@@ -18,7 +19,7 @@ const endedAt = '2026-09-12T00:00:45.000Z';
 function response(data: Record<string, unknown>, running = false) {
   return Response.json({
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: endedAt,
     ...(running ? { next_poll_after_seconds: 1 } : {}),
     data,

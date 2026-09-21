@@ -40,6 +40,8 @@ import {
   characterIdSchema,
   discriminatorSchema,
   skillIdSchema,
+  equipmentSlotSchema,
+  itemIdSchema,
 } from './ids.js';
 
 export const characterViewSchema = z.object({
@@ -99,6 +101,33 @@ export const characterStatusSchema = z.object({
   weakened_until: z.iso.datetime().nullable(),
 });
 
+const equipmentStatsSchema = z.object({
+  equip_slot: equipmentSlotSchema,
+  required_job: jobSchema.nullable(),
+  required_job_name: z.string().nullable(),
+  power: z.number().int().nonnegative(),
+  armor: z.number().int().nonnegative(),
+});
+
+const repairEstimateSchema = z.object({
+  available: z.boolean(),
+  reason: z
+    .enum([
+      'busy',
+      'wrong_location',
+      'not_repairable',
+      'no_effect',
+      'insufficient_kits',
+      'insufficient_funds',
+    ])
+    .nullable(),
+  repair_kit_item_id: itemIdSchema.nullable(),
+  repair_kit_name: z.string().nullable(),
+  required_quantity: z.number().int().nonnegative().nullable(),
+  fee: z.number().int().nonnegative().nullable(),
+  durability_after: z.number().int().positive().nullable(),
+});
+
 const inventoryRowSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('stack'),
@@ -107,6 +136,12 @@ const inventoryRowSchema = z.discriminatedUnion('kind', [
     unit_weight: z.number().int().positive(),
     tradeable: z.boolean(),
     quantity: z.number().int().positive(),
+    use_effect: z
+      .object({
+        hp_recovery: z.number().int().nonnegative(),
+        mp_recovery: z.number().int().nonnegative(),
+      })
+      .optional(),
   }),
   z.object({
     kind: z.literal('equipment'),
@@ -118,19 +153,9 @@ const inventoryRowSchema = z.discriminatedUnion('kind', [
     quality: z.enum(['standard', 'fine', 'superior']),
     durability: z.number().int().nonnegative(),
     max_durability: z.number().int().positive(),
-    slot: z
-      .enum([
-        'main_hand',
-        'off_hand',
-        'body',
-        'head',
-        'leg',
-        'foot',
-        'hands',
-        'neck',
-        'gathering_tool',
-      ])
-      .nullable(),
+    slot: equipmentSlotSchema.nullable(),
+    equipment: equipmentStatsSchema,
+    repair_estimate: repairEstimateSchema.optional(),
   }),
 ]);
 
@@ -178,7 +203,7 @@ const guideMatchSchema = z.object({
 
 export const guideResponseSchema = z.object({
   guide: z.object({
-    topics: z.array(guideTopicSchema),
+    topics: z.array(guideTopicSchema).optional(),
     section: guideTopicSchema.extend({ body: z.string().min(1) }).optional(),
     matches: z.array(guideMatchSchema).optional(),
     truncated: z.boolean().optional(),
@@ -214,10 +239,12 @@ export const profileReceiptSchema = z.object({
   preferred_locale: localeSchema,
 });
 
+export const agentSchemaVersion = '3.3';
+
 export const agentGameResponseSchema = z
   .object({
     ok: z.boolean(),
-    schema_version: z.literal('3.2'),
+    schema_version: z.literal(agentSchemaVersion),
     server_time: z.iso.datetime(),
     next_poll_after_seconds: z.number().int().positive().optional(),
     attention: attentionSchema.optional(),
@@ -318,6 +345,13 @@ export const agentGameResponseSchema = z
       profile_saved: profileReceiptSchema.optional(),
       options: optionsSchema.optional(),
       inventory: z.array(inventoryRowSchema).optional(),
+      rest_estimate: z
+        .object({
+          available: z.boolean(),
+          reason: z.enum(['no_effect', 'busy', 'wrong_location']).nullable(),
+          duration_seconds: z.number().int().nonnegative().nullable(),
+        })
+        .optional(),
       capacity: z
         .object({
           carried_weight: z.number().int().nonnegative(),
@@ -357,6 +391,15 @@ export const agentGameResponseSchema = z
     error: z
       .object({
         message: z.string(),
+        details: z
+          .object({
+            kind: z.literal('delivery_shortage'),
+            item_id: itemIdSchema,
+            required: z.number().int().positive(),
+            owned: z.number().int().nonnegative(),
+            missing: z.number().int().positive(),
+          })
+          .optional(),
         fields: z
           .array(z.object({ path: z.string(), message: z.string() }))
           .optional(),

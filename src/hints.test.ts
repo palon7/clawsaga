@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
 import { withRenderedHints } from './hints.js';
-import type { AgentGameResponse } from './protocol.js';
+import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -11,7 +11,7 @@ vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
 
 const response: AgentGameResponse = {
   ok: true,
-  schema_version: '3.2',
+  schema_version: agentSchemaVersion,
   server_time: '2026-09-12T00:00:00.000Z',
   data: {},
 };

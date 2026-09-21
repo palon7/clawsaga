@@ -119,12 +119,12 @@ const commands: Record<string, CommandDefinition> = {
     flags: [
       [
         '--include <sections>',
-        'Comma-separated profile,inventory; the response omits both unless named',
+        'Comma-separated profile,inventory,repair_estimates; repair estimates also include inventory',
         false,
-        ['profile', 'inventory'],
+        ['profile', 'inventory', 'repair_estimates'],
       ],
     ],
-    help: 'Read a character. Add --include inventory for the carried items and --include profile for the persona.',
+    help: 'Read a character and the current rest estimate. Add --include inventory for carried items, repair_estimates for inventory with repair costs, or profile for the persona.',
   },
   create: {
     path: 'character/create',
@@ -211,8 +211,7 @@ const commands: Record<string, CommandDefinition> = {
       ['--recipe <id>', 'Recipe ID from recipes', true],
       [
         '--max-fee-per-lot <gold>',
-        'Maximum gold fee you accept per lot; the craft is refused above it',
-        true,
+        'Refuse a lot whose gold fee is above this. Omit it to accept the fee the recipe lists',
       ],
       ['--count <number>', 'Lots, one at a time (default 1)'],
       [
@@ -221,9 +220,9 @@ const commands: Record<string, CommandDefinition> = {
       ],
       noWaitFlag,
     ],
-    help: 'Craft while idle; wait for each completion. Each --count lot gets a new request ID; --request retries one lot and needs --count 1. The whole repetition must finish before starting another main activity for this character.',
+    help: 'Craft while idle; wait for each completion. Omit --max-fee-per-lot to accept the fee the recipe lists. Each --count lot gets a new request ID; --request retries one lot and needs --count 1. The whole repetition must finish before starting another main activity for this character.',
     examples: [
-      'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --count 3',
+      'clawsaga craft -c m7Qp2_aR9L-x --recipe wolf_jerky --count 3',
       'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --no-wait',
     ],
   },
@@ -449,6 +448,16 @@ type HelpOption = {
   choices?: readonly string[];
 };
 
+const guideTopicOption = {
+  flags: '--topic <topic>',
+  description: 'Return one topic body at guide.section.body',
+};
+const guideQueryOption = {
+  flags: '--query <text>',
+  description:
+    'Search every topic for |-separated alternatives; returns excerpts at guide.matches',
+};
+
 type StructuredHelp = {
   command: string;
   description: string;
@@ -544,9 +553,9 @@ function programHelp(): StructuredHelp {
         description: definition.help,
       })),
       {
-        name: 'guide [--topic <topic>]',
+        name: 'guide [--topic <topic>] [--query <text>]',
         description:
-          'Read the English game guide. Without --topic, list the topics.',
+          'Read the game guide. Without --topic or --query, list the topics.',
       },
       {
         name: 'resume',
@@ -562,6 +571,25 @@ function programHelp(): StructuredHelp {
         name: 'auth login',
         description: 'Authorize this CLI with the server.',
       },
+    ],
+  };
+}
+
+function guideHelp(): StructuredHelp {
+  return {
+    command: 'clawsaga guide',
+    description:
+      'Read the game guide. With no option, guide.topics lists the topics. --topic returns its Markdown body at guide.section.body; get_guide returns the same body at data.guide.section.body. --query returns excerpts at guide.matches. Topic and query responses omit topics.',
+    usage: 'clawsaga guide [options]',
+    options: [
+      ...globalOptions.map((option) => helpOption(option, false)),
+      helpOption(guideTopicOption, false),
+      helpOption(guideQueryOption, false),
+    ],
+    examples: [
+      'clawsaga guide',
+      'clawsaga guide --topic travel-production',
+      'clawsaga guide --query "ambush|potion"',
     ],
   };
 }
@@ -664,13 +692,10 @@ export async function execute(
   const guideCommand = program
     .command('guide')
     .description(
-      'Read the English game guide served by the game server. Without --topic or --query, list the topics and what each covers.',
+      'Read the game guide served by the game server. Without --topic or --query, list the topics and what each covers.',
     )
-    .option('--topic <topic>', 'Topic to read, chosen from the topic list')
-    .option(
-      '--query <text>',
-      'Search every topic; separate alternatives with |',
-    );
+    .option(guideTopicOption.flags, guideTopicOption.description)
+    .option(guideQueryOption.flags, guideQueryOption.description);
   guideCommand.on('--help', () => {
     helpTarget = 'clawsaga guide';
     helpCommand = 'clawsaga guide --help';
@@ -876,7 +901,9 @@ export async function execute(
       const detail =
         executedActivity &&
         !notSent(error) &&
-        (error.code === 'INVALID_RESPONSE' || error.code === 'UPDATE_REQUIRED')
+        (error.code === 'INVALID_RESPONSE' ||
+          error.code === 'UPDATE_REQUIRED' ||
+          error.code === 'SERVICE_UNAVAILABLE')
           ? { ...error.detail, outcome: 'unknown' }
           : error.detail;
       // A thrown error never reaches withRenderedHints, so carry the recovery
@@ -931,6 +958,7 @@ async function helloNotes(
 
 function structuredHelp(target: string): StructuredHelp {
   if (target === 'clawsaga') return programHelp();
+  if (target === 'clawsaga guide') return guideHelp();
   if (target === 'auth login') return authLoginHelp();
   if (target === 'schema') return schemaHelp();
   const name = target.startsWith('clawsaga ')

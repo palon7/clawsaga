@@ -7,6 +7,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import lockfile from 'proper-lockfile';
@@ -22,12 +23,34 @@ export const credentialSchema = z.object({
 export type Credential = z.infer<typeof credentialSchema>;
 const storeSchema = z.record(z.string(), credentialSchema);
 
-export function credentialPath(directory = process.cwd()) {
-  return join(directory, '.clawsaga', 'credentials.json');
+export function credentialPath(home = homedir()) {
+  return join(home, '.clawsaga', 'credentials.json');
 }
 
 export class CredentialStore {
   constructor(private readonly path = credentialPath()) {}
+
+  /**
+   * Reads the stored credentials without taking the lock. A writer replaces the
+   * file by rename, so a reader sees either the previous or the new content.
+   */
+  async read(): Promise<Record<string, Credential>> {
+    try {
+      return await this.parse();
+    } catch {
+      throw new CliError('CREDENTIAL_STORAGE_FAILED');
+    }
+  }
+
+  private async parse(): Promise<Record<string, Credential>> {
+    try {
+      return storeSchema.parse(JSON.parse(await readFile(this.path, 'utf8')));
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+        return {};
+      throw error;
+    }
+  }
 
   async update<T>(
     action: (entries: Record<string, Credential>) => T | Promise<T>,
@@ -42,24 +65,15 @@ export class CredentialStore {
       release = await lockfile.lock(directory, {
         realpath: false,
         lockfilePath: join(directory, 'credentials.lock'),
-        // Allow the other process's 30-second token request to finish and save.
-        retries: { retries: 70, factor: 1, minTimeout: 500, maxTimeout: 500 },
+        // A SIGKILLed holder's lock only becomes stealable once it goes stale,
+        // so the waiting side must outlast `stale` rather than expire with it.
+        retries: { retries: 150, factor: 1, minTimeout: 500, maxTimeout: 500 },
+        // Longer than a held lock ever legitimately lasts: a 30-second token
+        // request and the save that follows it.
         stale: 60_000,
       });
-      let entries: Record<string, Credential> = {};
-      try {
-        await chmod(this.path, 0o600).catch(() => undefined);
-        entries = storeSchema.parse(
-          JSON.parse(await readFile(this.path, 'utf8')),
-        );
-      } catch (error) {
-        if (!(
-          error instanceof Error &&
-          'code' in error &&
-          error.code === 'ENOENT'
-        ))
-          throw error;
-      }
+      await chmod(this.path, 0o600).catch(() => undefined);
+      const entries = await this.parse();
       const original = JSON.stringify(entries);
       const result = await action(entries);
       const updated = JSON.stringify(entries);
