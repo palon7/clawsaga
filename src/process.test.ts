@@ -1,10 +1,17 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
+import { agentSchemaVersion } from './protocol.js';
 
 // 実際の配布CLIを子プロセスで動かし、ローカルHTTPハーネスだけで受付・待機の
 // 中断と、別プロセスからの同じ活動の回収を確かめる。参照するbundleは
@@ -15,6 +22,14 @@ const cli = fileURLToPath(
 const characterId = 'Traveler0000';
 const travelId = '00000000-0000-4000-8000-000000000001';
 const serverTime = '2026-09-19T00:00:00.000Z';
+const contractFixtures = JSON.parse(
+  readFileSync(
+    fileURLToPath(
+      new URL('../test-fixtures/agent-responses.json', import.meta.url),
+    ),
+    'utf8',
+  ),
+) as { name: string; response: { ok: boolean } }[];
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -35,7 +50,7 @@ const runningTravel = {
 function accepted(pollSeconds: number) {
   return JSON.stringify({
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: serverTime,
     next_poll_after_seconds: pollSeconds,
     data: { activity: runningTravel },
@@ -44,7 +59,7 @@ function accepted(pollSeconds: number) {
 
 const currentActivity = JSON.stringify({
   ok: true,
-  schema_version: '3.2',
+  schema_version: agentSchemaVersion,
   server_time: serverTime,
   data: { activity: runningTravel },
 });
@@ -109,7 +124,12 @@ function workspace(origin: string) {
 
 function runCli(origin: string, args: string[]) {
   const directory = workspace(origin);
-  const env = { ...process.env };
+  // The CLI reads and writes credentials under the home directory.
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: directory,
+    USERPROFILE: directory,
+  };
   delete env.CLAWSAGA_SERVER;
   const child: ChildProcess = spawn(
     process.execPath,
@@ -249,3 +269,44 @@ it('recovers a travel killed during the wait from its acceptance diagnostic', as
     },
   ]);
 }, 20_000);
+
+it('preserves success and failure fixtures through the built CLI', async () => {
+  let index = 0;
+  const { origin, requests } = await harness((_request, response) => {
+    const fixture = contractFixtures[index++];
+    if (!fixture) throw new Error('Unexpected CLI request');
+    response.statusCode = fixture.response.ok ? 200 : 404;
+    response.end(JSON.stringify(fixture.response));
+  });
+
+  for (const fixture of contractFixtures) {
+    const args =
+      fixture.name === 'accepted_activity'
+        ? ['travel', '-c', characterId, '--to', 'openpit', '--no-wait']
+        : ['activity', '-c', characterId];
+    const cli = runCli(origin, args);
+    expect(await cli.exited).toEqual({
+      code: fixture.response.ok ? 0 : 1,
+      signal: null,
+    });
+    const output: { hints?: unknown } & Record<string, unknown> = JSON.parse(
+      cli.stdout(),
+    );
+    if (fixture.name === 'accepted_activity') {
+      expect(output.hints).toEqual([
+        {
+          note: expect.stringContaining('00000000-0000-4000-8000-000000000006'),
+        },
+      ]);
+      const response = structuredClone(output);
+      delete response.hints;
+      expect(response).toEqual(fixture.response);
+    } else {
+      expect(output).toEqual(fixture.response);
+    }
+  }
+  expect(requests).toHaveLength(contractFixtures.length);
+  expect(
+    requests.filter((request) => request.path === '/api/v1/character/travel'),
+  ).toHaveLength(1);
+});

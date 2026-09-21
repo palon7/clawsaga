@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import type { AgentGameResponse } from './protocol.js';
+import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
 import { GameClient } from './client.js';
 import { execute, waitForActivity } from './commands.js';
 import { CliError } from './errors.js';
@@ -208,6 +208,49 @@ it('generates structured help examples from the command definitions without auth
   );
 });
 
+it('parses every structured help command example with a fake client', async () => {
+  const failure: AgentGameResponse = {
+    ok: false,
+    schema_version: agentSchemaVersion,
+    server_time: '2026-09-20T00:00:00.000Z',
+    data: {},
+    error: { message: 'Fixture response.' },
+  };
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(failure);
+  const program = (await execute([], vi.fn())) as unknown as {
+    help: { commands: { name: string }[] };
+  };
+  const special = new Set([
+    'guide [--topic <topic>] [--query <text>]',
+    'resume',
+    'changelog',
+    'schema <command>',
+    'auth login',
+  ]);
+  let checked = 0;
+
+  for (const { name } of program.help.commands) {
+    if (special.has(name)) continue;
+    const result = (await execute([name, '--help'], vi.fn())) as unknown as {
+      help: { examples: string[]; input_example?: Record<string, unknown> };
+    };
+    for (const example of result.help.examples) {
+      expect(example.startsWith('clawsaga ')).toBe(true);
+      if (result.help.input_example)
+        vi.mocked(readFile).mockResolvedValue(
+          JSON.stringify(result.help.input_example),
+        );
+      await execute(example.slice('clawsaga '.length).split(' '), vi.fn());
+      checked += 1;
+    }
+  }
+
+  expect(checked).toBeGreaterThan(0);
+  expect(invoke).toHaveBeenCalledTimes(checked);
+});
+
 it('passes a Character ID that begins with a dash without treating it as an option', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
@@ -237,7 +280,7 @@ it('accepts comma-separated include sections while help lists each choice', asyn
     expect.arrayContaining([
       expect.objectContaining({
         flags: '--include <sections>',
-        choices: ['profile', 'inventory'],
+        choices: ['profile', 'inventory', 'repair_estimates'],
       }),
     ]),
   );
@@ -324,28 +367,33 @@ it('validates JSON examples and keeps character and locale outside the body', as
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
-  for (const name of [
-    'create',
-    'profile',
-    'tactics-check',
-    'tactics-set',
-    'journal-write',
-    'end',
-    'chat-send',
-    'dm-send',
-    'plan-set',
-  ]) {
-    const help = await execute([name, '--help'], vi.fn());
-    const inputExample = (help as { help: { input_example: unknown } }).help
-      .input_example;
-    expect(inputExample).toBeDefined();
+  const program = (await execute([], vi.fn())) as unknown as {
+    help: { commands: { name: string }[] };
+  };
+  const special = new Set([
+    'guide [--topic <topic>] [--query <text>]',
+    'resume',
+    'changelog',
+    'schema <command>',
+    'auth login',
+  ]);
+  let checked = 0;
+  for (const { name } of program.help.commands) {
+    if (special.has(name)) continue;
+    const help = (await execute([name, '--help'], vi.fn())) as unknown as {
+      help: { usage: string; input_example?: Record<string, unknown> };
+    };
+    const inputExample = help.help.input_example;
+    if (!inputExample) continue;
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(inputExample));
     const args = [name, '-i', 'body.json', '-l', 'ja'];
-    if (name !== 'create') args.push('-c', 'Traveler0000');
+    if (help.help.usage.includes('-c <id>')) args.push('-c', 'Traveler0000');
     await execute(args, vi.fn());
     expect(invoke.mock.lastCall?.[1]).toMatchObject({
       locale: 'ja',
-      ...(name === 'create' ? {} : { character_id: 'Traveler0000' }),
+      ...(help.help.usage.includes('-c <id>')
+        ? { character_id: 'Traveler0000' }
+        : {}),
     });
     const schema = await execute(['schema', name], vi.fn());
     expect(schema).toMatchObject({ input_kind: 'json_body' });
@@ -353,7 +401,9 @@ it('validates JSON examples and keeps character and locale outside the body', as
       throw new Error('Expected input schema');
     expect(schema.input_schema.properties).not.toHaveProperty('character_id');
     expect(schema.input_schema.properties).not.toHaveProperty('locale');
+    checked += 1;
   }
+  expect(checked).toBeGreaterThan(0);
   invoke.mockClear();
   for (const extra of [{ character_id: 'SomeoneElse0' }, { locale: 'en' }]) {
     vi.mocked(readFile).mockResolvedValue(
@@ -403,7 +453,7 @@ it('rejects invalid Unicode in journal searches before making a request', async 
 
 const initial: AgentGameResponse = {
   ok: true,
-  schema_version: '3.2',
+  schema_version: agentSchemaVersion,
   server_time: '2026-09-09T00:00:00.000Z',
   next_poll_after_seconds: 5,
   data: {
@@ -557,7 +607,26 @@ it('recovers a main activity whose start response could not be read', async () =
   expect(map.detail).not.toHaveProperty('hint');
 });
 
+it('recovers a main activity whose start returned 503', async () => {
+  vi.spyOn(GameClient.prototype, 'accessToken').mockResolvedValue('test-token');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(new Response(null, { status: 503 }))),
+  );
+  const error = await execute(
+    ['travel', '-c', 'Traveler0000', '--to', 'openpit'],
+    vi.fn(),
+  ).catch((thrown: unknown) => thrown);
+  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+  expect(error).toMatchObject({
+    code: 'SERVICE_UNAVAILABLE',
+    detail: { outcome: 'unknown' },
+  });
+  expect(error.detail.hint).toContain('activity -c Traveler0000');
+});
+
 it('recovers a main activity whose response has a newer server schema', async () => {
+  const [major = 0, minor = 0] = agentSchemaVersion.split('.').map(Number);
   vi.spyOn(GameClient.prototype, 'accessToken').mockResolvedValue('test-token');
   vi.stubGlobal(
     'fetch',
@@ -565,7 +634,7 @@ it('recovers a main activity whose response has a newer server schema', async ()
       Promise.resolve(
         Response.json({
           ok: true,
-          schema_version: '3.3',
+          schema_version: `${major}.${minor + 1}`,
           server_time: '2026-09-19T00:00:00.000Z',
           data: {},
         }),
@@ -951,4 +1020,18 @@ it('reads the guide index, one topic or a search from the document route', async
     'guide?query=ambush%7Cpotion',
     expect.anything(),
   );
+
+  expect(await execute(['guide', '--help'], vi.fn())).toMatchObject({
+    ok: true,
+    help: {
+      command: 'clawsaga guide',
+      description: expect.stringMatching(
+        /guide\.topics.*guide\.section\.body.*data\.guide\.section\.body/,
+      ),
+      options: expect.arrayContaining([
+        expect.objectContaining({ flags: '--topic <topic>' }),
+        expect.objectContaining({ flags: '--query <text>' }),
+      ]),
+    },
+  });
 });

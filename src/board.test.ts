@@ -2,14 +2,18 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
-import { createBoardThreadSchema, replyBoardThreadSchema } from './protocol.js';
+import {
+  agentSchemaVersion,
+  createBoardThreadSchema,
+  replyBoardThreadSchema,
+} from './protocol.js';
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
 
 const result = {
   ok: true,
-  schema_version: '3.2',
+  schema_version: agentSchemaVersion,
   server_time: '2026-09-20T00:00:00.000Z',
   data: {},
 } as const;

@@ -1,0 +1,221 @@
+[
+  {
+    "name": "settled_result_with_current_activity",
+    "response": {
+      "ok": true,
+      "schema_version": "3.3",
+      "server_time": "2026-09-19T01:02:03.456Z",
+      "next_poll_after_seconds": 7,
+      "data": {
+        "inventory": [
+          {
+            "kind": "stack",
+            "item_id": "healing_potion",
+            "name": "Healing Potion",
+            "unit_weight": 1,
+            "tradeable": true,
+            "quantity": 3,
+            "use_effect": { "hp_recovery": 60, "mp_recovery": 0 }
+          },
+          {
+            "kind": "equipment",
+            "equipment_id": "00000000-0000-4000-8000-000000000001",
+            "item_id": "oak_staff",
+            "name": "Oak Staff",
+            "unit_weight": 4,
+            "tradeable": true,
+            "quality": "fine",
+            "durability": 37,
+            "max_durability": 50,
+            "slot": "main_hand",
+            "equipment": {
+              "equip_slot": "main_hand",
+              "required_job": "mage",
+              "required_job_name": "Mage",
+              "power": 9,
+              "armor": 0
+            },
+            "repair_estimate": {
+              "available": false,
+              "reason": "insufficient_kits",
+              "repair_kit_item_id": "metal_repair_kit",
+              "repair_kit_name": "Repair Kit (Iron)",
+              "required_quantity": 1,
+              "fee": 3,
+              "durability_after": 50
+            }
+          }
+        ],
+        "status": {
+          "character_id": "Traveler0000",
+          "job_id": "mage",
+          "hp": 73,
+          "max_hp": 120,
+          "mp": 41,
+          "max_mp": 100,
+          "gold": 127,
+          "level": 3,
+          "experience": 219,
+          "weakened_until": null
+        },
+        "rest_estimate": {
+          "available": false,
+          "reason": "busy",
+          "duration_seconds": null
+        },
+        "activity": {
+          "kind": "rest",
+          "activity_id": "00000000-0000-4000-8000-000000000002",
+          "started_at": "2026-09-19T01:02:00.123Z",
+          "completes_at": "2026-09-19T01:07:00.123Z",
+          "duration_seconds": 300,
+          "status": "RUNNING",
+          "hp": 73,
+          "max_hp": 120,
+          "mp": 41
+        },
+        "last_result": {
+          "kind": "combat",
+          "activity_id": "00000000-0000-4000-8000-000000000003",
+          "status": "ENDED",
+          "ended_at": "2026-09-19T01:01:59.987Z",
+          "end_reason": "VICTORY",
+          "enemy_id": "wolf",
+          "enemy_name": "Wolf",
+          "practice": false,
+          "summary": {
+            "experience": { "job_id": "mage", "awarded": 17 },
+            "gold_gained": 11,
+            "loot": [
+              { "item_id": "wolf_meat", "name": "Wolf Meat", "quantity": 2 }
+            ],
+            "unclaimed_loot": [
+              { "item_id": "wolf_meat", "name": "Wolf Meat", "quantity": 1 }
+            ],
+            "potions_used": 1
+          }
+        },
+        "position": { "id": "selene", "name": "Selene", "kind": "town" }
+      }
+    }
+  },
+  {
+    "name": "accepted_activity",
+    "response": {
+      "ok": true,
+      "schema_version": "3.3",
+      "server_time": "2026-09-19T01:08:00.456Z",
+      "next_poll_after_seconds": 5,
+      "data": {
+        "status": {
+          "character_id": "Traveler0000",
+          "job_id": "mage",
+          "hp": 73,
+          "max_hp": 120,
+          "mp": 41,
+          "max_mp": 100,
+          "gold": 138,
+          "level": 3,
+          "experience": 236,
+          "weakened_until": null
+        },
+        "activity": {
+          "kind": "travel",
+          "activity_id": "00000000-0000-4000-8000-000000000006",
+          "from": { "id": "selene", "name": "Selene", "kind": "town" },
+          "to": { "id": "openpit", "name": "Openpit", "kind": "field" },
+          "started_at": "2026-09-19T01:08:00.123Z",
+          "arrives_at": "2026-09-19T01:08:15.123Z",
+          "duration_seconds": 15,
+          "status": "RUNNING"
+        }
+      }
+    }
+  },
+  {
+    "name": "cancelled_result",
+    "response": {
+      "ok": true,
+      "schema_version": "3.3",
+      "server_time": "2026-09-19T02:03:04.567Z",
+      "data": {
+        "activity": null,
+        "last_result": {
+          "kind": "combat",
+          "activity_id": "00000000-0000-4000-8000-000000000004",
+          "status": "ENDED",
+          "ended_at": "2026-09-19T02:03:04.321Z",
+          "end_reason": "CANCELLED",
+          "summary": null
+        }
+      }
+    }
+  },
+  {
+    "name": "location_chat",
+    "response": {
+      "ok": true,
+      "schema_version": "3.3",
+      "server_time": "2026-09-19T03:04:05.678Z",
+      "attention": {
+        "unread_direct_messages": 0,
+        "chat": { "channel_id": "selene", "new_messages": 2 },
+        "board": { "unread_threads": 0 }
+      },
+      "data": {
+        "chat": {
+          "channel": { "id": "selene", "name": "Selene" },
+          "messages": [
+            {
+              "message_id": "00000000-0000-4000-8000-000000000005",
+              "number": 42,
+              "channel_id": "selene",
+              "author_character_id": "Friend000000",
+              "author_discriminator": "0042",
+              "created_at": "2026-09-19T03:04:05.123Z",
+              "language": "en",
+              "references": [],
+              "user_content": {
+                "author_name": "Friend",
+                "text": "Meet me by the fountain."
+              }
+            }
+          ],
+          "next_cursor": null
+        }
+      }
+    }
+  },
+  {
+    "name": "business_failure",
+    "response": {
+      "ok": false,
+      "schema_version": "3.3",
+      "server_time": "2026-09-19T04:05:06.789Z",
+      "data": {},
+      "error": {
+        "message": "The requested object was not found.",
+        "fields": [{ "path": "activity_id", "message": "Unknown activity." }]
+      }
+    }
+  },
+  {
+    "name": "delivery_shortage",
+    "response": {
+      "ok": false,
+      "schema_version": "3.3",
+      "server_time": "2026-09-19T04:06:07.890Z",
+      "data": {},
+      "error": {
+        "message": "Not enough items to complete this delivery.",
+        "details": {
+          "kind": "delivery_shortage",
+          "item_id": "herb",
+          "required": 3,
+          "owned": 1,
+          "missing": 2
+        }
+      }
+    }
+  }
+]

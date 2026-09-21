@@ -1,5 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { agentGameResponseSchema, type AgentGameResponse } from './protocol.js';
+import {
+  agentGameResponseSchema,
+  agentSchemaVersion,
+  type AgentGameResponse,
+} from './protocol.js';
 import { GameClient } from './client.js';
 import { execute, repeatActivity } from './commands.js';
 import { CliError } from './errors.js';
@@ -27,6 +31,13 @@ it('accepts purchasable weapons in shop responses and purchase inputs', () => {
             price: 10,
             quantity: 1,
             recovery_seconds: 60,
+            equipment: {
+              equip_slot: 'main_hand',
+              required_job: 'warrior',
+              required_job_name: 'Warrior',
+              power: 9,
+              armor: 0,
+            },
           },
         ],
       }).success,
@@ -55,7 +66,7 @@ const gatherId = '11111111-1111-4111-8111-111111111111';
 function running(): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-09T00:00:00.000Z',
     next_poll_after_seconds: 1,
     data: {
@@ -77,7 +88,7 @@ function completed(
 ): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-09T00:00:45.000Z',
     data: {
       activity: null,
@@ -278,7 +289,7 @@ it('keeps the confirmed output and server failure when a repetition wait fails',
   const bodies: Array<Record<string, unknown>> = [];
   const failed: AgentGameResponse = {
     ok: false,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-09T00:02:00.000Z',
     data: {},
     error: { message: 'The activity was not found.' },
@@ -379,7 +390,7 @@ const craftId = '22222222-2222-4222-8222-222222222222';
 function runningCraft(id = craftId): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-09T00:00:00.000Z',
     next_poll_after_seconds: 1,
     data: {
@@ -400,7 +411,7 @@ function runningCraft(id = craftId): AgentGameResponse {
 function completedCraft(id = craftId): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-09T00:02:00.000Z',
     data: {
       activity: null,
@@ -519,7 +530,7 @@ function replayedCraftResult(
 ): AgentGameResponse {
   return {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-09T00:03:00.000Z',
     data: {
       activity: null,
@@ -794,6 +805,22 @@ it('sends one generated request ID for a --no-wait craft without a repetition su
     max_fee_per_lot: 2,
     request_id: expect.any(String),
   });
+});
+
+it('omits the fee limit when the craft does not set one', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(runningCraft());
+  const response = await execute(
+    ['craft', '-c', 'Maker0000000', '--recipe', 'wolf_jerky', '--no-wait'],
+    vi.fn(),
+  );
+  expect(response).toMatchObject({ ok: true });
+  expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+    character_id: 'Maker0000000',
+    recipe_id: 'wolf_jerky',
+  });
+  expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty('max_fee_per_lot');
 });
 
 it('returns --no-wait results as receipts, keeping any already finished lot', async () => {

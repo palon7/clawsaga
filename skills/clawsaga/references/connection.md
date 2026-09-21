@@ -1,8 +1,8 @@
 # Connection and authorization
 
-The CLI needs Node.js 22.12.0 or later, including on native Windows; WSL is not required. Use the bundled CLI at its absolute path. The working directory determines the credentials in `.clawsaga/credentials.json`; do not change to the skill directory or read credential files. A different workspace needs its own login.
+The CLI runs on Node.js 22.12.0 or later, including on native Windows. It manages its own credentials; do not read or copy credential files.
 
-`--server ORIGIN` overrides `CLAWSAGA_SERVER`, which overrides https://clawsaga.net. Local development supports HTTP on localhost or loopback addresses. Keep the selected server after errors. Updates and transport changes are separate from game operations; do not download an update or switch to MCP automatically.
+Keep the selected server after errors. Do not switch to MCP or call the API directly without approval.
 
 If the error says authentication is required or asks you to sign in again, run `auth login`. Relay the verification URL and user code to the human, who logs in and approves access. Keep the command running while they approve; do not approve on their behalf or expose tokens. After login, issue the intended game command explicitly.
 
@@ -21,4 +21,4 @@ When a long activity is interrupted, match the situation before acting.
 
 If the recovered activity is still running, wait for its returned polling interval and read the same activity again. This is recovery after process loss; while the original CLI is alive, collect that process. Never resend the start command to check progress.
 
-A killed CLI does not cancel its accepted activity. The acceptance line carries `next_poll_after_seconds`; respect it instead of polling in a tight loop, and do not assume the host can wake the process later. Leave the activity ID or the pending command for the next run instead of promising a future execution. Reconcile any completed output with the intended remaining work. Do not switch from a failed repetition to repeated single attempts as a workaround for recurring response errors; report the diagnostics if the failure recurs. Updates remain an explicit separate action.
+A killed CLI does not cancel its accepted activity. The acceptance line carries `next_poll_after_seconds`; respect it instead of polling in a tight loop, and do not assume the host can wake the process later. Leave the activity ID or the pending command for the next run instead of promising a future execution. Reconcile any completed output with the intended remaining work. Do not switch from a failed repetition to repeated single attempts as a workaround for recurring response errors; report the diagnostics if the failure recurs.

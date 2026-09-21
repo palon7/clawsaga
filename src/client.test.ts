@@ -1,10 +1,12 @@
 import { chmod, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
+import lockfile from 'proper-lockfile';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CredentialStore, credentialPath } from './credentials.js';
 import { GameClient, serverOrigin } from './client.js';
 import { CliError } from './errors.js';
+import { agentSchemaVersion } from './protocol.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs/promises')>();
@@ -40,9 +42,9 @@ async function fixture() {
   return { store, path };
 }
 
-it('chooses the working directory and rejects unsafe servers', () => {
+it('chooses the home directory and rejects unsafe servers', () => {
   expect(credentialPath()).toBe(
-    join(process.cwd(), '.clawsaga', 'credentials.json'),
+    join(homedir(), '.clawsaga', 'credentials.json'),
   );
   for (const value of [
     'http://example.com',
@@ -54,16 +56,14 @@ it('chooses the working directory and rejects unsafe servers', () => {
   expect(serverOrigin('http://localhost:3000')).toBe('http://localhost:3000');
 });
 
-it('keeps storage and locks inside each workspace and excludes them from Git', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'clawsaga-workspace-'));
-  directories.push(directory);
-  const path = credentialPath(directory);
+it('keeps storage and locks inside the home directory and excludes them from Git', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'clawsaga-home-'));
+  directories.push(home);
+  const path = credentialPath(home);
   const store = new CredentialStore(path);
   await store.update(async (entries) => {
     expect(
-      (
-        await stat(join(directory, '.clawsaga', 'credentials.lock'))
-      ).isDirectory(),
+      (await stat(join(home, '.clawsaga', 'credentials.lock'))).isDirectory(),
     ).toBe(true);
     entries[origin] = {
       access_token: 'access',
@@ -72,15 +72,15 @@ it('keeps storage and locks inside each workspace and excludes them from Git', a
       scope: 'game:read',
     };
   });
-  expect(
-    await readFile(join(directory, '.clawsaga', '.gitignore'), 'utf8'),
-  ).toBe('*\n');
+  expect(await readFile(join(home, '.clawsaga', '.gitignore'), 'utf8')).toBe(
+    '*\n',
+  );
   expect(
     await new CredentialStore(path).update(
       (entries) => entries[origin]?.access_token,
     ),
   ).toBe('access');
-  const other = new CredentialStore(credentialPath(join(directory, 'other')));
+  const other = new CredentialStore(credentialPath(join(home, 'other')));
   const request = vi.fn<typeof fetch>();
   await expect(
     new GameClient(origin, other, request).accessToken(),
@@ -111,6 +111,32 @@ it('keeps credentials private and serializes concurrent refreshes without stale 
   expect(JSON.parse(await readFile(path, 'utf8'))).toMatchObject({
     [origin]: { refresh_token: 'new-refresh' },
   });
+});
+
+it('serves a valid token while another process holds the lock', async () => {
+  const { store, path } = await fixture();
+  await store.update((entries) => {
+    const current = entries[origin];
+    if (current) current.expires_at = Date.now() + 600_000;
+  });
+  const directory = join(path, '..');
+  const release = await lockfile.lock(directory, {
+    realpath: false,
+    lockfilePath: join(directory, 'credentials.lock'),
+  });
+  const request = vi.fn<typeof fetch>();
+  try {
+    expect(
+      await new GameClient(
+        origin,
+        new CredentialStore(path),
+        request,
+      ).accessToken(),
+    ).toBe('old-access');
+  } finally {
+    await release();
+  }
+  expect(request).not.toHaveBeenCalled();
 });
 
 it('saves, updates and reads credentials even when permission changes fail', async () => {
@@ -193,7 +219,7 @@ it('reports 5xx and unreadable responses without exposing response contents', as
     {
       response: Response.json({
         ok: true,
-        schema_version: '3.2',
+        schema_version: agentSchemaVersion,
         server_time: '2026-09-11T00:00:00.000Z',
         next_poll_after_seconds: 'private upstream details',
         data: {},
@@ -226,7 +252,8 @@ it('reports UPDATE_REQUIRED only when the server schema is newer', async () => {
   await store.update((entries) => {
     entries[origin]!.expires_at = Date.now() + 3600_000;
   });
-  for (const schema_version of ['4.0', '3.3']) {
+  const [major = 0, minor = 0] = agentSchemaVersion.split('.').map(Number);
+  for (const schema_version of [`${major + 1}.0`, `${major}.${minor + 1}`]) {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json({
         ok: true,

@@ -27,7 +27,11 @@ const target = {
   character_id: characterIdSchema.describe('The immutable Character ID.'),
 };
 
-export const includeSchema = z.enum(['profile', 'inventory']);
+export const includeSchema = z.enum([
+  'profile',
+  'inventory',
+  'repair_estimates',
+]);
 
 export const helloSchema = z.object({ ...target, ...presentation }).strict();
 export type HelloInput = z.infer<typeof helloSchema>;
@@ -36,7 +40,7 @@ export const getCharacterSchema = z
   .object({
     ...target,
     ...presentation,
-    include: z.array(includeSchema).max(2).optional(),
+    include: z.array(includeSchema).max(3).optional(),
   })
   .strict();
 

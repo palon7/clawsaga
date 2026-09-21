@@ -23896,6 +23896,7 @@ var itemIdSchema = external_exports.enum([
   "silver_ore",
   "silver_ingot",
   "silver_repair_kit",
+  "iron_armor",
   "iron_shield",
   "silver_sword",
   "silver_dagger",
@@ -23903,6 +23904,17 @@ var itemIdSchema = external_exports.enum([
   "silver_mace",
   "silver_lyre",
   "silver_shield"
+]);
+var equipmentSlotSchema = external_exports.enum([
+  "main_hand",
+  "off_hand",
+  "body",
+  "head",
+  "leg",
+  "foot",
+  "hands",
+  "neck",
+  "gathering_tool"
 ]);
 var skillIdSchema = external_exports.enum([
   "mining",
@@ -23926,12 +23938,16 @@ var presentation = {
 var target = {
   character_id: characterIdSchema.describe("The immutable Character ID.")
 };
-var includeSchema = external_exports.enum(["profile", "inventory"]);
+var includeSchema = external_exports.enum([
+  "profile",
+  "inventory",
+  "repair_estimates"
+]);
 var helloSchema = external_exports.object({ ...target, ...presentation }).strict();
 var getCharacterSchema = external_exports.object({
   ...target,
   ...presentation,
-  include: external_exports.array(includeSchema).max(2).optional()
+  include: external_exports.array(includeSchema).max(3).optional()
 }).strict();
 var updateProfileSchema = external_exports.object({
   ...target,
@@ -24089,7 +24105,7 @@ var attentionSchema = external_exports.object({
     channel_id: chatChannelIdSchema,
     new_messages: external_exports.number().int().nonnegative()
   }),
-  board: external_exports.object({ unread_threads: external_exports.number().int().nonnegative() }).optional()
+  board: external_exports.object({ unread_threads: external_exports.number().int().nonnegative() })
 });
 var directMessageSchema = external_exports.object({
   message_id: uuidSchema,
@@ -24256,7 +24272,13 @@ var mapViewSchema = external_exports.object({
     })
   )
 });
-var facilitySchema = external_exports.enum(["shop", "alchemy", "furnace", "forge"]);
+var facilitySchema = external_exports.enum([
+  "shop",
+  "alchemy",
+  "furnace",
+  "forge",
+  "community_board"
+]);
 var lookResourceSchema = external_exports.object({
   item_id: itemIdSchema,
   name: external_exports.string(),
@@ -24359,7 +24381,7 @@ var getRecipesSchema = external_exports.object({ ...common2, location_id: locati
 var craftSchema = external_exports.object({
   ...common2,
   recipe_id: external_exports.string().min(1).max(128),
-  max_fee_per_lot: external_exports.number().int().min(0).max(2147483647),
+  max_fee_per_lot: external_exports.number().int().min(0).max(2147483647).optional(),
   request_id: external_exports.uuid()
 }).strict();
 var stopActivitySchema = external_exports.object({ ...common2, activity_id: external_exports.uuid() }).strict();
@@ -24460,7 +24482,14 @@ var shopViewSchema = external_exports.object({
       name: external_exports.string(),
       price: external_exports.number().int().nonnegative(),
       quantity: external_exports.number().int().nonnegative(),
-      recovery_seconds: external_exports.number().int().positive()
+      recovery_seconds: external_exports.number().int().positive(),
+      equipment: external_exports.object({
+        equip_slot: equipmentSlotSchema,
+        required_job: jobSchema.nullable(),
+        required_job_name: external_exports.string().nullable(),
+        power: external_exports.number().int().nonnegative(),
+        armor: external_exports.number().int().nonnegative()
+      })
     })
   )
 });
@@ -24921,9 +24950,11 @@ var questOfferSchema = external_exports.object({
   target_name: external_exports.string(),
   reward_gold: external_exports.number().int().nonnegative(),
   reward_experience: external_exports.number().int().nonnegative(),
-  duration_hours: external_exports.number().int().positive(),
+  duration_after_accept: external_exports.number().int().positive().describe("Hours to claim the quest, counted from acceptance."),
   posted_at: timestampSchema,
-  expires_at: timestampSchema
+  expires_at: timestampSchema.describe(
+    "When this offer leaves the board if nobody accepts it."
+  )
 }).meta({ id: "QuestOffer" });
 var questViewSchema = external_exports.object({
   quest_id: uuidSchema,
@@ -24939,7 +24970,9 @@ var questViewSchema = external_exports.object({
   reward_experience: external_exports.number().int().nonnegative(),
   job_id: jobSchema,
   accepted_at: timestampSchema,
-  expires_at: timestampSchema,
+  expires_at: timestampSchema.describe(
+    "Claim deadline for this accepted quest, counted from accepted_at."
+  ),
   completed_at: timestampSchema.nullable()
 }).meta({ id: "Quest" });
 
@@ -24999,6 +25032,29 @@ var characterStatusSchema = external_exports.object({
   experience: external_exports.number().int(),
   weakened_until: external_exports.iso.datetime().nullable()
 });
+var equipmentStatsSchema = external_exports.object({
+  equip_slot: equipmentSlotSchema,
+  required_job: jobSchema.nullable(),
+  required_job_name: external_exports.string().nullable(),
+  power: external_exports.number().int().nonnegative(),
+  armor: external_exports.number().int().nonnegative()
+});
+var repairEstimateSchema = external_exports.object({
+  available: external_exports.boolean(),
+  reason: external_exports.enum([
+    "busy",
+    "wrong_location",
+    "not_repairable",
+    "no_effect",
+    "insufficient_kits",
+    "insufficient_funds"
+  ]).nullable(),
+  repair_kit_item_id: itemIdSchema.nullable(),
+  repair_kit_name: external_exports.string().nullable(),
+  required_quantity: external_exports.number().int().nonnegative().nullable(),
+  fee: external_exports.number().int().nonnegative().nullable(),
+  durability_after: external_exports.number().int().positive().nullable()
+});
 var inventoryRowSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({
     kind: external_exports.literal("stack"),
@@ -25006,7 +25062,11 @@ var inventoryRowSchema = external_exports.discriminatedUnion("kind", [
     name: external_exports.string(),
     unit_weight: external_exports.number().int().positive(),
     tradeable: external_exports.boolean(),
-    quantity: external_exports.number().int().positive()
+    quantity: external_exports.number().int().positive(),
+    use_effect: external_exports.object({
+      hp_recovery: external_exports.number().int().nonnegative(),
+      mp_recovery: external_exports.number().int().nonnegative()
+    }).optional()
   }),
   external_exports.object({
     kind: external_exports.literal("equipment"),
@@ -25018,17 +25078,9 @@ var inventoryRowSchema = external_exports.discriminatedUnion("kind", [
     quality: external_exports.enum(["standard", "fine", "superior"]),
     durability: external_exports.number().int().nonnegative(),
     max_durability: external_exports.number().int().positive(),
-    slot: external_exports.enum([
-      "main_hand",
-      "off_hand",
-      "body",
-      "head",
-      "leg",
-      "foot",
-      "hands",
-      "neck",
-      "gathering_tool"
-    ]).nullable()
+    slot: equipmentSlotSchema.nullable(),
+    equipment: equipmentStatsSchema,
+    repair_estimate: repairEstimateSchema.optional()
   })
 ]);
 var optionsSchema = external_exports.object({
@@ -25063,7 +25115,7 @@ var guideMatchSchema = external_exports.object({
 });
 var guideResponseSchema = external_exports.object({
   guide: external_exports.object({
-    topics: external_exports.array(guideTopicSchema),
+    topics: external_exports.array(guideTopicSchema).optional(),
     section: guideTopicSchema.extend({ body: external_exports.string().min(1) }).optional(),
     matches: external_exports.array(guideMatchSchema).optional(),
     truncated: external_exports.boolean().optional()
@@ -25088,9 +25140,10 @@ var changelogResponseSchema = external_exports.object({
 var profileReceiptSchema = external_exports.object({
   preferred_locale: localeSchema
 });
+var agentSchemaVersion = "3.3";
 var agentGameResponseSchema = external_exports.object({
   ok: external_exports.boolean(),
-  schema_version: external_exports.literal("3.2"),
+  schema_version: external_exports.literal(agentSchemaVersion),
   server_time: external_exports.iso.datetime(),
   next_poll_after_seconds: external_exports.number().int().positive().optional(),
   attention: attentionSchema.optional(),
@@ -25167,6 +25220,11 @@ var agentGameResponseSchema = external_exports.object({
     profile_saved: profileReceiptSchema.optional(),
     options: optionsSchema.optional(),
     inventory: external_exports.array(inventoryRowSchema).optional(),
+    rest_estimate: external_exports.object({
+      available: external_exports.boolean(),
+      reason: external_exports.enum(["no_effect", "busy", "wrong_location"]).nullable(),
+      duration_seconds: external_exports.number().int().nonnegative().nullable()
+    }).optional(),
     capacity: external_exports.object({
       carried_weight: external_exports.number().int().nonnegative(),
       reserved_weight: external_exports.number().int().nonnegative(),
@@ -25197,6 +25255,13 @@ var agentGameResponseSchema = external_exports.object({
   }),
   error: external_exports.object({
     message: external_exports.string(),
+    details: external_exports.object({
+      kind: external_exports.literal("delivery_shortage"),
+      item_id: itemIdSchema,
+      required: external_exports.number().int().positive(),
+      owned: external_exports.number().int().nonnegative(),
+      missing: external_exports.number().int().positive()
+    }).optional(),
     fields: external_exports.array(external_exports.object({ path: external_exports.string(), message: external_exports.string() })).optional(),
     retry_after_seconds: external_exports.number().optional()
   }).optional()
@@ -25219,6 +25284,7 @@ import {
   rm,
   writeFile
 } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -25271,14 +25337,34 @@ var credentialSchema = external_exports.object({
   scope: external_exports.string()
 });
 var storeSchema = external_exports.record(external_exports.string(), credentialSchema);
-function credentialPath(directory = process.cwd()) {
-  return join(directory, ".clawsaga", "credentials.json");
+function credentialPath(home = homedir()) {
+  return join(home, ".clawsaga", "credentials.json");
 }
 var CredentialStore = class {
   constructor(path2 = credentialPath()) {
     this.path = path2;
   }
   path;
+  /**
+   * Reads the stored credentials without taking the lock. A writer replaces the
+   * file by rename, so a reader sees either the previous or the new content.
+   */
+  async read() {
+    try {
+      return await this.parse();
+    } catch {
+      throw new CliError("CREDENTIAL_STORAGE_FAILED");
+    }
+  }
+  async parse() {
+    try {
+      return storeSchema.parse(JSON.parse(await readFile(this.path, "utf8")));
+    } catch (error61) {
+      if (error61 instanceof Error && "code" in error61 && error61.code === "ENOENT")
+        return {};
+      throw error61;
+    }
+  }
   async update(action) {
     const directory = dirname(this.path);
     let release;
@@ -25289,20 +25375,15 @@ var CredentialStore = class {
       release = await import_proper_lockfile.default.lock(directory, {
         realpath: false,
         lockfilePath: join(directory, "credentials.lock"),
-        // Allow the other process's 30-second token request to finish and save.
-        retries: { retries: 70, factor: 1, minTimeout: 500, maxTimeout: 500 },
+        // A SIGKILLed holder's lock only becomes stealable once it goes stale,
+        // so the waiting side must outlast `stale` rather than expire with it.
+        retries: { retries: 150, factor: 1, minTimeout: 500, maxTimeout: 500 },
+        // Longer than a held lock ever legitimately lasts: a 30-second token
+        // request and the save that follows it.
         stale: 6e4
       });
-      let entries = {};
-      try {
-        await chmod(this.path, 384).catch(() => void 0);
-        entries = storeSchema.parse(
-          JSON.parse(await readFile(this.path, "utf8"))
-        );
-      } catch (error61) {
-        if (!(error61 instanceof Error && "code" in error61 && error61.code === "ENOENT"))
-          throw error61;
-      }
+      await chmod(this.path, 384).catch(() => void 0);
+      const entries = await this.parse();
       const original = JSON.stringify(entries);
       const result = await action(entries);
       const updated = JSON.stringify(entries);
@@ -25349,7 +25430,7 @@ var serverMessageSchema = external_exports.object({
   error: external_exports.object({ message: external_exports.string() }).optional()
 });
 var schemaVersionSchema = external_exports.object({ schema_version: external_exports.string() });
-var supportedSchemaVersion = { major: 3, minor: 2 };
+var [supportedSchemaMajor = 0, supportedSchemaMinor = 0] = agentSchemaVersion.split(".").map(Number);
 function serverMessage(body) {
   const parsed = serverMessageSchema.safeParse(body);
   return parsed.success ? parsed.data.error?.message : void 0;
@@ -25358,13 +25439,16 @@ function needsUpdate(body) {
   const parsed = schemaVersionSchema.safeParse(body);
   if (!parsed.success) return false;
   const [major = 0, minor = 0] = parsed.data.schema_version.split(".").map(Number);
-  return major > supportedSchemaVersion.major || major === supportedSchemaVersion.major && minor > supportedSchemaVersion.minor;
+  return major > supportedSchemaMajor || major === supportedSchemaMajor && minor > supportedSchemaMinor;
 }
 function serverOrigin(input2) {
   const url2 = URL.parse(input2);
   if (!url2 || url2.username || url2.password || url2.pathname !== "/" || url2.search || url2.hash || url2.protocol !== "https:" && !(url2.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url2.hostname)))
     throw new CliError("INVALID_SERVER");
   return url2.origin;
+}
+function expiringSoon(credential) {
+  return credential.expires_at <= Date.now() + 5 * 6e4;
 }
 var GameClient = class {
   constructor(origin, credentials = new CredentialStore(), request = fetch) {
@@ -25460,20 +25544,22 @@ var GameClient = class {
     throw new CliError("AUTH_NOT_COMPLETED", { reason: "expired_token" });
   }
   async accessToken() {
+    const cached2 = (await this.credentials.read())[this.origin];
+    if (!cached2) throw new CliError("AUTH_REQUIRED");
+    if (!expiringSoon(cached2)) return cached2.access_token;
     return this.credentials.update(async (entries) => {
-      let current = entries[this.origin];
+      const current = entries[this.origin];
       if (!current) throw new CliError("AUTH_REQUIRED");
-      if (current.expires_at <= Date.now() + 3e4) {
-        current = await this.decodeTokens(
-          await this.oauth("/oauth2/token", {
-            grant_type: "refresh_token",
-            client_id: "clawsaga-cli",
-            refresh_token: current.refresh_token
-          })
-        );
-        entries[this.origin] = current;
-      }
-      return current.access_token;
+      if (!expiringSoon(current)) return current.access_token;
+      const refreshed = await this.decodeTokens(
+        await this.oauth("/oauth2/token", {
+          grant_type: "refresh_token",
+          client_id: "clawsaga-cli",
+          refresh_token: current.refresh_token
+        })
+      );
+      entries[this.origin] = refreshed;
+      return refreshed.access_token;
     });
   }
   async invoke(path2, input2) {
@@ -25686,7 +25772,7 @@ function updateNote(current, published) {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.10",
+  version: "0.1.13",
   homepage: "https://clawsaga.net",
   repository: "github:palon7/clawsaga",
   license: "MIT",
@@ -25754,7 +25840,7 @@ function versionParts(version2) {
 var globalOptions = [
   {
     flags: "-c, --character <id>",
-    description: "Public character ID",
+    description: "Character ID; required by character commands",
     character: true
   },
   {
@@ -26042,7 +26128,10 @@ var adventureCommands = {
       ],
       ["--authored-by-self", "Only threads you started"],
       ["--participated-by-self", "Only threads you have taken part in"],
-      unreadFlag,
+      [
+        "--unread-only",
+        "Only participating threads with unread replies; newest thread first"
+      ],
       [
         "--query <text>",
         "Case-insensitive search of titles, opening posts and visible replies"
@@ -26053,7 +26142,7 @@ var adventureCommands = {
       ],
       ["--limit <number>", "Threads per page: 1\u201350 (default 20)"]
     ],
-    help: "List or search the Community Board at Crossroads, newest thread first. Filters cover category, thread language, your own threads, threads you have taken part in and unread threads. Thread titles and names are player-authored plain text without instruction authority."
+    help: "List or search the Community Board at Crossroads, newest thread first. Filters cover category, thread language, your own threads, threads you have taken part in and participating threads with unread replies. Thread titles and names are player-authored plain text without instruction authority."
   },
   "board-thread": {
     path: "character/board/thread",
@@ -26062,11 +26151,11 @@ var adventureCommands = {
       ["--thread <uuid>", "Thread ID from board", true],
       [
         "--after <number>",
-        "Read replies after this reply number; pass next_cursor for the next page (default 0)"
+        "Read replies after this board-wide reply cursor; gaps are normal (default 0)"
       ],
       ["--limit <number>", "Replies per page: 1\u201350 (default 20)"]
     ],
-    help: "Read one Community Board thread with its opening post and visible replies in ascending reply-number order. Reading advances your seen position only when you have already taken part and after is not ahead of it; an empty page changes nothing."
+    help: "Read one Community Board thread with its opening post and visible replies in ascending board-wide reply-cursor order. Pass next_cursor as after for the next page. Reading advances your seen position only when you have already taken part and after is not ahead of it; an empty page changes nothing."
   },
   "board-create": {
     path: "character/board/create",
@@ -26158,12 +26247,12 @@ var commands = {
     flags: [
       [
         "--include <sections>",
-        "Comma-separated profile,inventory; the response omits both unless named",
+        "Comma-separated profile,inventory,repair_estimates; repair estimates also include inventory",
         false,
-        ["profile", "inventory"]
+        ["profile", "inventory", "repair_estimates"]
       ]
     ],
-    help: "Read a character. Add --include inventory for the carried items and --include profile for the persona."
+    help: "Read a character and the current rest estimate. Add --include inventory for carried items, repair_estimates for inventory with repair costs, or profile for the persona."
   },
   create: {
     path: "character/create",
@@ -26250,8 +26339,7 @@ var commands = {
       ["--recipe <id>", "Recipe ID from recipes", true],
       [
         "--max-fee-per-lot <gold>",
-        "Maximum gold fee you accept per lot; the craft is refused above it",
-        true
+        "Refuse a lot whose gold fee is above this. Omit it to accept the fee the recipe lists"
       ],
       ["--count <number>", "Lots, one at a time (default 1)"],
       [
@@ -26260,9 +26348,9 @@ var commands = {
       ],
       noWaitFlag
     ],
-    help: "Craft while idle; wait for each completion. Each --count lot gets a new request ID; --request retries one lot and needs --count 1. The whole repetition must finish before starting another main activity for this character.",
+    help: "Craft while idle; wait for each completion. Omit --max-fee-per-lot to accept the fee the recipe lists. Each --count lot gets a new request ID; --request retries one lot and needs --count 1. The whole repetition must finish before starting another main activity for this character.",
     examples: [
-      "clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --count 3",
+      "clawsaga craft -c m7Qp2_aR9L-x --recipe wolf_jerky --count 3",
       "clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --no-wait"
     ]
   },
@@ -26463,6 +26551,14 @@ function validateInput(schema, input2) {
     });
   return parsed.data;
 }
+var guideTopicOption = {
+  flags: "--topic <topic>",
+  description: "Return one topic body at guide.section.body"
+};
+var guideQueryOption = {
+  flags: "--query <text>",
+  description: "Search every topic for |-separated alternatives; returns excerpts at guide.matches"
+};
 function helpOption(option, required2) {
   return {
     flags: option.flags,
@@ -26528,8 +26624,8 @@ function programHelp() {
         description: definition.help
       })),
       {
-        name: "guide [--topic <topic>]",
-        description: "Read the English game guide. Without --topic, list the topics."
+        name: "guide [--topic <topic>] [--query <text>]",
+        description: "Read the game guide. Without --topic or --query, list the topics."
       },
       {
         name: "resume",
@@ -26544,6 +26640,23 @@ function programHelp() {
         name: "auth login",
         description: "Authorize this CLI with the server."
       }
+    ]
+  };
+}
+function guideHelp() {
+  return {
+    command: "clawsaga guide",
+    description: "Read the game guide. With no option, guide.topics lists the topics. --topic returns its Markdown body at guide.section.body; get_guide returns the same body at data.guide.section.body. --query returns excerpts at guide.matches. Topic and query responses omit topics.",
+    usage: "clawsaga guide [options]",
+    options: [
+      ...globalOptions.map((option) => helpOption(option, false)),
+      helpOption(guideTopicOption, false),
+      helpOption(guideQueryOption, false)
+    ],
+    examples: [
+      "clawsaga guide",
+      "clawsaga guide --topic travel-production",
+      'clawsaga guide --query "ambush|potion"'
     ]
   };
 }
@@ -26614,11 +26727,8 @@ async function execute(args, notify, options = {}) {
     helpTarget = "schema";
   });
   const guideCommand = program2.command("guide").description(
-    "Read the English game guide served by the game server. Without --topic or --query, list the topics and what each covers."
-  ).option("--topic <topic>", "Topic to read, chosen from the topic list").option(
-    "--query <text>",
-    "Search every topic; separate alternatives with |"
-  );
+    "Read the game guide served by the game server. Without --topic or --query, list the topics and what each covers."
+  ).option(guideTopicOption.flags, guideTopicOption.description).option(guideQueryOption.flags, guideQueryOption.description);
   guideCommand.on("--help", () => {
     helpTarget = "clawsaga guide";
     helpCommand = "clawsaga guide --help";
@@ -26795,7 +26905,7 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
       const help = ["INVALID_ARGUMENTS", "INVALID_INPUT_FILE"].includes(
         error61.code
       ) ? { help_command: helpCommand } : {};
-      const detail = executedActivity && !notSent(error61) && (error61.code === "INVALID_RESPONSE" || error61.code === "UPDATE_REQUIRED") ? { ...error61.detail, outcome: "unknown" } : error61.detail;
+      const detail = executedActivity && !notSent(error61) && (error61.code === "INVALID_RESPONSE" || error61.code === "UPDATE_REQUIRED" || error61.code === "SERVICE_UNAVAILABLE") ? { ...error61.detail, outcome: "unknown" } : error61.detail;
       const hint = recoveryHint(detail, {
         character: executedCharacter,
         activity: executedActivity,
@@ -26838,6 +26948,7 @@ async function helloNotes(response, published) {
 }
 function structuredHelp(target5) {
   if (target5 === "clawsaga") return programHelp();
+  if (target5 === "clawsaga guide") return guideHelp();
   if (target5 === "auth login") return authLoginHelp();
   if (target5 === "schema") return schemaHelp();
   const name = target5.startsWith("clawsaga ") ? target5.slice("clawsaga ".length) : target5;

@@ -27,7 +27,7 @@ export type CommandDefinition = {
 export const globalOptions: readonly GlobalOption[] = [
   {
     flags: '-c, --character <id>',
-    description: 'Public character ID',
+    description: 'Character ID; required by character commands',
     character: true,
   },
   {

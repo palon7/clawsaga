@@ -4,6 +4,8 @@ import {
   localeSchema,
   characterIdSchema,
   skillIdSchema,
+  equipmentSlotSchema,
+  jobSchema,
 } from './ids.js';
 import {
   ambushReferenceSchema,
@@ -23,7 +25,7 @@ export const craftSchema = z
   .object({
     ...common,
     recipe_id: z.string().min(1).max(128),
-    max_fee_per_lot: z.number().int().min(0).max(2_147_483_647),
+    max_fee_per_lot: z.number().int().min(0).max(2_147_483_647).optional(),
     request_id: z.uuid(),
   })
   .strict();
@@ -135,6 +137,13 @@ export const shopViewSchema = z.object({
       price: z.number().int().nonnegative(),
       quantity: z.number().int().nonnegative(),
       recovery_seconds: z.number().int().positive(),
+      equipment: z.object({
+        equip_slot: equipmentSlotSchema,
+        required_job: jobSchema.nullable(),
+        required_job_name: z.string().nullable(),
+        power: z.number().int().nonnegative(),
+        armor: z.number().int().nonnegative(),
+      }),
     }),
   ),
 });

@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
-import { agentGameResponseSchema } from './protocol.js';
+import { agentGameResponseSchema, agentSchemaVersion } from './protocol.js';
 import { CredentialStore, type Credential } from './credentials.js';
 import { CliError, cliErrorMessage } from './errors.js';
 
@@ -23,8 +23,9 @@ const serverMessageSchema = z.object({
 });
 const schemaVersionSchema = z.object({ schema_version: z.string() });
 
-// Keep in step with the public agent contract the CLI bundles.
-const supportedSchemaVersion = { major: 3, minor: 2 };
+const [supportedSchemaMajor = 0, supportedSchemaMinor = 0] = agentSchemaVersion
+  .split('.')
+  .map(Number);
 
 function serverMessage(body: unknown): string | undefined {
   const parsed = serverMessageSchema.safeParse(body);
@@ -38,9 +39,8 @@ function needsUpdate(body: unknown): boolean {
     .split('.')
     .map(Number);
   return (
-    major > supportedSchemaVersion.major ||
-    (major === supportedSchemaVersion.major &&
-      minor > supportedSchemaVersion.minor)
+    major > supportedSchemaMajor ||
+    (major === supportedSchemaMajor && minor > supportedSchemaMinor)
   );
 }
 
@@ -61,6 +61,11 @@ export function serverOrigin(input: string) {
   )
     throw new CliError('INVALID_SERVER');
   return url.origin;
+}
+
+/** A token that expires in flight fails the request as AUTH_REQUIRED. */
+function expiringSoon(credential: Credential) {
+  return credential.expires_at <= Date.now() + 5 * 60_000;
 }
 
 export class GameClient {
@@ -155,20 +160,26 @@ export class GameClient {
     throw new CliError('AUTH_NOT_COMPLETED', { reason: 'expired_token' });
   }
   async accessToken() {
+    const cached = (await this.credentials.read())[this.origin];
+    if (!cached) throw new CliError('AUTH_REQUIRED');
+    if (!expiringSoon(cached)) return cached.access_token;
+
+    // The token request stays inside the lock: the server revokes the whole
+    // connection when a rotated refresh token is replayed.
     return this.credentials.update(async (entries) => {
-      let current = entries[this.origin];
+      const current = entries[this.origin];
       if (!current) throw new CliError('AUTH_REQUIRED');
-      if (current.expires_at <= Date.now() + 30_000) {
-        current = await this.decodeTokens(
-          await this.oauth('/oauth2/token', {
-            grant_type: 'refresh_token',
-            client_id: 'clawsaga-cli',
-            refresh_token: current.refresh_token,
-          }),
-        );
-        entries[this.origin] = current;
-      }
-      return current.access_token;
+      // Another process may have refreshed while this one waited for the lock.
+      if (!expiringSoon(current)) return current.access_token;
+      const refreshed = await this.decodeTokens(
+        await this.oauth('/oauth2/token', {
+          grant_type: 'refresh_token',
+          client_id: 'clawsaga-cli',
+          refresh_token: current.refresh_token,
+        }),
+      );
+      entries[this.origin] = refreshed;
+      return refreshed.access_token;
     });
   }
   async invoke(path: string, input: unknown) {

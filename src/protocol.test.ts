@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { agentGameResponseSchema } from './protocol.js';
+import {
+  agentGameResponseSchema,
+  agentSchemaVersion,
+  guideResponseSchema,
+} from './protocol.js';
 import { combatReportSchema, useItemSchema } from './protocol/combat.js';
 import {
   agentCombatResultSchema,
@@ -9,11 +13,48 @@ import { itemIdSchema } from './protocol/ids.js';
 import { recipeViewSchema } from './protocol/production.js';
 import { lookResourceSchema } from './protocol/movement.js';
 
+it('accepts the three guide response shapes', () => {
+  const responses = [
+    {
+      guide: {
+        topics: [{ id: 'overview', title: 'Overview', summary: 'Start here.' }],
+      },
+    },
+    {
+      guide: {
+        section: {
+          id: 'overview',
+          title: 'Overview',
+          summary: 'Start here.',
+          body: '# Overview',
+        },
+      },
+    },
+    {
+      guide: {
+        matches: [
+          {
+            topic_id: 'overview',
+            title: 'Overview',
+            heading: 'Overview',
+            text: 'Start here.',
+            topic_body_bytes: 42,
+          },
+        ],
+        truncated: false,
+      },
+    },
+  ];
+
+  for (const response of responses)
+    expect(guideResponseSchema.parse(response)).toEqual(response);
+});
+
 it('accepts the compact profile receipt', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.2',
+      schema_version: agentSchemaVersion,
       server_time: '2026-09-12T00:00:00.000Z',
       data: { profile_saved: { preferred_locale: 'en' } },
     }).success,
@@ -23,7 +64,7 @@ it('accepts the compact profile receipt', () => {
 it('keeps the repair receipt from an equipment repair', () => {
   const response = {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-12T00:00:00.000Z',
     data: {
       repair: {
@@ -63,7 +104,7 @@ it('requires a position in character responses', () => {
   };
   const response = {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-12T00:00:00.000Z',
     data: { character },
   };
@@ -80,7 +121,7 @@ it('requires a position in character responses', () => {
 it('rejects responses whose status and error disagree', () => {
   const result = {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-12T00:00:00.000Z',
     data: {},
   };
@@ -112,7 +153,7 @@ it('rejects responses whose status and error disagree', () => {
 it('accepts characters discovered in a completed travel result', () => {
   const response = agentGameResponseSchema.parse({
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-12T00:00:15.000Z',
     data: {
       last_result: {
@@ -173,6 +214,13 @@ function equipmentRow(
     durability: 100,
     max_durability: 100,
     slot: null,
+    equipment: {
+      equip_slot: 'main_hand',
+      required_job: 'warrior',
+      required_job_name: 'Warrior',
+      power: 9,
+      armor: 0,
+    },
   };
 }
 
@@ -185,7 +233,7 @@ it('accepts wolf meat and wolf jerky in inventory responses', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.2',
+      schema_version: agentSchemaVersion,
       server_time: '2026-09-12T00:00:00.000Z',
       data: {
         inventory: [
@@ -201,7 +249,7 @@ it('accepts non-standard qualities on individual items', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.2',
+      schema_version: agentSchemaVersion,
       server_time: '2026-09-12T00:00:00.000Z',
       data: {
         inventory: [
@@ -217,7 +265,7 @@ it('rejects the flat inventory row that has no kind', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.2',
+      schema_version: agentSchemaVersion,
       server_time: '2026-09-12T00:00:00.000Z',
       data: {
         inventory: [
@@ -342,7 +390,7 @@ it('accepts the compact character status alongside other data', () => {
   expect(
     agentGameResponseSchema.safeParse({
       ok: true,
-      schema_version: '3.2',
+      schema_version: agentSchemaVersion,
       server_time: '2026-09-12T00:00:00.000Z',
       data: {
         status: {
@@ -396,7 +444,7 @@ it('uses only cooked recovery foods and rejects raw ingredients', () => {
 it('accepts operation and note hints and rejects other shapes', () => {
   const result = {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-12T00:00:00.000Z',
     data: {},
   };

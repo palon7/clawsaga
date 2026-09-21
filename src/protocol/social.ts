@@ -157,9 +157,7 @@ export const attentionSchema = z.object({
     channel_id: chatChannelIdSchema,
     new_messages: z.number().int().nonnegative(),
   }),
-  board: z
-    .object({ unread_threads: z.number().int().nonnegative() })
-    .optional(),
+  board: z.object({ unread_threads: z.number().int().nonnegative() }),
 });
 export const directMessageSchema = z.object({
   message_id: uuidSchema,

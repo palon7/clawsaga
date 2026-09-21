@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
-import type { AgentGameResponse } from './protocol.js';
+import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
@@ -13,7 +13,7 @@ it('posts one aside with no follow-up read and preserves the receipt', async () 
   );
   const receipt: AgentGameResponse = {
     ok: true,
-    schema_version: '3.2',
+    schema_version: agentSchemaVersion,
     server_time: '2026-09-12T00:00:00.000Z',
     data: {
       monologue: {

@@ -53,9 +53,15 @@ export const questOfferSchema = z
     target_name: z.string(),
     reward_gold: z.number().int().nonnegative(),
     reward_experience: z.number().int().nonnegative(),
-    duration_hours: z.number().int().positive(),
+    duration_after_accept: z
+      .number()
+      .int()
+      .positive()
+      .describe('Hours to claim the quest, counted from acceptance.'),
     posted_at: timestampSchema,
-    expires_at: timestampSchema,
+    expires_at: timestampSchema.describe(
+      'When this offer leaves the board if nobody accepts it.',
+    ),
   })
   .meta({ id: 'QuestOffer' });
 export const questViewSchema = z
@@ -73,7 +79,9 @@ export const questViewSchema = z
     reward_experience: z.number().int().nonnegative(),
     job_id: jobSchema,
     accepted_at: timestampSchema,
-    expires_at: timestampSchema,
+    expires_at: timestampSchema.describe(
+      'Claim deadline for this accepted quest, counted from accepted_at.',
+    ),
     completed_at: timestampSchema.nullable(),
   })
   .meta({ id: 'Quest' });
