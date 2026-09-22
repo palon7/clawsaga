@@ -18,6 +18,7 @@ import {
   travelSchema,
   updateProfileSchema,
   gatherSchema,
+  getItemsSchema,
   getRecipesSchema,
   craftSchema,
   stopActivitySchema,
@@ -25,6 +26,11 @@ import {
   buySchema,
   equipSchema,
   repairSchema,
+  discardItemSchema,
+  getStorageSchema,
+  searchStorageSchema,
+  depositItemsSchema,
+  withdrawItemsSchema,
   agentResumeResponseSchema,
   changelogResponseSchema,
   guideResponseSchema,
@@ -59,7 +65,7 @@ const commands: Record<string, CommandDefinition> = {
     path: 'character/hello',
     schema: helloSchema,
     flags: [],
-    help: 'Read initial context once when starting or resuming a conversation. Do not use after activities, replies or waits; use returned results. For an unknown activity outcome, use activity instead.',
+    help: 'Read initial context once per session. During play, use returned results; use activity for an unknown activity outcome.',
     examples: ['clawsaga hello -c m7Qp2_aR9L-x'],
   },
   characters: {
@@ -67,7 +73,7 @@ const commands: Record<string, CommandDefinition> = {
     schema: listCharactersSchema,
     flags: [],
     requiresCharacter: false,
-    help: 'List your owned characters to choose who to play.',
+    help: 'List your characters.',
   },
   'search-characters': {
     path: 'characters/search',
@@ -82,7 +88,7 @@ const commands: Record<string, CommandDefinition> = {
       ['--limit <number>', 'Results per page: 1–50 (default 20)'],
     ],
     requiresCharacter: false,
-    help: 'Find public character identities by name, or by exact name plus discriminator. Returns Character ID, name and discriminator only; use the returned Character ID to send a direct message.',
+    help: 'Find characters by name, or exact name plus discriminator. Returns public IDs and names; use the Character ID for DMs.',
     examples: [
       'clawsaga search-characters --name El',
       'clawsaga search-characters --name Elwen --discriminator 0427',
@@ -99,7 +105,7 @@ const commands: Record<string, CommandDefinition> = {
       ],
     ],
     requiresCharacter: false,
-    help: 'Resolve one of your own characters to its Character ID by exact name, optionally with the discriminator. Use the returned Character ID for every other command.',
+    help: 'Find your character by exact name, adding the discriminator if needed. Use the returned Character ID in other commands.',
     examples: [
       'clawsaga resolve-character --name Aster',
       'clawsaga resolve-character --name Aster --discriminator 0427',
@@ -124,7 +130,7 @@ const commands: Record<string, CommandDefinition> = {
         ['profile', 'inventory', 'repair_estimates'],
       ],
     ],
-    help: 'Read a character and the current rest estimate. Add --include inventory for carried items, repair_estimates for inventory with repair costs, or profile for the persona.',
+    help: 'Read character status, capacity and rest estimate. Use --include for inventory, repair estimates or persona.',
   },
   create: {
     path: 'character/create',
@@ -144,7 +150,7 @@ const commands: Record<string, CommandDefinition> = {
     path: 'character/profile',
     schema: updateProfileSchema,
     flags: [jsonFlag],
-    help: 'Update a character profile.',
+    help: 'Update persona or preferred_locale. Omitted fields stay unchanged; an empty persona clears it.',
     inputExample: { persona: 'A curious traveler who records discoveries.' },
   },
   map: {
@@ -156,8 +162,8 @@ const commands: Record<string, CommandDefinition> = {
   look: {
     path: 'character/look',
     schema: lookSchema,
-    flags: [['--people', 'Include active other characters at this location']],
-    help: 'Read resources, enemies and facilities at your current location. Resource item_ids are passed to gather; enemy ids to fight. In town every listed enemy is a practice opponent; fight it with --practice. Use encounters for full enemy details.',
+    flags: [['--people', 'Include other active characters at this location']],
+    help: 'Read local resources, enemies and facilities. Use resource item_id for gather and enemy id for fight. Town enemies require --practice. Use encounters for full enemy details.',
   },
   route: {
     path: 'character/route',
@@ -201,8 +207,34 @@ const commands: Record<string, CommandDefinition> = {
   recipes: {
     path: 'character/recipes',
     schema: getRecipesSchema,
-    flags: [['--location <id>', 'Location to inspect']],
-    help: 'Read recipes: inputs.quantity is required per lot; owned_quantity and missing_quantity describe current materials. Check unavailable_reasons, facility and fee.',
+    flags: [
+      ['--location <id>', 'Location used for a recipe detail estimate'],
+      [
+        '--skill <id>',
+        'Filter the recipe list by required skill',
+        false,
+        [
+          'mining',
+          'gathering',
+          'smithing',
+          'crafting',
+          'alchemy',
+          'cooking',
+          'enchanting',
+        ],
+      ],
+      ['--recipe <id>', 'Read one recipe in detail'],
+    ],
+    help: 'List recipe IDs, outputs and skill requirements, or use --recipe for materials, shortages, fee, duration, facility, availability and output effects.',
+  },
+  items: {
+    path: 'character/items',
+    schema: getItemsSchema,
+    flags: [
+      ['--query <text>', 'Search IDs, names, descriptions, effects and stats'],
+      ['--item <id>', 'Read one public item definition'],
+    ],
+    help: 'List public items, search with normalized AND terms, or read one item in detail. Search is independent of inventory ownership.',
   },
   craft: {
     path: 'character/craft',
@@ -220,7 +252,7 @@ const commands: Record<string, CommandDefinition> = {
       ],
       noWaitFlag,
     ],
-    help: 'Craft while idle; wait for each completion. Omit --max-fee-per-lot to accept the fee the recipe lists. Each --count lot gets a new request ID; --request retries one lot and needs --count 1. The whole repetition must finish before starting another main activity for this character.',
+    help: 'Craft goods from standard-quality materials while idle; wait for each lot. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.',
     examples: [
       'clawsaga craft -c m7Qp2_aR9L-x --recipe wolf_jerky --count 3',
       'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --no-wait',
@@ -236,13 +268,13 @@ const commands: Record<string, CommandDefinition> = {
         true,
       ],
     ],
-    help: 'Stop gathering, crafting or rest, or request combat retreat.',
+    help: 'Stop gathering, crafting or rest, or request combat retreat. Travel continues until arrival.',
   },
   shop: {
     path: 'shop',
     schema: getShopSchema,
     flags: [],
-    help: 'Read the current town equipment shop.',
+    help: 'Read the shop and available stock in your current town.',
   },
   buy: {
     path: 'character/shop-purchases',
@@ -262,8 +294,8 @@ const commands: Record<string, CommandDefinition> = {
     schema: equipSchema,
     flags: [
       [
-        '--equipment <uuid>',
-        'Equipment ID from purchase.equipment_id or inventory[].equipment_id',
+        '--instance <uuid>',
+        'Item instance ID from purchase.instance_id or inventory[].instance_id',
         true,
       ],
     ],
@@ -274,8 +306,8 @@ const commands: Record<string, CommandDefinition> = {
     schema: equipSchema,
     flags: [
       [
-        '--equipment <uuid>',
-        'Equipment ID from inventory[].equipment_id',
+        '--instance <uuid>',
+        'Item instance ID from inventory[].instance_id',
         true,
       ],
     ],
@@ -286,12 +318,78 @@ const commands: Record<string, CommandDefinition> = {
     schema: repairSchema,
     flags: [
       [
-        '--equipment <uuid>',
-        'Equipment ID from inventory[].equipment_id',
+        '--instance <uuid>',
+        'Item instance ID from inventory[].instance_id',
         true,
       ],
     ],
-    help: 'Repair owned equipment at a town smithy while idle.',
+    help: 'Repair owned equipment with standard-quality kits at a town smithy while idle.',
+  },
+  discard: {
+    path: 'character/item/discard',
+    schema: discardItemSchema,
+    flags: [
+      ['--item <id>', 'Stack item ID from inventory'],
+      ['--quantity <number>', 'Stack quantity to discard'],
+      ['--instance <uuid>', 'Item instance ID from inventory'],
+    ],
+    help: 'Permanently discard a standard-quality stack quantity or one item instance while idle.',
+    examples: [
+      'clawsaga discard -c m7Qp2_aR9L-x --item wolf_meat --quantity 10',
+      'clawsaga discard -c m7Qp2_aR9L-x --instance 00000000-0000-4000-8000-000000000001',
+    ],
+  },
+  storage: {
+    path: 'character/storage',
+    schema: getStorageSchema,
+    flags: [['--town <id>', 'Town location ID', true]],
+    help: 'Read your storage in one town from anywhere: items, weight and capacity. Unused storage is empty.',
+    examples: ['clawsaga storage -c m7Qp2_aR9L-x --town selene'],
+  },
+  'search-storage': {
+    path: 'character/storage/search',
+    schema: searchStorageSchema,
+    flags: [
+      [
+        '--query <text>',
+        'Exact item ID or a case-insensitive substring of the item name',
+        true,
+      ],
+    ],
+    help: 'Find an item across every town storage you own, grouped by town. No match returns an empty list.',
+    examples: ['clawsaga search-storage -c m7Qp2_aR9L-x --query ore'],
+  },
+  deposit: {
+    path: 'character/storage/deposit',
+    schema: depositItemsSchema,
+    flags: [
+      ['--town <id>', 'Town location ID where you stand', true],
+      ['--items <json>', 'JSON array of stack and individual targets', true],
+      [
+        '--request <uuid>',
+        'Retry with the same ID, town and items after an uncertain deposit',
+      ],
+    ],
+    help: 'Deposit items while idle in that town. The entire --items array succeeds or fails together. A request ID is generated unless supplied.',
+    examples: [
+      'clawsaga deposit -c m7Qp2_aR9L-x --town selene --items \'[{"kind":"stack","item_id":"ore","quality":"standard","quantity":10}]\'',
+    ],
+  },
+  withdraw: {
+    path: 'character/storage/withdraw',
+    schema: withdrawItemsSchema,
+    flags: [
+      ['--town <id>', 'Town location ID where you stand', true],
+      ['--items <json>', 'JSON array of stack and individual targets', true],
+      [
+        '--request <uuid>',
+        'Retry with the same ID, town and items after an uncertain withdrawal',
+      ],
+    ],
+    help: 'Withdraw items while idle in that town. The entire --items array succeeds or fails together. A request ID is generated unless supplied.',
+    examples: [
+      'clawsaga withdraw -c m7Qp2_aR9L-x --town selene --items \'[{"kind":"individual","instance_id":"00000000-0000-4000-8000-000000000001"}]\'',
+    ],
   },
 };
 
@@ -320,12 +418,14 @@ const optionsSchema = z.object({
   location: z.string().optional(),
   item: z.string().optional(),
   recipe: z.string().optional(),
+  skill: z.string().optional(),
   count: z.string().optional(),
+  quantity: z.string().optional(),
   maxFeePerLot: z.string().optional(),
   maxPayment: z.string().optional(),
   request: z.string().optional(),
   wait: z.boolean().optional(),
-  equipment: z.string().optional(),
+  instance: z.string().optional(),
   enemy: z.string().optional(),
   preset: z.string().optional(),
   practice: z.boolean().optional(),
@@ -337,6 +437,7 @@ const optionsSchema = z.object({
   query: z.string().optional(),
   with: z.string().optional(),
   unreadOnly: z.boolean().optional(),
+  activeOnly: z.boolean().optional(),
   limit: z.string().optional(),
   before: z.string().optional(),
   beforeThread: z.string().optional(),
@@ -347,6 +448,8 @@ const optionsSchema = z.object({
   authoredBySelf: z.boolean().optional(),
   participatedBySelf: z.boolean().optional(),
   thread: z.string().optional(),
+  town: z.string().optional(),
+  items: z.string().optional(),
 });
 type Values = z.infer<typeof optionsSchema>;
 
@@ -365,6 +468,7 @@ async function readStdin() {
 async function commandInput(
   values: Values,
   definition: CommandDefinition,
+  commandName: string,
 ): Promise<unknown> {
   if (values.input) {
     let input: unknown;
@@ -397,14 +501,31 @@ async function commandInput(
   if (values.activity) input.activity_id = values.activity;
   if (values.include) input.include = values.include.split(',');
   if (values.location) input.location_id = values.location;
+  if (commandName === 'discard') {
+    const stack = values.item !== undefined || values.quantity !== undefined;
+    const individual = values.instance !== undefined;
+    if (stack !== individual)
+      input.target = stack
+        ? {
+            kind: 'stack',
+            item_id: values.item,
+            quantity: Number(values.quantity),
+          }
+        : {
+            kind: 'individual',
+            instance_id: values.instance,
+          };
+    return input;
+  }
   if (values.item) input.item_id = values.item;
   if (values.recipe) input.recipe_id = values.recipe;
+  if (values.skill) input.skill_id = values.skill;
   if (values.maxFeePerLot !== undefined)
     input.max_fee_per_lot = Number(values.maxFeePerLot);
   if (values.maxPayment !== undefined)
     input.max_payment = Number(values.maxPayment);
   if (values.request) input.request_id = values.request;
-  if (values.equipment) input.equipment_id = values.equipment;
+  if (values.instance) input.instance_id = values.instance;
   if (values.enemy) input.enemy_id = values.enemy;
   if (values.preset) input.preset = values.preset;
   if (values.practice) input.practice = values.practice;
@@ -416,6 +537,7 @@ async function commandInput(
   if (values.query) input.query = values.query;
   if (values.with) input.with_character_id = values.with;
   if (values.unreadOnly) input.unread_only = true;
+  if (values.activeOnly) input.active_only = true;
   if (values.limit !== undefined) input.limit = Number(values.limit);
   if (values.before) input.before = Number(values.before);
   if (values.beforeThread) input.before = values.beforeThread;
@@ -425,7 +547,22 @@ async function commandInput(
   if (values.authoredBySelf) input.authored_by_self = true;
   if (values.participatedBySelf) input.participated_by_self = true;
   if (values.thread) input.thread_id = values.thread;
+  if (values.town) input.town_id = values.town;
+  if (commandName === 'deposit' || commandName === 'withdraw') {
+    input.items = parseItemTargets(values.items);
+  }
   return input;
+}
+
+// The storage batch is one JSON array option. The request schema validates its
+// elements after parsing, so a malformed array is reported as invalid arguments.
+function parseItemTargets(value: string | undefined) {
+  if (value === undefined) return undefined;
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new CliError('INVALID_ARGUMENTS', { fields: ['items'] });
+  }
 }
 
 function validateInput(schema: z.ZodObject, input: unknown) {
@@ -597,7 +734,8 @@ function guideHelp(): StructuredHelp {
 function authLoginHelp(): StructuredHelp {
   return {
     command: 'clawsaga auth login',
-    description: 'Request human approval using a device code.',
+    description:
+      'Return a device verification URL for human approval without waiting.',
     usage: 'clawsaga auth login [options]',
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: ['clawsaga auth login'],
@@ -635,7 +773,12 @@ export async function execute(
     | GuideResponse
     | AgentResumeResponse
     | ChangelogResponse
-    | { ok: boolean; authenticated: boolean }
+    | {
+        ok: boolean;
+        authenticated: boolean;
+        verification_uri: string;
+        user_code: string;
+      }
     | undefined;
   const program = new Command('clawsaga')
     .description('Play ClawSaga. Requires Node.js 22.12.0 or later.')
@@ -748,7 +891,7 @@ export async function execute(
     .command('auth')
     .description('Manage authorization')
     .command('login')
-    .description('Request human approval using a device code')
+    .description('Return a device verification URL without waiting')
     .configureOutput({
       outputError: () => {
         helpCommand = 'clawsaga auth login --help';
@@ -760,7 +903,7 @@ export async function execute(
   login.action(async () => {
     result = await clientFor(
       optionsSchema.parse(login.optsWithGlobals()),
-    ).login(notify);
+    ).login();
   });
   for (const [name, definition] of Object.entries(commands)) {
     const command = program
@@ -805,7 +948,13 @@ export async function execute(
         });
       }
       const requestedId = values.request;
-      if ((name === 'buy' || name === 'craft') && !values.request)
+      if (
+        (name === 'buy' ||
+          name === 'craft' ||
+          name === 'deposit' ||
+          name === 'withdraw') &&
+        !values.request
+      )
         values.request = randomUUID();
       const inputValues =
         name === 'characters' ||
@@ -818,7 +967,7 @@ export async function execute(
           : values;
       const input = validateInput(
         definition.schema,
-        await commandInput(inputValues, definition),
+        await commandInput(inputValues, definition, name),
       );
       const client = clientFor(values);
       if (name === 'gather' || name === 'craft') {
@@ -873,6 +1022,15 @@ export async function execute(
             request_id: values.request,
             item_id: values.item,
             max_payment: Number(values.maxPayment),
+          });
+        if (
+          (name === 'deposit' || name === 'withdraw') &&
+          error instanceof CliError
+        )
+          throw new CliError(error.code, {
+            ...error.detail,
+            request_id: values.request,
+            town_id: values.town,
           });
         throw error;
       }

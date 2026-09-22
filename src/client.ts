@@ -1,7 +1,10 @@
-import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
 import { agentGameResponseSchema, agentSchemaVersion } from './protocol.js';
-import { CredentialStore, type Credential } from './credentials.js';
+import {
+  CredentialStore,
+  isPendingAuthorization,
+  type Credential,
+} from './credentials.js';
 import { CliError, cliErrorMessage } from './errors.js';
 
 const tokensSchema = z.object({
@@ -13,9 +16,8 @@ const tokensSchema = z.object({
 const deviceSchema = z.object({
   device_code: z.string(),
   user_code: z.string(),
-  verification_uri: z.url(),
+  verification_uri_complete: z.url(),
   expires_in: z.number().positive(),
-  interval: z.number().positive().default(5),
 });
 const errorSchema = z.object({ error: z.string() });
 const serverMessageSchema = z.object({
@@ -110,7 +112,7 @@ export class GameClient {
       expires_at: Date.now() + parsed.data.expires_in * 1000,
     };
   }
-  async login(notify: (value: unknown) => void) {
+  async login() {
     const response = await this.oauth('/device/code', {
       client_id: 'clawsaga-cli',
       scope: 'game:read game:play offline_access',
@@ -122,53 +124,59 @@ export class GameClient {
     );
     if (!parsed.success) throw new CliError('INVALID_RESPONSE');
     const device = parsed.data;
-    if (new URL(device.verification_uri).origin !== this.origin)
+    if (new URL(device.verification_uri_complete).origin !== this.origin)
       throw new CliError('INVALID_AUTH_SERVER');
-    notify({
-      verification_uri: device.verification_uri,
-      user_code: device.user_code,
-    });
-    const deadline = Date.now() + device.expires_in * 1000;
-    let interval = device.interval;
-    while (Date.now() < deadline) {
-      await sleep(interval * 1000);
-      const polled = await this.oauth('/oauth2/token', {
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        client_id: 'clawsaga-cli',
+    await this.credentials.update((entries) => {
+      entries[this.origin] = {
         device_code: device.device_code,
-      });
-      if (polled.ok) {
-        const credential = await this.decodeTokens(polled);
-        await this.credentials.update((entries) => {
-          entries[this.origin] = credential;
-        });
-        return { ok: true, authenticated: true };
-      }
-      const failure = errorSchema.safeParse(
-        await polled.json().catch(() => null),
-      );
-      if (failure.success && failure.data.error === 'authorization_pending')
-        continue;
-      if (failure.success && failure.data.error === 'slow_down') {
-        interval += 5;
-        continue;
-      }
-      throw new CliError('AUTH_NOT_COMPLETED', {
-        reason: failure.success ? failure.data.error : 'invalid_response',
-      });
-    }
-    throw new CliError('AUTH_NOT_COMPLETED', { reason: 'expired_token' });
+        expires_at: Date.now() + device.expires_in * 1000,
+      };
+    });
+    return {
+      ok: true,
+      authenticated: false,
+      verification_uri: device.verification_uri_complete,
+      user_code: device.user_code,
+    };
   }
   async accessToken() {
     const cached = (await this.credentials.read())[this.origin];
     if (!cached) throw new CliError('AUTH_REQUIRED');
-    if (!expiringSoon(cached)) return cached.access_token;
+    if (!isPendingAuthorization(cached) && !expiringSoon(cached))
+      return cached.access_token;
 
-    // The token request stays inside the lock: the server revokes the whole
-    // connection when a rotated refresh token is replayed.
     return this.credentials.update(async (entries) => {
       const current = entries[this.origin];
       if (!current) throw new CliError('AUTH_REQUIRED');
+      if (isPendingAuthorization(current)) {
+        if (current.expires_at <= Date.now()) {
+          delete entries[this.origin];
+          throw new CliError('AUTH_NOT_COMPLETED', {
+            reason: 'expired_token',
+          });
+        }
+        const polled = await this.oauth('/oauth2/token', {
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+          client_id: 'clawsaga-cli',
+          device_code: current.device_code,
+        });
+        if (polled.ok) {
+          const credential = await this.decodeTokens(polled);
+          entries[this.origin] = credential;
+          return credential.access_token;
+        }
+        const failure = errorSchema.safeParse(
+          await polled.json().catch(() => null),
+        );
+        const reason = failure.success
+          ? failure.data.error
+          : 'invalid_response';
+        if (reason !== 'authorization_pending' && reason !== 'slow_down')
+          delete entries[this.origin];
+        throw new CliError('AUTH_NOT_COMPLETED', { reason });
+      }
+      // The token request stays inside the lock: the server revokes the whole
+      // connection when a rotated refresh token is replayed.
       // Another process may have refreshed while this one waited for the lock.
       if (!expiringSoon(current)) return current.access_token;
       const refreshed = await this.decodeTokens(

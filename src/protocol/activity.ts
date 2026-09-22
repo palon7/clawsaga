@@ -6,7 +6,10 @@ import {
   presentCharacterSchema,
   travelActivityViewSchema,
 } from './movement.js';
-import { productionActivityViewSchema } from './production.js';
+import {
+  productionActivityViewSchema,
+  productionExperienceSchema,
+} from './production.js';
 import { combatActivityViewSchema, restActivityViewSchema } from './combat.js';
 
 export const activityViewSchema = z.union([
@@ -99,7 +102,7 @@ const ended = {
 export const agentTravelResultSchema = z.object({
   ...ended,
   kind: z.literal('travel'),
-  end_reason: z.literal('COMPLETED'),
+  end_reason: z.enum(['COMPLETED', 'CANCELLED']),
   to: locationViewSchema,
   characters: z.array(presentCharacterSchema).optional(),
   ambush: ambushReferenceSchema.optional(),
@@ -114,6 +117,7 @@ export const agentGatherResultSchema = z.object({
     'CAPACITY_EXCEEDED',
   ]),
   output: agentMaterialSchema,
+  experience: productionExperienceSchema.optional(),
   ambush: ambushReferenceSchema.optional(),
 });
 export const agentCraftResultSchema = z.object({
@@ -122,6 +126,7 @@ export const agentCraftResultSchema = z.object({
   end_reason: z.enum(['COMPLETED', 'STOPPED']),
   recipe_id: z.string(),
   output: agentMaterialSchema,
+  experience: productionExperienceSchema.optional(),
   fee_paid: z.number().int().nonnegative(),
 });
 
@@ -133,7 +138,12 @@ export const agentCombatSummarySchema = z.object({
   gold_gained: z.number().int().nonnegative(),
   loot: z.array(agentMaterialSchema),
   unclaimed_loot: z.array(agentMaterialSchema),
-  potions_used: z.number().int().nonnegative(),
+  items_used: z.array(
+    z.object({
+      item_id: itemIdSchema,
+      quantity: z.number().int().positive(),
+    }),
+  ),
 });
 export type AgentCombatSummary = z.infer<typeof agentCombatSummarySchema>;
 

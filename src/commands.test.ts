@@ -24,7 +24,12 @@ it('uses one selected origin for authorization and game commands, with explicit 
     this: GameClient,
   ) {
     origins.push(this.origin);
-    return Promise.resolve({ ok: true, authenticated: true });
+    return Promise.resolve({
+      ok: true,
+      authenticated: false,
+      verification_uri: `${this.origin}/oauth/device?user_code=ABCD1234`,
+      user_code: 'ABCD1234',
+    });
   });
   vi.spyOn(GameClient.prototype, 'invoke').mockImplementation(function (
     this: GameClient,
@@ -74,16 +79,19 @@ it('resolves a named character to a Character ID without -c or a JSON body', asy
 });
 
 it('parses nested auth commands and rejects irrelevant or incomplete options before any request', async () => {
-  const login = vi
-    .spyOn(GameClient.prototype, 'login')
-    .mockResolvedValue({ ok: true, authenticated: true });
+  const login = vi.spyOn(GameClient.prototype, 'login').mockResolvedValue({
+    ok: true,
+    authenticated: false,
+    verification_uri: 'https://example.com/oauth/device?user_code=ABCD1234',
+    user_code: 'ABCD1234',
+  });
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
   vi.stubEnv('CLAWSAGA_SERVER', 'https://example.com');
   expect(await execute(['auth', 'login'], vi.fn())).toMatchObject({
     ok: true,
-    authenticated: true,
+    authenticated: false,
   });
   expect(login).toHaveBeenCalledTimes(1);
   for (const args of [
@@ -242,7 +250,7 @@ it('parses every structured help command example with a fake client', async () =
         vi.mocked(readFile).mockResolvedValue(
           JSON.stringify(result.help.input_example),
         );
-      await execute(example.slice('clawsaga '.length).split(' '), vi.fn());
+      await execute(shellArguments(example), vi.fn());
       checked += 1;
     }
   }
@@ -250,6 +258,19 @@ it('parses every structured help command example with a fake client', async () =
   expect(checked).toBeGreaterThan(0);
   expect(invoke).toHaveBeenCalledTimes(checked);
 });
+
+// Help examples are written to be pasted into a shell, so a quoted argument
+// arrives without its quotes. Strip that one quoting form before running them.
+function shellArguments(example: string) {
+  return example
+    .slice('clawsaga '.length)
+    .split(' ')
+    .map((argument) =>
+      argument.startsWith("'") && argument.endsWith("'")
+        ? argument.slice(1, -1)
+        : argument,
+    );
+}
 
 it('passes a Character ID that begins with a dash without treating it as an option', async () => {
   const invoke = vi
@@ -286,6 +307,33 @@ it('accepts comma-separated include sections while help lists each choice', asyn
   );
 });
 
+it('maps stack and individual discard flags', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  await execute(
+    ['discard', '-c', 'Traveler0000', '--item', 'wolf_meat', '--quantity', '2'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith('character/item/discard', {
+    character_id: 'Traveler0000',
+    target: { kind: 'stack', item_id: 'wolf_meat', quantity: 2 },
+  });
+  invoke.mockClear();
+  const instance = '11111111-1111-4111-8111-111111111111';
+  await execute(
+    ['discard', '-c', 'Traveler0000', '--instance', instance],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenCalledWith('character/item/discard', {
+    character_id: 'Traveler0000',
+    target: {
+      kind: 'individual',
+      instance_id: instance,
+    },
+  });
+});
+
 it('rejects a command option value outside its request schema enum', async () => {
   const invoke = vi.spyOn(GameClient.prototype, 'invoke');
   await expect(
@@ -313,7 +361,7 @@ it('returns the parser reason and command-specific help without sending a reques
         'equip',
         '-c',
         'Traveler0000',
-        '--equipment',
+        '--instance',
         '00000000-0000-4000-8000-000000000001',
         '--item',
         'iron_sword',
@@ -322,8 +370,8 @@ it('returns the parser reason and command-specific help without sending a reques
       'clawsaga equip',
     ],
     [
-      ['equip', '--equipment'],
-      "option '--equipment <uuid>' argument missing",
+      ['equip', '--instance'],
+      "option '--instance <uuid>' argument missing",
       'clawsaga equip',
     ],
     [['characters', 'unexpected'], 'too many arguments', 'clawsaga characters'],
@@ -928,7 +976,41 @@ it('validates quest identifiers and cursors before sending requests', async () =
   });
 });
 
-it('uses cooked recovery foods and rejects raw ingredients before sending', async () => {
+it('maps item, recipe and active quest discovery flags', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  await execute(['items', '-c', 'Traveler0000', '--query', 'MP 回復'], vi.fn());
+  await execute(
+    ['recipes', '-c', 'Traveler0000', '--skill', 'cooking'],
+    vi.fn(),
+  );
+  await execute(['quests', '-c', 'Traveler0000', '--active-only'], vi.fn());
+  expect(invoke.mock.calls).toEqual([
+    ['character/items', { character_id: 'Traveler0000', query: 'MP 回復' }],
+    [
+      'character/recipes',
+      { character_id: 'Traveler0000', skill_id: 'cooking' },
+    ],
+    ['character/quests', { character_id: 'Traveler0000', active_only: true }],
+  ]);
+  await expect(
+    execute(
+      [
+        'items',
+        '-c',
+        'Traveler0000',
+        '--query',
+        'potion',
+        '--item',
+        'healing_potion',
+      ],
+      vi.fn(),
+    ),
+  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
+});
+
+it('passes item IDs to the server, including definitions unknown to this CLI', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
@@ -937,13 +1019,14 @@ it('uses cooked recovery foods and rejects raw ingredients before sending', asyn
     character_id: 'Traveler0000',
     item_id: 'wolf_jerky',
   });
-  invoke.mockClear();
-  for (const item_id of ['wolf_meat', 'food', 'herb']) {
-    await expect(
-      execute(['use', '-c', 'Traveler0000', '--item', item_id], vi.fn()),
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  }
-  expect(invoke).not.toHaveBeenCalled();
+  await execute(
+    ['use', '-c', 'Traveler0000', '--item', 'future_tonic'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith('character/item/use', {
+    character_id: 'Traveler0000',
+    item_id: 'future_tonic',
+  });
 });
 
 it('reads the server changelog without a character', async () => {

@@ -1,9 +1,73 @@
 [
   {
+    "name": "cancelled_travel",
+    "response": {
+      "ok": true,
+      "schema_version": "3.6",
+      "server_time": "2026-09-22T01:02:03Z",
+      "data": {
+        "activity": null,
+        "last_result": {
+          "kind": "travel",
+          "activity_id": "00000000-0000-4000-8000-000000000003",
+          "status": "ENDED",
+          "ended_at": "2026-09-22T01:02:03Z",
+          "end_reason": "CANCELLED",
+          "to": { "id": "mossway", "name": "Mossway", "kind": "field" },
+          "characters": []
+        }
+      }
+    }
+  },
+  {
+    "name": "gather_actual_experience",
+    "response": {
+      "ok": true,
+      "schema_version": "3.6",
+      "server_time": "2026-09-22T01:02:03Z",
+      "data": {
+        "last_result": {
+          "kind": "gather",
+          "activity_id": "00000000-0000-4000-8000-000000000003",
+          "status": "ENDED",
+          "ended_at": "2026-09-22T01:02:03Z",
+          "end_reason": "COMPLETED",
+          "output": { "item_id": "herb", "name": "Herb", "quantity": 1 },
+          "experience": { "skill_id": "gathering", "awarded": 2 }
+        }
+      }
+    }
+  },
+  {
+    "name": "craft_actual_experience",
+    "response": {
+      "ok": true,
+      "schema_version": "3.6",
+      "server_time": "2026-09-22T01:02:03Z",
+      "data": {
+        "last_result": {
+          "kind": "craft",
+          "activity_id": "00000000-0000-4000-8000-000000000003",
+          "status": "ENDED",
+          "ended_at": "2026-09-22T01:02:03Z",
+          "end_reason": "STOPPED",
+          "recipe_id": "healing_potion",
+          "output": {
+            "item_id": "healing_potion",
+            "name": "Healing Potion",
+            "quantity": 0
+          },
+          "fee_paid": 0,
+          "experience": { "skill_id": "alchemy", "awarded": 0 }
+        }
+      }
+    }
+  },
+  {
     "name": "settled_result_with_current_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.3",
+      "schema_version": "3.6",
       "server_time": "2026-09-19T01:02:03.456Z",
       "next_poll_after_seconds": 7,
       "data": {
@@ -15,25 +79,28 @@
             "unit_weight": 1,
             "tradeable": true,
             "quantity": 3,
+            "quality": "standard",
             "use_effect": { "hp_recovery": 60, "mp_recovery": 0 }
           },
           {
-            "kind": "equipment",
-            "equipment_id": "00000000-0000-4000-8000-000000000001",
+            "kind": "individual",
+            "instance_id": "00000000-0000-4000-8000-000000000001",
             "item_id": "oak_staff",
             "name": "Oak Staff",
             "unit_weight": 4,
             "tradeable": true,
+            "quantity": 1,
             "quality": "fine",
-            "durability": 37,
-            "max_durability": 50,
-            "slot": "main_hand",
             "equipment": {
               "equip_slot": "main_hand",
               "required_job": "mage",
               "required_job_name": "Mage",
               "power": 9,
               "armor": 0
+            },
+            "equipment_state": {
+              "durability": { "current": 37, "maximum": 50 },
+              "equipped_slot": "main_hand"
             },
             "repair_estimate": {
               "available": false,
@@ -92,7 +159,7 @@
             "unclaimed_loot": [
               { "item_id": "wolf_meat", "name": "Wolf Meat", "quantity": 1 }
             ],
-            "potions_used": 1
+            "items_used": [{ "item_id": "healing_potion", "quantity": 1 }]
           }
         },
         "position": { "id": "selene", "name": "Selene", "kind": "town" }
@@ -103,7 +170,7 @@
     "name": "accepted_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.3",
+      "schema_version": "3.6",
       "server_time": "2026-09-19T01:08:00.456Z",
       "next_poll_after_seconds": 5,
       "data": {
@@ -136,7 +203,7 @@
     "name": "cancelled_result",
     "response": {
       "ok": true,
-      "schema_version": "3.3",
+      "schema_version": "3.6",
       "server_time": "2026-09-19T02:03:04.567Z",
       "data": {
         "activity": null,
@@ -155,7 +222,7 @@
     "name": "location_chat",
     "response": {
       "ok": true,
-      "schema_version": "3.3",
+      "schema_version": "3.6",
       "server_time": "2026-09-19T03:04:05.678Z",
       "attention": {
         "unread_direct_messages": 0,
@@ -190,7 +257,7 @@
     "name": "business_failure",
     "response": {
       "ok": false,
-      "schema_version": "3.3",
+      "schema_version": "3.6",
       "server_time": "2026-09-19T04:05:06.789Z",
       "data": {},
       "error": {
@@ -203,7 +270,7 @@
     "name": "delivery_shortage",
     "response": {
       "ok": false,
-      "schema_version": "3.3",
+      "schema_version": "3.6",
       "server_time": "2026-09-19T04:06:07.890Z",
       "data": {},
       "error": {

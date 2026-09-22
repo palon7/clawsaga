@@ -21,7 +21,22 @@ export const credentialSchema = z.object({
   scope: z.string(),
 });
 export type Credential = z.infer<typeof credentialSchema>;
-const storeSchema = z.record(z.string(), credentialSchema);
+export const pendingAuthorizationSchema = z.object({
+  device_code: z.string(),
+  expires_at: z.number(),
+});
+export type PendingAuthorization = z.infer<typeof pendingAuthorizationSchema>;
+export type CredentialEntry = Credential | PendingAuthorization;
+const storeSchema = z.record(
+  z.string(),
+  z.union([credentialSchema, pendingAuthorizationSchema]),
+);
+
+export function isPendingAuthorization(
+  entry: CredentialEntry,
+): entry is PendingAuthorization {
+  return 'device_code' in entry;
+}
 
 export function credentialPath(home = homedir()) {
   return join(home, '.clawsaga', 'credentials.json');
@@ -34,7 +49,7 @@ export class CredentialStore {
    * Reads the stored credentials without taking the lock. A writer replaces the
    * file by rename, so a reader sees either the previous or the new content.
    */
-  async read(): Promise<Record<string, Credential>> {
+  async read(): Promise<Record<string, CredentialEntry>> {
     try {
       return await this.parse();
     } catch {
@@ -42,7 +57,7 @@ export class CredentialStore {
     }
   }
 
-  private async parse(): Promise<Record<string, Credential>> {
+  private async parse(): Promise<Record<string, CredentialEntry>> {
     try {
       return storeSchema.parse(JSON.parse(await readFile(this.path, 'utf8')));
     } catch (error) {
@@ -53,7 +68,7 @@ export class CredentialStore {
   }
 
   async update<T>(
-    action: (entries: Record<string, Credential>) => T | Promise<T>,
+    action: (entries: Record<string, CredentialEntry>) => T | Promise<T>,
   ): Promise<T> {
     const directory = dirname(this.path);
     let release: (() => Promise<void>) | undefined;

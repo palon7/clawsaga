@@ -9,8 +9,7 @@ import {
   agentCombatResultSchema,
   agentRestResultSchema,
 } from './protocol/activity.js';
-import { itemIdSchema } from './protocol/ids.js';
-import { recipeViewSchema } from './protocol/production.js';
+import { discardItemSchema, recipeViewSchema } from './protocol/production.js';
 import { lookResourceSchema } from './protocol/movement.js';
 
 it('accepts the three guide response shapes', () => {
@@ -61,6 +60,38 @@ it('accepts the compact profile receipt', () => {
   ).toBe(true);
 });
 
+it('accepts new item and location IDs without weakening their format', () => {
+  const response = {
+    ok: true,
+    schema_version: agentSchemaVersion,
+    server_time: '2026-09-12T00:00:00.000Z',
+    data: {
+      position: { id: 'new_outpost', name: 'New Outpost', kind: 'town' },
+      inventory: [
+        {
+          kind: 'stack',
+          item_id: 'future_tonic',
+          name: 'Future Tonic',
+          unit_weight: 1,
+          tradeable: true,
+          quantity: 1,
+          quality: 'standard',
+        },
+      ],
+    },
+  };
+  expect(agentGameResponseSchema.parse(response)).toEqual(response);
+  expect(
+    agentGameResponseSchema.safeParse({
+      ...response,
+      data: {
+        ...response.data,
+        position: { id: 'INVALID LOCATION', name: 'Bad', kind: 'town' },
+      },
+    }).success,
+  ).toBe(false);
+});
+
 it('keeps the repair receipt from an equipment repair', () => {
   const response = {
     ok: true,
@@ -68,9 +99,8 @@ it('keeps the repair receipt from an equipment repair', () => {
     server_time: '2026-09-12T00:00:00.000Z',
     data: {
       repair: {
-        equipment_id: '11111111-1111-4111-8111-111111111111',
-        durability: 50,
-        max_durability: 50,
+        instance_id: '11111111-1111-4111-8111-111111111111',
+        durability: { current: 50, maximum: 50 },
         kits_used: 1,
         fee_paid: 3,
       },
@@ -195,25 +225,24 @@ function stackRow(item_id: string, name: string) {
     quantity: 1,
     unit_weight: 1,
     tradeable: true,
+    quality: 'standard',
   };
 }
 
-function equipmentRow(
+function individualRow(
   item_id: string,
   name: string,
   quality: 'standard' | 'fine' | 'superior' = 'standard',
 ) {
   return {
-    kind: 'equipment',
-    equipment_id: '00000000-0000-4000-8000-000000000001',
+    kind: 'individual',
+    instance_id: '00000000-0000-4000-8000-000000000001',
     item_id,
     name,
     unit_weight: 1,
     tradeable: true,
+    quantity: 1,
     quality,
-    durability: 100,
-    max_durability: 100,
-    slot: null,
     equipment: {
       equip_slot: 'main_hand',
       required_job: 'warrior',
@@ -221,13 +250,16 @@ function equipmentRow(
       power: 9,
       armor: 0,
     },
+    equipment_state: {
+      durability: { current: 100, maximum: 100 },
+      equipped_slot: null,
+    },
   };
 }
 
-it('accepts the new wolf items as item IDs', () => {
-  expect(itemIdSchema.safeParse('wolf_meat').success).toBe(true);
-  expect(itemIdSchema.safeParse('wolf_jerky').success).toBe(true);
-});
+function itemSummary(item_id: string, name: string) {
+  return { item_id, name, unit_weight: 1, tradeable: true };
+}
 
 it('accepts wolf meat and wolf jerky in inventory responses', () => {
   expect(
@@ -253,8 +285,8 @@ it('accepts non-standard qualities on individual items', () => {
       server_time: '2026-09-12T00:00:00.000Z',
       data: {
         inventory: [
-          equipmentRow('iron_sword', 'Iron Sword', 'fine'),
-          equipmentRow('iron_dagger', 'Iron Dagger', 'superior'),
+          individualRow('iron_sword', 'Iron Sword', 'fine'),
+          individualRow('iron_dagger', 'Iron Dagger', 'superior'),
         ],
       },
     }).success,
@@ -297,7 +329,7 @@ it('accepts wolf meat loot and the wolf jerky recipe', () => {
       damage_dealt: 10,
       damage_taken: 2,
       healing: 0,
-      potions_used: 0,
+      items_used: [],
       experience_gained: 5,
       gold_gained: 2,
       loot: [{ item_id: 'wolf_meat', name: 'Wolf Meat', quantity: 1 }],
@@ -313,16 +345,14 @@ it('accepts wolf meat loot and the wolf jerky recipe', () => {
       name: 'Wolf Jerky',
       inputs: [
         {
-          item_id: 'wolf_meat',
-          name: 'Wolf Meat',
+          ...itemSummary('wolf_meat', 'Wolf Meat'),
           quantity: 2,
           owned_quantity: 0,
           missing_quantity: 2,
         },
       ],
       output: {
-        item_id: 'wolf_jerky',
-        name: 'Wolf Jerky',
+        ...itemSummary('wolf_jerky', 'Wolf Jerky'),
         quantity: 1,
       },
       facility: null,
@@ -355,7 +385,7 @@ it('requires a confirmed summary on a settled combat or rest result', () => {
       gold_gained: 2,
       loot: [{ item_id: 'wolf_meat', name: 'Wolf Meat', quantity: 1 }],
       unclaimed_loot: [],
-      potions_used: 0,
+      items_used: [],
     },
   };
   expect(agentCombatResultSchema.safeParse(settled).success).toBe(true);
@@ -426,19 +456,48 @@ it('accepts gathered nuts as a look resource', () => {
   ).toBe(true);
 });
 
-it('uses only cooked recovery foods and rejects raw ingredients', () => {
-  for (const item_id of ['healing_potion', 'travel_ration', 'wolf_jerky']) {
+it('validates item ID format without enumerating server content', () => {
+  for (const item_id of ['healing_potion', 'travel_ration', 'future_tonic']) {
     expect(
       useItemSchema.safeParse({ character_id: 'Traveler0000', item_id })
         .success,
     ).toBe(true);
   }
-  for (const item_id of ['wolf_meat', 'food', 'herb']) {
+  for (const item_id of ['INVALID ITEM', '_hidden']) {
     expect(
       useItemSchema.safeParse({ character_id: 'Traveler0000', item_id })
         .success,
     ).toBe(false);
   }
+});
+
+it('requires an instance ID or a positive stack quantity when discarding', () => {
+  const character_id = 'Traveler0000';
+  expect(
+    discardItemSchema.safeParse({
+      character_id,
+      target: { kind: 'stack', item_id: 'wolf_meat', quantity: 2 },
+    }).success,
+  ).toBe(true);
+  expect(
+    discardItemSchema.safeParse({
+      character_id,
+      target: {
+        kind: 'individual',
+        instance_id: '11111111-1111-4111-8111-111111111111',
+      },
+    }).success,
+  ).toBe(true);
+  expect(
+    discardItemSchema.safeParse({
+      character_id,
+      target: {
+        kind: 'individual',
+        instance_id: '11111111-1111-4111-8111-111111111111',
+        discard_equipment: true,
+      },
+    }).success,
+  ).toBe(false);
 });
 
 it('accepts operation and note hints and rejects other shapes', () => {

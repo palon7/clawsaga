@@ -4,13 +4,13 @@ The CLI runs on Node.js 22.12.0 or later, including on native Windows. It manage
 
 Keep the selected server after errors. Do not switch to MCP or call the API directly without approval.
 
-If the error says authentication is required or asks you to sign in again, run `auth login`. Relay the verification URL and user code to the human, who logs in and approves access. Keep the command running while they approve; do not approve on their behalf or expose tokens. After login, issue the intended game command explicitly.
+If the error says authentication is required or asks you to sign in again, run `auth login`. It returns immediately with a verification URL containing the user code. Relay the URL and code to the human, do not approve on their behalf, and end the turn. After the human confirms approval, issue the intended game command explicitly. That command completes the pending authorization before sending the game request. If the human has not approved yet, stop on `Authorization was not completed`; do not poll repeatedly.
 
 On 429, pause sending for the returned retry interval; this alone does not end the adventure. Authentication errors may require human action. For an uncertain game change, read the affected activity or current state before deciding what to do. Read `guide --topic travel-production` for purchase and craft retries, and `guide --topic records` for record retries.
 
 ## Response failures
 
-If the error says this CLI is older than the server response, update the CLI before retrying, and reconcile a main-activity start from the accepted activity instead of starting it again. Other unreadable response errors distinguish invalid JSON from a response that does not match the expected format. They include `operation`, `http_status` and invalid `fields` when available. Retain these diagnostics when reporting the failure; they do not prove that an accepted activity failed. An unreadable response to a main-activity start carries the same recovery step as a lost response: recover the accepted activity before retrying.
+If the CLI is older than the server response, update it first. For any unreadable response, retain `operation`, `http_status` and invalid `fields` when provided. These diagnostics do not prove the action failed. Recover an accepted activity before retrying its start.
 
 When a long activity is interrupted, match the situation before acting.
 
@@ -21,4 +21,4 @@ When a long activity is interrupted, match the situation before acting.
 
 If the recovered activity is still running, wait for its returned polling interval and read the same activity again. This is recovery after process loss; while the original CLI is alive, collect that process. Never resend the start command to check progress.
 
-A killed CLI does not cancel its accepted activity. The acceptance line carries `next_poll_after_seconds`; respect it instead of polling in a tight loop, and do not assume the host can wake the process later. Leave the activity ID or the pending command for the next run instead of promising a future execution. Reconcile any completed output with the intended remaining work. Do not switch from a failed repetition to repeated single attempts as a workaround for recurring response errors; report the diagnostics if the failure recurs.
+A killed CLI does not cancel its accepted activity. Respect `next_poll_after_seconds` from the acceptance line. Keep the activity ID or pending command for the next run in the host context, not the game plan. Do not promise a later wake-up unless the host supports it. Subtract confirmed results from remaining work. If response errors recur, report the diagnostics; switching from repetitions to single attempts does not fix them.

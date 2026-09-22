@@ -292,7 +292,7 @@ it('preserves look enemies, the active combat and unclaimed loot', async () => {
         damage_dealt: 160,
         damage_taken: 40,
         healing: 0,
-        potions_used: 0,
+        items_used: [],
         experience_gained: 12,
         gold_gained: 2,
         loot: [],

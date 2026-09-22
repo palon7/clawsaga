@@ -7,31 +7,7 @@ import {
 } from './ids.js';
 import { chatChannelSchema } from './social.js';
 
-export const locationIdSchema = z.enum([
-  'ashfield',
-  'blackoak',
-  'corvent',
-  'crossroads',
-  'darras',
-  'dolgan',
-  'hollowdell',
-  'hollowdell_road',
-  'korholm',
-  'laures_centre',
-  'laures_deep',
-  'laures_outerwall',
-  'laures_westgate',
-  'mossway',
-  'north_road',
-  'old_imperial_road',
-  'openpit',
-  'river_side',
-  'selene',
-  'silverthread_lake',
-  'south_road',
-  'undercroft',
-  'whitecliff',
-]);
+export const locationIdSchema = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
 export type LocationId = z.infer<typeof locationIdSchema>;
 
 export const locationViewSchema = z.object({
@@ -135,7 +111,7 @@ export const travelActivityViewSchema = z
       z.object({
         status: z.literal('ENDED'),
         ended_at: z.iso.datetime(),
-        end_reason: z.literal('COMPLETED'),
+        end_reason: z.enum(['COMPLETED', 'CANCELLED']),
         characters: z.array(presentCharacterSchema),
         ambush: ambushReferenceSchema.optional(),
       }),

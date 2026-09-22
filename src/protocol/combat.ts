@@ -37,36 +37,63 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
       kind: z.enum(['hp_below', 'mp_below', 'enemy_hp_below']),
       percent: z.number().int().min(1).max(100),
     })
-    .strict(),
-  z.object({ kind: z.literal('enemy_winding_up') }).strict(),
-  z.object({ kind: z.literal('enemy_attacking_heavy') }).strict(),
+    .strict()
+    .describe(
+      'Matches when the named current percentage is strictly below percent. HP percentages use current / maximum HP; MP uses its 0–100 value.',
+    ),
+  z
+    .object({ kind: z.literal('enemy_winding_up') })
+    .strict()
+    .describe(
+      'Matches when the enemy heavy attack is at most two ticks away, including the tick it occurs.',
+    ),
+  z
+    .object({ kind: z.literal('enemy_attacking_heavy') })
+    .strict()
+    .describe('Matches on the tick when the enemy heavy attack occurs.'),
   z
     .object({
       kind: z.literal('potions_below'),
       count: z.number().int().min(1).max(21),
     })
-    .strict(),
+    .strict()
+    .describe(
+      'Matches when usable healing potions remaining in this battle are strictly below count.',
+    ),
   z
     .object({ kind: z.literal('enemy_weak_to'), damage_type: damageTypeSchema })
-    .strict(),
+    .strict()
+    .describe('Matches when the enemy resistance for damage_type is negative.'),
   z
     .object({
       kind: z.enum(['self_has_status', 'self_missing_status']),
       status: combatStatusSchema,
     })
-    .strict(),
+    .strict()
+    .describe(
+      'Matches when the named self status has remaining ticks, or has none, respectively.',
+    ),
   z
     .object({
       kind: z.literal('enemy_missing_status'),
       status: z.literal('poison'),
     })
-    .strict(),
+    .strict()
+    .describe('Matches when the enemy has no remaining poison ticks.'),
 ]);
 export const tacticActionSchema = z.discriminatedUnion('kind', [
   z
     .object({ kind: z.enum(['attack', 'defend', 'potion', 'retreat']) })
-    .strict(),
-  z.object({ kind: z.literal('ability'), ability_id: combatIdSchema }).strict(),
+    .strict()
+    .describe(
+      'A potion action is usable only with a remaining potion and missing HP.',
+    ),
+  z
+    .object({ kind: z.literal('ability'), ability_id: combatIdSchema })
+    .strict()
+    .describe(
+      'Uses the ability when it is unlocked, off cooldown, affordable in MP and its effect is currently applicable.',
+    ),
 ]);
 export const tacticSchema = z
   .object({
@@ -165,7 +192,7 @@ export const restSchema = z.object(target).strict();
 export const useItemSchema = z
   .object({
     ...target,
-    item_id: z.enum(['healing_potion', 'travel_ration', 'wolf_jerky']),
+    item_id: itemIdSchema,
   })
   .strict();
 export const changeJobSchema = z
@@ -229,7 +256,12 @@ export const combatReportSchema = z
     damage_dealt: z.number().int().nonnegative(),
     damage_taken: z.number().int().nonnegative(),
     healing: z.number().int().nonnegative(),
-    potions_used: z.number().int().nonnegative(),
+    items_used: z.array(
+      z.object({
+        item_id: itemIdSchema,
+        quantity: z.number().int().positive(),
+      }),
+    ),
     experience_gained: z.number().int().nonnegative(),
     gold_gained: z.number().int().nonnegative(),
     loot: z.array(

@@ -18,7 +18,11 @@ import {
   combatReportSchema,
   lostItemsViewSchema,
 } from './combat.js';
-import { questOfferSchema, questViewSchema } from './quests.js';
+import {
+  questBudgetStageSchema,
+  questOfferSchema,
+  questViewSchema,
+} from './quests.js';
 import {
   journalViewSchema,
   chatChannelSchema,
@@ -33,7 +37,12 @@ import {
   boardPostSchema,
   boardQuotaSchema,
 } from './social.js';
-import { recipeViewSchema, shopViewSchema } from './production.js';
+import {
+  itemSummarySchema,
+  itemCatalogSchema,
+  recipeCatalogSchema,
+  shopViewSchema,
+} from './production.js';
 import {
   localeSchema,
   jobSchema,
@@ -101,14 +110,6 @@ export const characterStatusSchema = z.object({
   weakened_until: z.iso.datetime().nullable(),
 });
 
-const equipmentStatsSchema = z.object({
-  equip_slot: equipmentSlotSchema,
-  required_job: jobSchema.nullable(),
-  required_job_name: z.string().nullable(),
-  power: z.number().int().nonnegative(),
-  armor: z.number().int().nonnegative(),
-});
-
 const repairEstimateSchema = z.object({
   available: z.boolean(),
   reason: z
@@ -128,38 +129,88 @@ const repairEstimateSchema = z.object({
   durability_after: z.number().int().positive().nullable(),
 });
 
-const inventoryRowSchema = z.discriminatedUnion('kind', [
-  z.object({
+export const inventoryRowSchema = z.discriminatedUnion('kind', [
+  itemSummarySchema.extend({
     kind: z.literal('stack'),
-    item_id: z.string(),
-    name: z.string(),
-    unit_weight: z.number().int().positive(),
-    tradeable: z.boolean(),
     quantity: z.number().int().positive(),
-    use_effect: z
-      .object({
-        hp_recovery: z.number().int().nonnegative(),
-        mp_recovery: z.number().int().nonnegative(),
-      })
-      .optional(),
-  }),
-  z.object({
-    kind: z.literal('equipment'),
-    equipment_id: z.uuid(),
-    item_id: z.string(),
-    name: z.string(),
-    unit_weight: z.number().int().positive(),
-    tradeable: z.boolean(),
     quality: z.enum(['standard', 'fine', 'superior']),
-    durability: z.number().int().nonnegative(),
-    max_durability: z.number().int().positive(),
-    slot: equipmentSlotSchema.nullable(),
-    equipment: equipmentStatsSchema,
-    repair_estimate: repairEstimateSchema.optional(),
   }),
+  itemSummarySchema
+    .extend({
+      kind: z.literal('individual'),
+      instance_id: z.uuid(),
+      quantity: z.literal(1),
+      quality: z.enum(['standard', 'fine', 'superior']),
+      equipment_state: z
+        .object({
+          durability: z.object({
+            current: z.number().int().nonnegative(),
+            maximum: z.number().int().positive(),
+          }),
+          equipped_slot: equipmentSlotSchema.nullable(),
+        })
+        .optional(),
+      repair_estimate: repairEstimateSchema.optional(),
+    })
+    .superRefine((entry, context) => {
+      if (entry.equipment && !entry.equipment_state)
+        context.addIssue({
+          code: 'custom',
+          path: ['equipment_state'],
+          message: 'An equipment instance requires equipment_state',
+        });
+      if (!entry.equipment && entry.equipment_state)
+        context.addIssue({
+          code: 'custom',
+          path: ['equipment_state'],
+          message: 'Only an equipment instance carries equipment_state',
+        });
+      if (!entry.equipment && entry.repair_estimate)
+        context.addIssue({
+          code: 'custom',
+          path: ['repair_estimate'],
+          message: 'Only an equipment instance has a repair estimate',
+        });
+    }),
 ]);
 
 export type InventoryItem = z.infer<typeof inventoryRowSchema>;
+
+const storageCapacitySchema = z.object({
+  stored_weight: z.number().int().nonnegative(),
+  maximum_weight: z.number().int().positive(),
+});
+const storageViewSchema = z.object({
+  town: locationViewSchema,
+  items: z.array(inventoryRowSchema),
+  capacity: storageCapacitySchema,
+});
+const storageTransferItemViewSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('stack'),
+    item_id: itemIdSchema,
+    quality: z.enum(['standard', 'fine', 'superior']),
+    quantity: z.number().int().positive(),
+  }),
+  z.object({
+    kind: z.literal('individual'),
+    instance_id: z.uuid(),
+  }),
+]);
+const storageTransferViewSchema = z.object({
+  request_id: z.uuid(),
+  direction: z.enum(['deposit', 'withdraw']),
+  town_id: locationIdSchema,
+  items: z.array(storageTransferItemViewSchema).min(1).max(50),
+});
+const storageSearchViewSchema = z.object({
+  results: z.array(
+    z.object({
+      town: locationViewSchema,
+      items: z.array(inventoryRowSchema),
+    }),
+  ),
+});
 
 export const optionsSchema = z.object({
   starting_location: locationViewSchema,
@@ -239,7 +290,7 @@ export const profileReceiptSchema = z.object({
   preferred_locale: localeSchema,
 });
 
-export const agentSchemaVersion = '3.3';
+export const agentSchemaVersion = '3.6';
 
 export const agentGameResponseSchema = z
   .object({
@@ -271,6 +322,11 @@ export const agentGameResponseSchema = z
       combat_report: combatReportSchema.optional(),
       lost_items: z.array(lostItemsViewSchema).optional(),
       quest_board: z.array(questOfferSchema).optional(),
+      quest_board_budget: questBudgetStageSchema
+        .optional()
+        .describe(
+          'How much the town can still post: ample, low, or halted. Rewards are paid when a quest is claimed, so the town budget can go into debt.',
+        ),
       quest: questViewSchema.optional(),
       quests: z
         .object({
@@ -345,6 +401,9 @@ export const agentGameResponseSchema = z
       profile_saved: profileReceiptSchema.optional(),
       options: optionsSchema.optional(),
       inventory: z.array(inventoryRowSchema).optional(),
+      storage: storageViewSchema.optional(),
+      storage_search: storageSearchViewSchema.optional(),
+      transfer: storageTransferViewSchema.optional(),
       rest_estimate: z
         .object({
           available: z.boolean(),
@@ -359,21 +418,26 @@ export const agentGameResponseSchema = z
           maximum_weight: z.number().int().positive(),
         })
         .optional(),
-      recipes: z.array(recipeViewSchema).optional(),
+      items: itemCatalogSchema.optional(),
+      recipes: recipeCatalogSchema.optional(),
       shop: shopViewSchema.optional(),
       purchase: z
         .object({
           request_id: z.uuid(),
           item_id: z.string(),
-          equipment_id: z.uuid(),
+          quality: z.enum(['standard', 'fine', 'superior']),
+          quantity: z.number().int().positive(),
           paid: z.number().int().nonnegative(),
+          instance_id: z.uuid().optional(),
         })
         .optional(),
       repair: z
         .object({
-          equipment_id: z.uuid(),
-          durability: z.number().int().nonnegative(),
-          max_durability: z.number().int().positive(),
+          instance_id: z.uuid(),
+          durability: z.object({
+            current: z.number().int().nonnegative(),
+            maximum: z.number().int().positive(),
+          }),
           kits_used: z.number().int().nonnegative(),
           fee_paid: z.number().int().nonnegative(),
         })

@@ -6,3 +6,4 @@ export * from './protocol/activity.js';
 export * from './protocol/combat.js';
 export * from './protocol/quests.js';
 export * from './protocol/social.js';
+export * from './protocol/storage.js';
