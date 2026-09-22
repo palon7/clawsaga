@@ -31,7 +31,11 @@ const target = {
   locale: localeSchema.optional(),
 };
 export const getQuestsSchema = z
-  .object({ ...target, before: z.number().int().positive().optional() })
+  .object({
+    ...target,
+    before: z.number().int().positive().optional(),
+    active_only: z.boolean().optional(),
+  })
   .strict();
 export const getQuestBoardSchema = z.object(target).strict();
 export const acceptQuestSchema = z
@@ -40,8 +44,14 @@ export const acceptQuestSchema = z
 export const claimQuestSchema = z
   .object({ ...target, quest_id: uuidSchema })
   .strict();
+export const discardQuestSchema = z
+  .object({ ...target, quest_id: uuidSchema })
+  .strict();
 export type AcceptQuestInput = z.infer<typeof acceptQuestSchema>;
 export type ClaimQuestInput = z.infer<typeof claimQuestSchema>;
+export type DiscardQuestInput = z.infer<typeof discardQuestSchema>;
+export const questBudgetStageSchema = z.enum(['ample', 'low', 'halted']);
+export type QuestBudgetStage = z.infer<typeof questBudgetStageSchema>;
 export const questOfferSchema = z
   .object({
     offer_id: uuidSchema,
@@ -74,7 +84,7 @@ export const questViewSchema = z
     objective: questObjectiveSchema,
     target_name: z.string(),
     progress: z.number().int().nonnegative(),
-    status: z.enum(['ACCEPTED', 'COMPLETED', 'EXPIRED']),
+    status: z.enum(['ACCEPTED', 'COMPLETED', 'EXPIRED', 'DISCARDED']),
     reward_gold: z.number().int().nonnegative(),
     reward_experience: z.number().int().nonnegative(),
     job_id: jobSchema,

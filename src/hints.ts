@@ -16,7 +16,7 @@ const command: Record<
   get_activity: (args, character) =>
     `Run \`activity -a ${args.activity_id}${character ? ` -c ${character}` : ''}\`.`,
   equip_item: (args, character) =>
-    `Run \`equip --equipment ${args.equipment_id}${character ? ` -c ${character}` : ''}\`.`,
+    `Run \`equip --instance ${args.instance_id}${character ? ` -c ${character}` : ''}\`.`,
 };
 
 function renderHint(hint: AgentHint, character?: string): string {

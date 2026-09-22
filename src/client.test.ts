@@ -3,7 +3,11 @@ import { join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import lockfile from 'proper-lockfile';
 import { afterEach, expect, it, vi } from 'vitest';
-import { CredentialStore, credentialPath } from './credentials.js';
+import {
+  CredentialStore,
+  credentialPath,
+  isPendingAuthorization,
+} from './credentials.js';
 import { GameClient, serverOrigin } from './client.js';
 import { CliError } from './errors.js';
 import { agentSchemaVersion } from './protocol.js';
@@ -76,9 +80,12 @@ it('keeps storage and locks inside the home directory and excludes them from Git
     '*\n',
   );
   expect(
-    await new CredentialStore(path).update(
-      (entries) => entries[origin]?.access_token,
-    ),
+    await new CredentialStore(path).update((entries) => {
+      const entry = entries[origin];
+      return entry && !isPendingAuthorization(entry)
+        ? entry.access_token
+        : undefined;
+    }),
   ).toBe('access');
   const other = new CredentialStore(credentialPath(join(home, 'other')));
   const request = vi.fn<typeof fetch>();
@@ -150,10 +157,17 @@ it('saves, updates and reads credentials even when permission changes fail', asy
     async () => {
       const { store, path } = await fixture();
       await store.update((entries) => {
-        entries[origin]!.access_token = 'updated-access';
+        const entry = entries[origin]!;
+        if (!isPendingAuthorization(entry))
+          entry.access_token = 'updated-access';
       });
       expect(
-        await store.update((entries) => entries[origin]?.access_token),
+        await store.update((entries) => {
+          const entry = entries[origin];
+          return entry && !isPendingAuthorization(entry)
+            ? entry.access_token
+            : undefined;
+        }),
       ).toBe('updated-access');
       expect(JSON.parse(await readFile(path, 'utf8'))).toMatchObject({
         [origin]: { access_token: 'updated-access' },
@@ -340,9 +354,8 @@ it('shows the server message for 401 and 429 responses', async () => {
   });
 });
 
-it('respects device polling interval and slow_down without exposing device codes or tokens', async () => {
+it('returns device approval immediately and exchanges the pending code on the next command', async () => {
   const { store } = await fixture();
-  vi.useFakeTimers();
   const request = vi
     .fn<typeof fetch>()
     .mockResolvedValueOnce(
@@ -350,35 +363,29 @@ it('respects device polling interval and slow_down without exposing device codes
         device_code: 'private-device',
         user_code: 'USER-CODE',
         verification_uri: `${origin}/oauth/device`,
+        verification_uri_complete: `${origin}/oauth/device?user_code=USER-CODE`,
         expires_in: 600,
         interval: 5,
       }),
     )
     .mockResolvedValueOnce(
-      Response.json({ error: 'slow_down' }, { status: 400 }),
-    )
-    .mockResolvedValueOnce(
-      Response.json({ error: 'access_denied' }, { status: 400 }),
+      Response.json({
+        access_token: 'new-access',
+        refresh_token: 'new-refresh',
+        expires_in: 3600,
+        scope: 'game:read game:play offline_access',
+      }),
     );
-  const notify = vi.fn();
-  const result = new GameClient(origin, store, request)
-    .login(notify)
-    .catch((error: unknown) => error);
-  await vi.advanceTimersByTimeAsync(0);
-  expect(notify).toHaveBeenCalledWith({
-    verification_uri: `${origin}/oauth/device`,
+  const client = new GameClient(origin, store, request);
+  const result = await client.login();
+  expect(result).toEqual({
+    ok: true,
+    authenticated: false,
+    verification_uri: `${origin}/oauth/device?user_code=USER-CODE`,
     user_code: 'USER-CODE',
   });
-  await vi.advanceTimersByTimeAsync(4999);
   expect(request).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(1);
+  expect(JSON.stringify(result)).not.toContain('private-device');
+  expect(await client.accessToken()).toBe('new-access');
   expect(request).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(9999);
-  expect(request).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(1);
-  expect(await result).toMatchObject({
-    code: 'AUTH_NOT_COMPLETED',
-    detail: { reason: 'access_denied' },
-  });
-  expect(JSON.stringify(notify.mock.calls)).not.toContain('private-device');
 });

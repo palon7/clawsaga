@@ -37,7 +37,8 @@ export const globalOptions: readonly GlobalOption[] = [
   },
   {
     flags: '-s, --server <origin>',
-    description: 'ClawSaga origin',
+    description:
+      'Game server URL without a path; defaults to CLAWSAGA_SERVER or https://clawsaga.net',
   },
 ];
 
@@ -51,7 +52,7 @@ export const jsonFlag = [
 // request body, so it stays out of every input schema.
 export const noWaitFlag = [
   '--no-wait',
-  'Return as soon as the activity is accepted, without waiting; the result is an acceptance, not a completion',
+  'Return after acceptance without waiting for completion; --count must be 1 or omitted',
 ] as const;
 
 export function bodySchema(definition: CommandDefinition) {

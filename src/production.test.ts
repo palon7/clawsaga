@@ -28,6 +28,8 @@ it('accepts purchasable weapons in shop responses and purchase inputs', () => {
           {
             item_id,
             name: item_id,
+            unit_weight: 8,
+            tradeable: true,
             price: 10,
             quantity: 1,
             recovery_seconds: 60,

@@ -25,7 +25,7 @@ it('renders server hints with CLI command syntax and keeps notes as written', ()
         { operation: 'get_activity', arguments: { activity_id: 'a1b2c3d4' } },
         {
           operation: 'equip_item',
-          arguments: { equipment_id: '11111111-1111-4111-8111-111111111111' },
+          arguments: { instance_id: '11111111-1111-4111-8111-111111111111' },
         },
         { note: 'Changing job puts your previous weapon in the bag.' },
       ],
@@ -34,7 +34,7 @@ it('renders server hints with CLI command syntax and keeps notes as written', ()
     { note: 'Run `hello -c m7Qp2_aR9L-x`.' },
     { note: 'Run `activity -a a1b2c3d4`.' },
     {
-      note: 'Run `equip --equipment 11111111-1111-4111-8111-111111111111`.',
+      note: 'Run `equip --instance 11111111-1111-4111-8111-111111111111`.',
     },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
@@ -50,7 +50,7 @@ it('adds the invoked character to hints for character commands', () => {
           {
             operation: 'equip_item',
             arguments: {
-              equipment_id: '11111111-1111-4111-8111-111111111111',
+              instance_id: '11111111-1111-4111-8111-111111111111',
             },
           },
         ],
@@ -60,7 +60,7 @@ it('adds the invoked character to hints for character commands', () => {
   ).toEqual([
     { note: 'Run `activity -a a1b2c3d4 -c HintHero0000`.' },
     {
-      note: 'Run `equip --equipment 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
+      note: 'Run `equip --instance 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
     },
   ]);
 });
@@ -80,7 +80,7 @@ it('renders hints from the result without another request', async () => {
     hints: [
       {
         operation: 'equip_item',
-        arguments: { equipment_id: '11111111-1111-4111-8111-111111111111' },
+        arguments: { instance_id: '11111111-1111-4111-8111-111111111111' },
       },
     ],
   };
@@ -104,7 +104,7 @@ it('renders hints from the result without another request', async () => {
   expect(result).toMatchObject({
     hints: [
       {
-        note: 'Run `equip --equipment 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
+        note: 'Run `equip --instance 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
       },
     ],
   });
