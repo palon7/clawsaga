@@ -97,8 +97,9 @@ export const equipmentStatsSchema = z.object({
   equip_slot: equipmentSlotSchema,
   required_job: jobSchema.nullable(),
   required_job_name: z.string().nullable(),
-  power: z.number().int().nonnegative(),
-  armor: z.number().int().nonnegative(),
+  required_level: z.number().int().positive().nullable(),
+  power: z.number().int(),
+  armor: z.number().int(),
 });
 const useEffectSchema = z.object({
   hp_recovery: z.number().int().nonnegative(),
@@ -124,6 +125,7 @@ export const itemSummarySchema = z.object({
 
 export const itemDetailSchema = itemSummarySchema.extend({
   description: z.string(),
+  flavor_text: z.string().nullable(),
   use_conditions: z.array(z.enum(['idle', 'standard_quality'])),
 });
 
@@ -156,7 +158,7 @@ export const recipeViewSchema = z.object({
   output: itemSummarySchema.extend({
     quantity: z.number().int().positive(),
   }),
-  facility: z.enum(['alchemy', 'furnace', 'forge']).nullable(),
+  facility: z.enum(['alchemy', 'furnace', 'forge', 'workshop']).nullable(),
   unavailable_reasons: z.array(
     z.enum([
       'ACTIVITY_CONFLICT',

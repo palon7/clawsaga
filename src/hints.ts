@@ -150,7 +150,18 @@ export type RecoveryContext = {
   activity: boolean;
   // The invoked command starts a craft.
   craft: boolean;
+  // The invoked command uses or discards items. It has no request ID.
+  itemChange: boolean;
 };
+
+function itemChangeRecovery(character: string | undefined) {
+  const read = `character${character ? ` -c ${character}` : ''} --include inventory`;
+  return [
+    'The outcome is unknown and the change may have been applied; do not resend it.',
+    `Check current HP, MP, items and capacity with \`${read}\`; if the goal is already met, make no further change.`,
+    'Unchanged state does not prove it failed because it may still be applied, and waiting or reading again does not make a resend safe. While the outcome is unclear, hold off further use or discard and report it as unknown.',
+  ].join(' ');
+}
 
 // A thrown error never reaches withRenderedHints, so the CLI carries this
 // short step in the failure envelope instead.
@@ -161,6 +172,7 @@ export function recoveryHint(
   const repetition = detail.repetition as RepetitionSummary | undefined;
   if (detail.outcome !== 'unknown' && repetition?.stopped_reason !== 'unknown')
     return undefined;
+  if (context.itemChange) return itemChangeRecovery(context.character);
   const activityId =
     typeof detail.activity_id === 'string' ? detail.activity_id : undefined;
   const requestId =

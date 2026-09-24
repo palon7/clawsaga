@@ -67,7 +67,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/encounters',
     schema: getEncountersSchema,
     flags: [],
-    help: 'List local enemies or town practice opponents.',
+    help: 'List local enemies or town training dummies.',
   },
   tactics: {
     path: 'character/tactics',
@@ -95,7 +95,10 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     flags: [
       ['--enemy <id>', 'Enemy ID from encounters', true],
       ['--preset <id>', 'Preset name', false, ['safe', 'aggressive']],
-      ['--practice', 'Practice in town without rewards or losses'],
+      [
+        '--practice',
+        'Practice against a training dummy in town without rewards or losses',
+      ],
       noWaitFlag,
     ],
     help: 'Start one battle while idle and wait for its outcome before starting another main activity.',
@@ -132,12 +135,11 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     flags: [
       [
         '--item <id>',
-        'Recovery item to consume',
+        'Item ID of a recovery item with use_effect in inventory',
         true,
-        ['healing_potion', 'travel_ration', 'wolf_jerky'],
       ],
     ],
-    help: 'Consume a standard-quality healing potion or cooked recovery food while idle.',
+    help: 'Consume a standard-quality healing potion or cooked recovery food while idle. The server rejects items that cannot be used.',
   },
   'change-job': {
     path: 'character/job/change',

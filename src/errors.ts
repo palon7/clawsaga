@@ -1,13 +1,13 @@
 const cliErrorMessages: Record<string, string> = {
   NETWORK_ERROR:
-    'Could not reach the server. Check your connection. If an action was sent, check its outcome before retrying.',
+    'Could not reach the server. Check your connection. If an action was sent, its outcome is unknown; check it before another change.',
   SERVICE_UNAVAILABLE:
-    'The server is temporarily unavailable. Check an uncertain action’s outcome before retrying.',
+    'The server is temporarily unavailable. An action may still have been applied; check its outcome before another change.',
   AUTH_REQUIRED: 'Authentication is required. Run auth login and try again.',
   RATE_LIMITED:
     'Too many requests. Wait for the returned retry interval before retrying.',
   UPDATE_REQUIRED:
-    'This CLI is older than the server response. Run `npx skills update clawsaga`, then check any uncertain action’s outcome before retrying.',
+    'This CLI is older than the server response. Run `npx skills update clawsaga`, then check any uncertain action’s outcome before another change.',
   INVALID_RESPONSE: 'The server returned a response this CLI could not read.',
   AUTH_START_FAILED: 'Could not start authorization. Try again later.',
   AUTH_NOT_COMPLETED: 'Authorization was not completed.',

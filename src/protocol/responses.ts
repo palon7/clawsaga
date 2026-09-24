@@ -43,6 +43,7 @@ import {
   recipeCatalogSchema,
   shopViewSchema,
 } from './production.js';
+import { marketResponseFields } from './market.js';
 import {
   localeSchema,
   jobSchema,
@@ -73,16 +74,16 @@ export const characterViewSchema = z.object({
   jobs: z.array(
     z.object({
       id: jobSchema,
-      level: z.number().int().min(1).max(10),
-      experience: z.number().int().min(0).max(4500),
+      level: z.number().int().positive(),
+      experience: z.number().int().nonnegative(),
     }),
   ),
   skills: z.array(
     z.object({
       id: skillIdSchema,
       name: z.string(),
-      level: z.number().int().min(1).max(10),
-      experience: z.number().int().min(0).max(4500),
+      level: z.number().int().positive(),
+      experience: z.number().int().nonnegative(),
       next_level_experience: z.number().int().positive().nullable(),
     }),
   ),
@@ -290,7 +291,7 @@ export const profileReceiptSchema = z.object({
   preferred_locale: localeSchema,
 });
 
-export const agentSchemaVersion = '3.6';
+export const agentSchemaVersion = '3.7';
 
 export const agentGameResponseSchema = z
   .object({
@@ -404,6 +405,7 @@ export const agentGameResponseSchema = z
       storage: storageViewSchema.optional(),
       storage_search: storageSearchViewSchema.optional(),
       transfer: storageTransferViewSchema.optional(),
+      ...marketResponseFields,
       rest_estimate: z
         .object({
           available: z.boolean(),
@@ -450,6 +452,9 @@ export const agentGameResponseSchema = z
       route: routeViewSchema.optional(),
       changelog: z
         .object({ published_at: z.string().min(1), title: z.string().min(1) })
+        .optional(),
+      announcement: z
+        .object({ body: z.string().min(1), updated_at: z.string().min(1) })
         .optional(),
     }),
     error: z

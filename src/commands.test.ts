@@ -735,6 +735,106 @@ it('does not offer activity recovery when the start was never sent', async () =>
   expect(request).not.toHaveBeenCalled();
 });
 
+const useArgs = ['use', '-c', 'Traveler0000', '--item', 'healing_potion'];
+const itemChanges = [
+  useArgs,
+  ['discard', '-c', 'Traveler0000', '--item', 'wolf_meat', '--quantity', '2'],
+];
+const lostItemResponses: [string, string, () => Promise<Response>][] = [
+  [
+    'NETWORK_ERROR',
+    'a connection failure',
+    () => Promise.reject(new TypeError('fetch failed')),
+  ],
+  [
+    'NETWORK_ERROR',
+    'a timeout',
+    () => Promise.reject(new DOMException('timed out', 'TimeoutError')),
+  ],
+  [
+    'SERVICE_UNAVAILABLE',
+    'a 5xx',
+    () => Promise.resolve(new Response(null, { status: 502 })),
+  ],
+  [
+    'INVALID_RESPONSE',
+    'invalid JSON',
+    () => Promise.resolve(new Response('upstream', { status: 200 })),
+  ],
+  [
+    'INVALID_RESPONSE',
+    'an unexpected schema',
+    () => Promise.resolve(Response.json({ ok: true })),
+  ],
+];
+
+it.each(
+  itemChanges.flatMap((args) =>
+    lostItemResponses.map(
+      ([code, label, respond]) =>
+        [args[0], label, args, code, respond] as const,
+    ),
+  ),
+)(
+  'warns against resending %s after %s',
+  async (_name, _label, args, code, respond) => {
+    vi.spyOn(GameClient.prototype, 'accessToken').mockResolvedValue(
+      'test-token',
+    );
+    const request = vi.fn(respond);
+    vi.stubGlobal('fetch', request);
+    const error = await execute(args, vi.fn()).catch(
+      (thrown: unknown) => thrown,
+    );
+    if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+    // 使用・廃棄は要求IDを持たないため、自動で再送せず、受理済みの可能性を残す。
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(error.code).toBe(code);
+    expect(error.detail.outcome).toBe('unknown');
+    const hint = String(error.detail.hint);
+    expect(hint).toContain('do not resend');
+    expect(hint).toContain('character -c Traveler0000 --include inventory');
+    expect(hint).toContain('Unchanged state does not prove it failed');
+    expect(hint).not.toContain('--request');
+  },
+);
+
+it('does not mark an item change unknown when it was never sent', async () => {
+  const request = vi.fn();
+  vi.stubGlobal('fetch', request);
+  vi.spyOn(GameClient.prototype, 'accessToken').mockRejectedValue(
+    new CliError('AUTH_REQUIRED'),
+  );
+  const error = await execute(useArgs, vi.fn()).catch(
+    (thrown: unknown) => thrown,
+  );
+  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+  expect(error.detail.outcome).toBe('not_sent');
+  expect(error.detail).not.toHaveProperty('hint');
+  expect(request).not.toHaveBeenCalled();
+});
+
+it('returns a rejected or successful item change without recovery steps', async () => {
+  const response = (ok: boolean): AgentGameResponse => ({
+    ok,
+    schema_version: agentSchemaVersion,
+    server_time: '2026-09-20T00:00:00.000Z',
+    data: {},
+    ...(ok ? {} : { error: { message: 'That item has no effect now.' } }),
+  });
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValueOnce(response(false))
+    .mockResolvedValueOnce(response(true));
+  for (const ok of [false, true]) {
+    const result = (await execute(useArgs, vi.fn())) as AgentGameResponse;
+    expect(result.ok).toBe(ok);
+    expect(result).not.toHaveProperty('hints');
+  }
+  // 正常応答の後に人物の再取得を追加しない。
+  expect(invoke).toHaveBeenCalledTimes(2);
+});
+
 it('lists the --no-wait option and example in structured help', async () => {
   const help = (await execute(['travel', '--help'], vi.fn())) as unknown as {
     help: { options: { flags: string }[]; examples: string[] };

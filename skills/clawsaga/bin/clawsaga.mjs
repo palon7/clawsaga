@@ -3534,13 +3534,13 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} source - expected values are default/config/env/cli/implied
    * @return {Command} `this` command for chaining
    */
-  setOptionValueWithSource(key, value, source) {
+  setOptionValueWithSource(key, value, source2) {
     if (this._storeOptionsAsProperties) {
       this[key] = value;
     } else {
       this._optionValues[key] = value;
     }
-    this._optionValueSources[key] = source;
+    this._optionValueSources[key] = source2;
     return this;
   }
   /**
@@ -3561,13 +3561,13 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @return {string}
    */
   getOptionValueSourceWithGlobals(key) {
-    let source;
+    let source2;
     this._getCommandAndAncestors().forEach((cmd) => {
       if (cmd.getOptionValueSource(key) !== void 0) {
-        source = cmd.getOptionValueSource(key);
+        source2 = cmd.getOptionValueSource(key);
       }
     });
-    return source;
+    return source2;
   }
   /**
    * Get user arguments from implied or explicit arguments.
@@ -4447,8 +4447,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
     const getErrorMessage = (option2) => {
       const bestOption = findBestOptionFromValue(option2);
       const optionKey2 = bestOption.attributeName();
-      const source = this.getOptionValueSource(optionKey2);
-      if (source === "env") {
+      const source2 = this.getOptionValueSource(optionKey2);
+      if (source2 === "env") {
         return `environment variable '${bestOption.envVar}'`;
       }
       return `option '${bestOption.flags}'`;
@@ -5676,10 +5676,10 @@ function cached(getter) {
 function nullish(input2) {
   return input2 === null || input2 === void 0;
 }
-function cleanRegex(source) {
-  const start = source.startsWith("^") ? 1 : 0;
-  const end = source.endsWith("$") ? source.length - 1 : source.length;
-  return source.slice(start, end);
+function cleanRegex(source2) {
+  const start = source2.startsWith("^") ? 1 : 0;
+  const end = source2.endsWith("$") ? source2.length - 1 : source2.length;
+  return source2.slice(start, end);
 }
 function floatSafeRemainder(val, step) {
   const ratio = val / step;
@@ -6964,8 +6964,8 @@ var httpProtocol = /^https?$/;
 var e164 = /^\+[1-9]\d{6,14}$/;
 var creditCard = /^\d(?:[ -]?\d){11,18}$/;
 var dateSource = `(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))`;
-function anchor(source) {
-  return new RegExp(`^${source}$`);
+function anchor(source2) {
+  return new RegExp(`^${source2}$`);
 }
 var date = /* @__PURE__ */ anchor(dateSource);
 function timeSource(args) {
@@ -9700,12 +9700,12 @@ var $ZodTemplateLiteral = /* @__PURE__ */ $constructor("$ZodTemplateLiteral", (i
       if (!part._zod.pattern) {
         throw new Error(`Invalid template literal part, no pattern found: ${[...part._zod.traits].shift()}`);
       }
-      const source = part._zod.pattern instanceof RegExp ? part._zod.pattern.source : part._zod.pattern;
-      if (!source)
+      const source2 = part._zod.pattern instanceof RegExp ? part._zod.pattern.source : part._zod.pattern;
+      if (!source2)
         throw new Error(`Invalid template literal part: ${part._zod.traits}`);
-      const start = source.startsWith("^") ? 1 : 0;
-      const end = source.endsWith("$") ? source.length - 1 : source.length;
-      regexParts.push(source.slice(start, end));
+      const start = source2.startsWith("^") ? 1 : 0;
+      const end = source2.endsWith("$") ? source2.length - 1 : source2.length;
+      regexParts.push(source2.slice(start, end));
     } else if (part === null || primitiveTypes.has(typeof part)) {
       regexParts.push(escapeRegex(`${part}`));
     } else {
@@ -14075,8 +14075,8 @@ function ko_default() {
 var capitalizeFirstCharacter = (text2) => {
   return text2.charAt(0).toUpperCase() + text2.slice(1);
 };
-function getUnitTypeFromNumber(number4) {
-  const abs = Math.abs(number4);
+function getUnitTypeFromNumber(number5) {
+  const abs = Math.abs(number5);
   const last = abs % 10;
   const last2 = abs % 100;
   if (last2 >= 11 && last2 <= 19 || last === 0)
@@ -17549,9 +17549,9 @@ function compile(schema, options) {
     return schema;
   }
 }
-function installCompiledUserMethods(target5, source, parser) {
+function installCompiledUserMethods(target5, source2, parser) {
   const targetAny = target5;
-  const sourceAny = source;
+  const sourceAny = source2;
   if (typeof sourceAny.safeParse === "function") {
     const originalSafeParse = sourceAny.safeParse;
     targetAny.safeParse = (data, params) => {
@@ -20092,10 +20092,10 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
 
 // node_modules/.pnpm/zod@4.5.4/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target5, ...sources) {
-  for (const source of sources) {
-    for (const key of Reflect.ownKeys(source)) {
-      if (Object.prototype.propertyIsEnumerable.call(source, key)) {
-        assignProp(target5, key, source[key]);
+  for (const source2 of sources) {
+    for (const key of Reflect.ownKeys(source2)) {
+      if (Object.prototype.propertyIsEnumerable.call(source2, key)) {
+        assignProp(target5, key, source2[key]);
       }
     }
   }
@@ -21083,13 +21083,13 @@ var recordProcessor = (schema, ctx, _json, params) => {
         ...params,
         path: [...params.path, "propertyNames"]
       });
-      let pending = pendingRecords.get(ctx);
-      if (!pending) {
-        pending = [];
-        pendingRecords.set(ctx, pending);
+      let pending2 = pendingRecords.get(ctx);
+      if (!pending2) {
+        pending2 = [];
+        pendingRecords.set(ctx, pending2);
         ctx.deferred.push(() => rewriteKeyNames(ctx));
       }
-      pending.push(schema);
+      pending2.push(schema);
     }
     json2.additionalProperties = process3(def.valueType, ctx, {
       ...params,
@@ -24219,7 +24219,9 @@ var facilitySchema = external_exports.enum([
   "alchemy",
   "furnace",
   "forge",
-  "community_board"
+  "workshop",
+  "community_board",
+  "market"
 ]);
 var lookResourceSchema = external_exports.object({
   item_id: itemIdSchema,
@@ -24375,8 +24377,9 @@ var equipmentStatsSchema = external_exports.object({
   equip_slot: equipmentSlotSchema,
   required_job: jobSchema.nullable(),
   required_job_name: external_exports.string().nullable(),
-  power: external_exports.number().int().nonnegative(),
-  armor: external_exports.number().int().nonnegative()
+  required_level: external_exports.number().int().positive().nullable(),
+  power: external_exports.number().int(),
+  armor: external_exports.number().int()
 });
 var useEffectSchema = external_exports.object({
   hp_recovery: external_exports.number().int().nonnegative(),
@@ -24397,6 +24400,7 @@ var itemSummarySchema = external_exports.object({
 });
 var itemDetailSchema = itemSummarySchema.extend({
   description: external_exports.string(),
+  flavor_text: external_exports.string().nullable(),
   use_conditions: external_exports.array(external_exports.enum(["idle", "standard_quality"]))
 });
 var itemCatalogSchema = external_exports.object({
@@ -24424,7 +24428,7 @@ var recipeViewSchema = external_exports.object({
   output: itemSummarySchema.extend({
     quantity: external_exports.number().int().positive()
   }),
-  facility: external_exports.enum(["alchemy", "furnace", "forge"]).nullable(),
+  facility: external_exports.enum(["alchemy", "furnace", "forge", "workshop"]).nullable(),
   unavailable_reasons: external_exports.array(
     external_exports.enum([
       "ACTIVITY_CONFLICT",
@@ -25021,6 +25025,212 @@ var questViewSchema = external_exports.object({
   completed_at: timestampSchema.nullable()
 }).meta({ id: "Quest" });
 
+// src/protocol/market.ts
+var common3 = {
+  character_id: characterIdSchema,
+  locale: localeSchema.optional()
+};
+var change = { ...common3, request_id: uuidSchema };
+var quality = external_exports.enum(["standard", "fine", "superior"]);
+var price = external_exports.number().int().positive().max(2147483647);
+var quantity = external_exports.number().int().positive().max(2147483647);
+var number4 = external_exports.number().int().positive().safe();
+var source = external_exports.enum(["carried", "storage"]);
+var getMarketSchema = external_exports.object({
+  ...common3,
+  town_id: locationIdSchema,
+  item_id: itemIdSchema.optional(),
+  quality: quality.optional(),
+  levels: external_exports.number().int().min(1).max(20).optional(),
+  cursor: external_exports.number().int().positive().safe().optional(),
+  max_price: price.optional(),
+  minimum_durability: external_exports.number().int().nonnegative().optional()
+}).strict();
+var getMyMarketSchema = external_exports.object({
+  ...common3,
+  section: external_exports.enum(["orders", "listings", "trades"]).optional(),
+  cursor: external_exports.number().int().positive().safe().optional()
+}).strict().refine((value) => value.cursor === void 0 || value.section, {
+  message: "Give section with cursor.",
+  path: ["section"]
+});
+var placeMarketSellOrderSchema = external_exports.object({
+  ...change,
+  item_id: itemIdSchema,
+  quality,
+  quantity,
+  unit_price: price,
+  source
+}).strict().refine((value) => value.quantity * value.unit_price <= 2147483647, {
+  message: "Order total exceeds the supported maximum.",
+  path: ["quantity"]
+});
+var placeMarketBuyOrderSchema = external_exports.object({
+  ...change,
+  item_id: itemIdSchema,
+  quality,
+  quantity,
+  unit_price: price
+}).strict().refine((value) => value.quantity * value.unit_price <= 2147483647, {
+  message: "Order total exceeds the supported maximum.",
+  path: ["quantity"]
+});
+var cancelMarketOrderSchema = external_exports.object({ ...change, order_id: number4 }).strict();
+var claimMarketOrderSchema = cancelMarketOrderSchema;
+var createMarketListingSchema = external_exports.object({ ...change, instance_id: uuidSchema, price, source }).strict();
+var buyMarketListingSchema = external_exports.object({
+  ...change,
+  listing_id: number4,
+  max_price: price,
+  minimum_durability: external_exports.number().int().nonnegative().optional()
+}).strict();
+var cancelMarketListingSchema = external_exports.object({ ...change, listing_id: number4 }).strict();
+var claimMarketListingSchema = cancelMarketListingSchema;
+var marketOrderPlacementSchema = external_exports.object({
+  order_id: number4,
+  filled_quantity: external_exports.number().int().nonnegative(),
+  remaining_quantity: external_exports.number().int().nonnegative(),
+  fills: external_exports.array(external_exports.object({ price, quantity })),
+  market_fee: external_exports.number().int().nonnegative()
+});
+var marketListingCreatedSchema = external_exports.object({
+  listing_id: number4,
+  market_fee: external_exports.number().int().positive()
+});
+var marketListingPurchaseSchema = external_exports.object({
+  listing_id: number4,
+  instance_id: uuidSchema,
+  paid: price
+});
+var marketCancellationSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("order"), order_id: number4 }),
+  external_exports.object({ kind: external_exports.literal("listing"), listing_id: number4 })
+]);
+var marketClaimSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("order"),
+    order_id: number4,
+    received_quantity: external_exports.number().int().nonnegative(),
+    refunded_gold: external_exports.number().int().nonnegative()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("listing"),
+    listing_id: number4,
+    instance_id: uuidSchema
+  })
+]);
+var priceLevel = external_exports.tuple([price, quantity]);
+var marketViewSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("overview"),
+    town_id: locationIdSchema,
+    items: external_exports.array(
+      external_exports.discriminatedUnion("kind", [
+        external_exports.object({
+          kind: external_exports.literal("order_book"),
+          item_id: itemIdSchema,
+          name: external_exports.string(),
+          quality,
+          best_bid: price.nullable(),
+          best_ask: price.nullable()
+        }),
+        external_exports.object({
+          kind: external_exports.literal("listings"),
+          item_id: itemIdSchema,
+          name: external_exports.string(),
+          quality,
+          best_bid: external_exports.null(),
+          best_ask: price
+        })
+      ])
+    ),
+    next_cursor: number4.nullable()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("order_book"),
+    town_id: locationIdSchema,
+    item_id: itemIdSchema,
+    quality,
+    last_price: price.nullable(),
+    asks: external_exports.array(priceLevel),
+    bids: external_exports.array(priceLevel)
+  }),
+  external_exports.object({
+    kind: external_exports.literal("listings"),
+    town_id: locationIdSchema,
+    item_id: itemIdSchema,
+    listings: external_exports.array(
+      external_exports.object({
+        listing_id: number4,
+        price,
+        quality,
+        durability: external_exports.number().int().nonnegative().nullable(),
+        max_durability: external_exports.number().int().positive().nullable(),
+        successful_uses: external_exports.number().int().nonnegative()
+      })
+    ),
+    next_cursor: number4.nullable()
+  })
+]);
+var pending = external_exports.enum(["receive", "return"]).nullable();
+var page = (entry) => external_exports.object({ entries: external_exports.array(entry), next_cursor: number4.nullable() }).optional();
+var myMarketViewSchema = external_exports.object({
+  orders: page(
+    external_exports.object({
+      order_id: number4,
+      town_id: locationIdSchema,
+      side: external_exports.enum(["buy", "sell"]),
+      item_id: itemIdSchema,
+      quality,
+      unit_price: price,
+      filled_quantity: external_exports.number().int().nonnegative(),
+      remaining_quantity: external_exports.number().int().nonnegative(),
+      reserved_gold: external_exports.number().int().nonnegative(),
+      market_fee: external_exports.number().int().nonnegative(),
+      status: external_exports.enum(["OPEN", "FILLED", "CANCELLED", "EXPIRED"]),
+      pending,
+      pending_quantity: external_exports.number().int().nonnegative(),
+      expires_at: timestampSchema
+    })
+  ),
+  listings: page(
+    external_exports.object({
+      listing_id: number4,
+      town_id: locationIdSchema,
+      item_id: itemIdSchema,
+      price,
+      market_fee: external_exports.number().int().positive(),
+      status: external_exports.enum(["OPEN", "SOLD", "CANCELLED", "EXPIRED"]),
+      pending,
+      instance_id: uuidSchema.nullable(),
+      expires_at: timestampSchema
+    })
+  ),
+  trades: page(
+    external_exports.object({
+      trade_id: number4,
+      town_id: locationIdSchema,
+      item_id: itemIdSchema,
+      quality,
+      side: external_exports.enum(["buy", "sell"]),
+      quantity,
+      unit_price: price,
+      total_price: price,
+      other_character_id: characterIdSchema,
+      created_at: timestampSchema
+    })
+  )
+});
+var marketResponseFields = {
+  order_placement: marketOrderPlacementSchema.optional(),
+  listing_created: marketListingCreatedSchema.optional(),
+  listing_purchase: marketListingPurchaseSchema.optional(),
+  market_cancellation: marketCancellationSchema.optional(),
+  market_claim: marketClaimSchema.optional(),
+  market: marketViewSchema.optional(),
+  my_market: myMarketViewSchema.optional()
+};
+
 // src/protocol/responses.ts
 var characterViewSchema = external_exports.object({
   character_id: characterIdSchema,
@@ -25042,16 +25252,16 @@ var characterViewSchema = external_exports.object({
   jobs: external_exports.array(
     external_exports.object({
       id: jobSchema,
-      level: external_exports.number().int().min(1).max(10),
-      experience: external_exports.number().int().min(0).max(4500)
+      level: external_exports.number().int().positive(),
+      experience: external_exports.number().int().nonnegative()
     })
   ),
   skills: external_exports.array(
     external_exports.object({
       id: skillIdSchema,
       name: external_exports.string(),
-      level: external_exports.number().int().min(1).max(10),
-      experience: external_exports.number().int().min(0).max(4500),
+      level: external_exports.number().int().positive(),
+      experience: external_exports.number().int().nonnegative(),
       next_level_experience: external_exports.number().int().positive().nullable()
     })
   ),
@@ -25225,7 +25435,7 @@ var changelogResponseSchema = external_exports.object({
 var profileReceiptSchema = external_exports.object({
   preferred_locale: localeSchema
 });
-var agentSchemaVersion = "3.6";
+var agentSchemaVersion = "3.7";
 var agentGameResponseSchema = external_exports.object({
   ok: external_exports.boolean(),
   schema_version: external_exports.literal(agentSchemaVersion),
@@ -25311,6 +25521,7 @@ var agentGameResponseSchema = external_exports.object({
     storage: storageViewSchema.optional(),
     storage_search: storageSearchViewSchema.optional(),
     transfer: storageTransferViewSchema.optional(),
+    ...marketResponseFields,
     rest_estimate: external_exports.object({
       available: external_exports.boolean(),
       reason: external_exports.enum(["no_effect", "busy", "wrong_location"]).nullable(),
@@ -25347,7 +25558,8 @@ var agentGameResponseSchema = external_exports.object({
     map: mapViewSchema.optional(),
     look: lookViewSchema.optional(),
     route: routeViewSchema.optional(),
-    changelog: external_exports.object({ published_at: external_exports.string().min(1), title: external_exports.string().min(1) }).optional()
+    changelog: external_exports.object({ published_at: external_exports.string().min(1), title: external_exports.string().min(1) }).optional(),
+    announcement: external_exports.object({ body: external_exports.string().min(1), updated_at: external_exports.string().min(1) }).optional()
   }),
   error: external_exports.object({
     message: external_exports.string(),
@@ -25367,7 +25579,7 @@ var agentGameResponseSchema = external_exports.object({
 });
 
 // src/protocol/storage.ts
-var common3 = {
+var common4 = {
   character_id: characterIdSchema,
   locale: localeSchema.optional()
 };
@@ -25391,16 +25603,16 @@ var searchQuerySchema = unicodeTextSchema.transform((value) => value.trim()).ref
   (value) => [...value].length >= 1 && [...value].length <= 128,
   "Use 1\u2013128 characters."
 );
-var getStorageSchema = external_exports.object({ ...common3, town_id: locationIdSchema }).strict();
-var searchStorageSchema = external_exports.object({ ...common3, query: searchQuerySchema }).strict();
+var getStorageSchema = external_exports.object({ ...common4, town_id: locationIdSchema }).strict();
+var searchStorageSchema = external_exports.object({ ...common4, query: searchQuerySchema }).strict();
 var depositItemsSchema = external_exports.object({
-  ...common3,
+  ...common4,
   town_id: locationIdSchema,
   request_id: uuidSchema,
   items: storageTransferItemsSchema
 }).strict();
 var withdrawItemsSchema = external_exports.object({
-  ...common3,
+  ...common4,
   town_id: locationIdSchema,
   request_id: uuidSchema,
   items: storageTransferItemsSchema
@@ -25423,11 +25635,11 @@ import { randomUUID } from "node:crypto";
 
 // src/errors.ts
 var cliErrorMessages = {
-  NETWORK_ERROR: "Could not reach the server. Check your connection. If an action was sent, check its outcome before retrying.",
-  SERVICE_UNAVAILABLE: "The server is temporarily unavailable. Check an uncertain action\u2019s outcome before retrying.",
+  NETWORK_ERROR: "Could not reach the server. Check your connection. If an action was sent, its outcome is unknown; check it before another change.",
+  SERVICE_UNAVAILABLE: "The server is temporarily unavailable. An action may still have been applied; check its outcome before another change.",
   AUTH_REQUIRED: "Authentication is required. Run auth login and try again.",
   RATE_LIMITED: "Too many requests. Wait for the returned retry interval before retrying.",
-  UPDATE_REQUIRED: "This CLI is older than the server response. Run `npx skills update clawsaga`, then check any uncertain action\u2019s outcome before retrying.",
+  UPDATE_REQUIRED: "This CLI is older than the server response. Run `npx skills update clawsaga`, then check any uncertain action\u2019s outcome before another change.",
   INVALID_RESPONSE: "The server returned a response this CLI could not read.",
   AUTH_START_FAILED: "Could not start authorization. Try again later.",
   AUTH_NOT_COMPLETED: "Authorization was not completed.",
@@ -25872,10 +26084,19 @@ function withRenderedHints(response, character, options = {}) {
     hints: [...rendered, ...notes.map((note) => ({ note }))]
   };
 }
+function itemChangeRecovery(character) {
+  const read = `character${character ? ` -c ${character}` : ""} --include inventory`;
+  return [
+    "The outcome is unknown and the change may have been applied; do not resend it.",
+    `Check current HP, MP, items and capacity with \`${read}\`; if the goal is already met, make no further change.`,
+    "Unchanged state does not prove it failed because it may still be applied, and waiting or reading again does not make a resend safe. While the outcome is unclear, hold off further use or discard and report it as unknown."
+  ].join(" ");
+}
 function recoveryHint(detail, context) {
   const repetition = detail.repetition;
   if (detail.outcome !== "unknown" && repetition?.stopped_reason !== "unknown")
     return void 0;
+  if (context.itemChange) return itemChangeRecovery(context.character);
   const activityId = typeof detail.activity_id === "string" ? detail.activity_id : void 0;
   const requestId = typeof detail.request_id === "string" ? detail.request_id : void 0;
   const parts = [
@@ -25911,6 +26132,10 @@ function withNotes(response, notes) {
 function changelogNote(headline) {
   return `Server changes were published on ${headline.published_at}: ${headline.title}. Read them with \`changelog\`.`;
 }
+function announcementNote(announcement) {
+  const updated = `${announcement.updated_at.slice(0, 10)} ${announcement.updated_at.slice(11, 16)} UTC`;
+  return `Announcement (updated ${updated}): ${announcement.body}`;
+}
 function updateNote(current, published) {
   return `This CLI is ${current}; ${published} is published. Update with \`npx skills update clawsaga\`.`;
 }
@@ -25918,7 +26143,7 @@ function updateNote(current, published) {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.14",
+  version: "0.1.15",
   homepage: "https://clawsaga.net",
   repository: "github:palon7/clawsaga",
   license: "MIT",
@@ -26046,7 +26271,7 @@ var adventureCommands = {
     path: "character/encounters",
     schema: getEncountersSchema,
     flags: [],
-    help: "List local enemies or town practice opponents."
+    help: "List local enemies or town training dummies."
   },
   tactics: {
     path: "character/tactics",
@@ -26074,7 +26299,10 @@ var adventureCommands = {
     flags: [
       ["--enemy <id>", "Enemy ID from encounters", true],
       ["--preset <id>", "Preset name", false, ["safe", "aggressive"]],
-      ["--practice", "Practice in town without rewards or losses"],
+      [
+        "--practice",
+        "Practice against a training dummy in town without rewards or losses"
+      ],
       noWaitFlag
     ],
     help: "Start one battle while idle and wait for its outcome before starting another main activity.",
@@ -26111,12 +26339,11 @@ var adventureCommands = {
     flags: [
       [
         "--item <id>",
-        "Recovery item to consume",
-        true,
-        ["healing_potion", "travel_ration", "wolf_jerky"]
+        "Item ID of a recovery item with use_effect in inventory",
+        true
       ]
     ],
-    help: "Consume a standard-quality healing potion or cooked recovery food while idle."
+    help: "Consume a standard-quality healing potion or cooked recovery food while idle. The server rejects items that cannot be used."
   },
   "change-job": {
     path: "character/job/change",
@@ -26335,9 +26562,176 @@ var adventureCommands = {
   }
 };
 
+// src/market-commands.ts
+var qualityChoices = ["standard", "fine", "superior"];
+var sourceChoices = ["carried", "storage"];
+var requestFlag = [
+  "--request <uuid>",
+  "Reuse the same ID and arguments after an uncertain result"
+];
+var marketCommands = {
+  market: {
+    path: "character/market",
+    schema: getMarketSchema,
+    flags: [
+      ["--town <id>", "Market town location ID", true],
+      ["--item <id>", "Optional item ID for board detail"],
+      [
+        "--quality <quality>",
+        "Stack board quality (default standard) or individual listing filter",
+        false,
+        qualityChoices
+      ],
+      ["--levels <number>", "Price levels returned per side: 1\u201320 (default 5)"],
+      [
+        "--cursor <number>",
+        "next_cursor from a previous overview or listings read"
+      ],
+      ["--max-price <gold>", "Only listings at or below this price"],
+      [
+        "--min-durability <number>",
+        "Only listings at or above this durability"
+      ]
+    ],
+    help: "Read every active item and quality in a market town with best bid and ask, 20 rows per page. Add --item to read one stack board or individual listings.",
+    examples: [
+      "clawsaga market -c m7Qp2_aR9L-x --town corvent",
+      "clawsaga market -c m7Qp2_aR9L-x --town corvent --item ore --quality standard"
+    ]
+  },
+  "my-market": {
+    path: "character/market/mine",
+    schema: getMyMarketSchema,
+    flags: [
+      [
+        "--section <section>",
+        "Read only this section; required with --cursor",
+        false,
+        ["orders", "listings", "trades"]
+      ],
+      ["--cursor <number>", "That section's next_cursor from a previous read"]
+    ],
+    help: "Read your orders, listings and trades across every market town from anywhere, newest first and 20 per section. Orders and listings include held items awaiting receipt or return.",
+    examples: [
+      "clawsaga my-market -c m7Qp2_aR9L-x",
+      "clawsaga my-market -c m7Qp2_aR9L-x --section orders --cursor 41"
+    ]
+  },
+  "market-sell": {
+    path: "character/market/orders/sell",
+    schema: placeMarketSellOrderSchema,
+    flags: [
+      ["--item <id>", "Item ID to sell", true],
+      ["--quality <quality>", "Stack quality", true, qualityChoices],
+      ["--quantity <number>", "Stack quantity to offer", true],
+      ["--unit-price <gold>", "Price per unit", true],
+      [
+        "--source <source>",
+        "Take the stack from carried or storage",
+        true,
+        sourceChoices
+      ],
+      requestFlag
+    ],
+    help: "Offer a quantity stack on the item and quality board while idle in a market town. New orders match crossing orders at the resting price, and the market fee applies only to the quantity left resting after that matching. A request ID is generated unless supplied.",
+    examples: [
+      "clawsaga market-sell -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5 --source storage"
+    ]
+  },
+  "market-buy": {
+    path: "character/market/orders/buy",
+    schema: placeMarketBuyOrderSchema,
+    flags: [
+      ["--item <id>", "Item ID to bid for", true],
+      ["--quality <quality>", "Stack quality", true, qualityChoices],
+      ["--quantity <number>", "Stack quantity to bid for", true],
+      ["--unit-price <gold>", "Bid price per unit", true],
+      requestFlag
+    ],
+    help: "Bid for a quantity stack on the item and quality board while idle in a market town. The bid reserves gold for the resting quantity, and the market fee applies only to the quantity left resting after immediate matching. A request ID is generated unless supplied.",
+    examples: [
+      "clawsaga market-buy -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5"
+    ]
+  },
+  "market-order-cancel": {
+    path: "character/market/orders/cancel",
+    schema: cancelMarketOrderSchema,
+    flags: [
+      ["--order <number>", "Numeric order ID from my-market", true],
+      requestFlag
+    ],
+    help: "Cancel one of your own orders from anywhere. Unused buy gold returns to your balance up to its limit; any excess remains claimable later. Resting sell goods move into your storage in the order town as far as they fit; the rest stays in market custody to claim. A request ID is generated unless supplied.",
+    examples: ["clawsaga market-order-cancel -c m7Qp2_aR9L-x --order 12"]
+  },
+  "market-order-claim": {
+    path: "character/market/orders/claim",
+    schema: claimMarketOrderSchema,
+    flags: [
+      ["--order <number>", "Numeric order ID from my-market", true],
+      requestFlag
+    ],
+    help: "Collect held items or leftover gold from one of your orders from anywhere. Items bought by a buy order can be collected while it stays open; leftover gold only after the order ends. Items move into your storage in the order town only as far as they fit, and gold only up to the balance limit; any remainder stays claimable. A request ID is generated unless supplied.",
+    examples: ["clawsaga market-order-claim -c m7Qp2_aR9L-x --order 12"]
+  },
+  "market-list": {
+    path: "character/market/listings/create",
+    schema: createMarketListingSchema,
+    flags: [
+      ["--instance <uuid>", "Item instance ID from inventory", true],
+      ["--price <gold>", "Fixed price for the individual", true],
+      [
+        "--source <source>",
+        "Take the individual from carried or storage",
+        true,
+        sourceChoices
+      ],
+      requestFlag
+    ],
+    help: "List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells. A request ID is generated unless supplied.",
+    examples: [
+      "clawsaga market-list -c m7Qp2_aR9L-x --instance 22222222-2222-4222-8222-222222222222 --price 100 --source carried"
+    ]
+  },
+  "market-purchase": {
+    path: "character/market/listings/buy",
+    schema: buyMarketListingSchema,
+    flags: [
+      ["--listing <number>", "Numeric listing ID from market", true],
+      ["--max-price <gold>", "Highest price you accept", true],
+      ["--min-durability <number>", "Reject an individual in worse condition"],
+      requestFlag
+    ],
+    help: "Buy a fixed-price listing while idle in a market town. The individual moves straight to your bag, which needs room for it. A request ID is generated unless supplied.",
+    examples: [
+      "clawsaga market-purchase -c m7Qp2_aR9L-x --listing 34 --max-price 120"
+    ]
+  },
+  "market-listing-cancel": {
+    path: "character/market/listings/cancel",
+    schema: cancelMarketListingSchema,
+    flags: [
+      ["--listing <number>", "Numeric listing ID from my-market", true],
+      requestFlag
+    ],
+    help: "Withdraw one of your own listings from anywhere. The individual moves into your storage in the listing town if it fits; otherwise it stays in market custody to claim. A request ID is generated unless supplied.",
+    examples: ["clawsaga market-listing-cancel -c m7Qp2_aR9L-x --listing 34"]
+  },
+  "market-listing-claim": {
+    path: "character/market/listings/claim",
+    schema: claimMarketListingSchema,
+    flags: [
+      ["--listing <number>", "Numeric listing ID from my-market", true],
+      requestFlag
+    ],
+    help: "Collect the individual held for one of your finished listings from anywhere. It moves into your storage in the listing town only if it fits; otherwise it stays claimable. A request ID is generated unless supplied.",
+    examples: ["clawsaga market-listing-claim -c m7Qp2_aR9L-x --listing 34"]
+  }
+};
+
 // src/commands.ts
 var commands = {
   ...adventureCommands,
+  ...marketCommands,
   hello: {
     path: "character/hello",
     schema: helloSchema,
@@ -26440,7 +26834,7 @@ var commands = {
     path: "character/look",
     schema: lookSchema,
     flags: [["--people", "Include other active characters at this location"]],
-    help: "Read local resources, enemies and facilities. Use resource item_id for gather and enemy id for fight. Town enemies require --practice. Use encounters for full enemy details."
+    help: "Read local resources, enemies and facilities. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for full enemy details."
   },
   route: {
     path: "character/route",
@@ -26532,7 +26926,7 @@ var commands = {
     help: "Craft goods from standard-quality materials while idle; wait for each lot. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.",
     examples: [
       "clawsaga craft -c m7Qp2_aR9L-x --recipe wolf_jerky --count 3",
-      "clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --no-wait"
+      "clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 10 --no-wait"
     ]
   },
   stop: {
@@ -26676,6 +27070,17 @@ var activityCommands = /* @__PURE__ */ new Set([
   "fight",
   "rest"
 ]);
+var marketCommandNames = new Set(Object.keys(marketCommands));
+var marketWriteCommands = /* @__PURE__ */ new Set([
+  "market-sell",
+  "market-buy",
+  "market-order-cancel",
+  "market-order-claim",
+  "market-list",
+  "market-purchase",
+  "market-listing-cancel",
+  "market-listing-claim"
+]);
 var optionsSchema2 = external_exports.object({
   server: external_exports.string(),
   contentLanguage: external_exports.enum(["ja", "en"]).optional(),
@@ -26723,7 +27128,17 @@ var optionsSchema2 = external_exports.object({
   participatedBySelf: external_exports.boolean().optional(),
   thread: external_exports.string().optional(),
   town: external_exports.string().optional(),
-  items: external_exports.string().optional()
+  items: external_exports.string().optional(),
+  quality: external_exports.string().optional(),
+  levels: external_exports.string().optional(),
+  maxPrice: external_exports.string().optional(),
+  minDurability: external_exports.string().optional(),
+  unitPrice: external_exports.string().optional(),
+  source: external_exports.string().optional(),
+  price: external_exports.string().optional(),
+  order: external_exports.string().optional(),
+  listing: external_exports.string().optional(),
+  section: external_exports.string().optional()
 });
 async function readStdin() {
   process.stdin.setEncoding("utf8");
@@ -26753,6 +27168,28 @@ async function commandInput(values, definition, commandName) {
   const input2 = {};
   if (values.contentLanguage) input2.locale = values.contentLanguage;
   if (values.character) input2.character_id = values.character;
+  if (marketCommandNames.has(commandName)) {
+    if (values.town) input2.town_id = values.town;
+    if (values.item) input2.item_id = values.item;
+    if (values.instance) input2.instance_id = values.instance;
+    if (values.quality !== void 0) input2.quality = values.quality;
+    if (values.section !== void 0) input2.section = values.section;
+    if (values.source !== void 0) input2.source = values.source;
+    if (values.levels !== void 0) input2.levels = Number(values.levels);
+    if (values.cursor !== void 0) input2.cursor = Number(values.cursor);
+    if (values.maxPrice !== void 0)
+      input2.max_price = Number(values.maxPrice);
+    if (values.minDurability !== void 0)
+      input2.minimum_durability = Number(values.minDurability);
+    if (values.quantity !== void 0) input2.quantity = Number(values.quantity);
+    if (values.unitPrice !== void 0)
+      input2.unit_price = Number(values.unitPrice);
+    if (values.price !== void 0) input2.price = Number(values.price);
+    if (values.order !== void 0) input2.order_id = Number(values.order);
+    if (values.listing !== void 0) input2.listing_id = Number(values.listing);
+    if (values.request) input2.request_id = values.request;
+    return input2;
+  }
   if (values.name !== void 0) input2.name = values.name;
   if (values.discriminator !== void 0)
     input2.discriminator = values.discriminator;
@@ -27106,7 +27543,7 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
         });
       }
       const requestedId = values.request;
-      if ((name === "buy" || name === "craft" || name === "deposit" || name === "withdraw") && !values.request)
+      if ((name === "buy" || name === "craft" || name === "deposit" || name === "withdraw" || marketWriteCommands.has(name)) && !values.request)
         values.request = randomUUID2();
       const inputValues = name === "characters" || name === "resolve-character" || name === "options" ? {
         ...values,
@@ -27174,6 +27611,13 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
             request_id: values.request,
             town_id: values.town
           });
+        if (marketWriteCommands.has(name) && error61 instanceof CliError)
+          throw new CliError(error61.code, {
+            ...error61.detail,
+            request_id: values.request,
+            ...values.order === void 0 ? {} : { order_id: Number(values.order) },
+            ...values.listing === void 0 ? {} : { listing_id: Number(values.listing) }
+          });
         throw error61;
       }
       result = activityCommands.has(name) && response.ok && executedWait ? await waitForActivity(
@@ -27191,11 +27635,13 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
       const help = ["INVALID_ARGUMENTS", "INVALID_INPUT_FILE"].includes(
         error61.code
       ) ? { help_command: helpCommand } : {};
-      const detail = executedActivity && !notSent(error61) && (error61.code === "INVALID_RESPONSE" || error61.code === "UPDATE_REQUIRED" || error61.code === "SERVICE_UNAVAILABLE") ? { ...error61.detail, outcome: "unknown" } : error61.detail;
+      const itemChange = executedCommand === "use" || executedCommand === "discard";
+      const detail = (executedActivity || itemChange) && !notSent(error61) && (error61.code === "INVALID_RESPONSE" || error61.code === "UPDATE_REQUIRED" || error61.code === "SERVICE_UNAVAILABLE") ? { ...error61.detail, outcome: "unknown" } : error61.detail;
       const hint = recoveryHint(detail, {
         character: executedCharacter,
         activity: executedActivity,
-        craft: executedCommand === "craft"
+        craft: executedCommand === "craft",
+        itemChange
       });
       if (Object.keys(help).length === 0 && !hint) throw error61;
       throw new CliError(error61.code, {
@@ -27225,6 +27671,8 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
 }
 async function helloNotes(response, published) {
   const notes = [];
+  if (response.data.announcement)
+    notes.push(announcementNote(response.data.announcement));
   if (response.data.changelog)
     notes.push(changelogNote(response.data.changelog));
   const latest = await published;

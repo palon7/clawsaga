@@ -3,7 +3,7 @@
     "name": "cancelled_travel",
     "response": {
       "ok": true,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "activity": null,
@@ -23,7 +23,7 @@
     "name": "gather_actual_experience",
     "response": {
       "ok": true,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "last_result": {
@@ -42,7 +42,7 @@
     "name": "craft_actual_experience",
     "response": {
       "ok": true,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "last_result": {
@@ -67,7 +67,7 @@
     "name": "settled_result_with_current_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-19T01:02:03.456Z",
       "next_poll_after_seconds": 7,
       "data": {
@@ -95,6 +95,7 @@
               "equip_slot": "main_hand",
               "required_job": "mage",
               "required_job_name": "Mage",
+              "required_level": null,
               "power": 9,
               "armor": 0
             },
@@ -170,7 +171,7 @@
     "name": "accepted_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-19T01:08:00.456Z",
       "next_poll_after_seconds": 5,
       "data": {
@@ -203,7 +204,7 @@
     "name": "cancelled_result",
     "response": {
       "ok": true,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-19T02:03:04.567Z",
       "data": {
         "activity": null,
@@ -222,7 +223,7 @@
     "name": "location_chat",
     "response": {
       "ok": true,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-19T03:04:05.678Z",
       "attention": {
         "unread_direct_messages": 0,
@@ -257,7 +258,7 @@
     "name": "business_failure",
     "response": {
       "ok": false,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-19T04:05:06.789Z",
       "data": {},
       "error": {
@@ -270,7 +271,7 @@
     "name": "delivery_shortage",
     "response": {
       "ok": false,
-      "schema_version": "3.6",
+      "schema_version": "3.7",
       "server_time": "2026-09-19T04:06:07.890Z",
       "data": {},
       "error": {
