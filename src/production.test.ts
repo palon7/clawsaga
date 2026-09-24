@@ -37,6 +37,7 @@ it('accepts purchasable weapons in shop responses and purchase inputs', () => {
               equip_slot: 'main_hand',
               required_job: 'warrior',
               required_job_name: 'Warrior',
+              required_level: null,
               power: 9,
               armor: 0,
             },

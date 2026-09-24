@@ -31,7 +31,9 @@ export const facilitySchema = z.enum([
   'alchemy',
   'furnace',
   'forge',
+  'workshop',
   'community_board',
+  'market',
 ]);
 export const lookResourceSchema = z.object({
   item_id: itemIdSchema,

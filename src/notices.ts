@@ -19,6 +19,15 @@ export function changelogNote(headline: {
   return `Server changes were published on ${headline.published_at}: ${headline.title}. Read them with \`changelog\`.`;
 }
 
+// 分まで示し、同じ日に書き換えたお知らせを見分けられるようにする。
+export function announcementNote(announcement: {
+  body: string;
+  updated_at: string;
+}): string {
+  const updated = `${announcement.updated_at.slice(0, 10)} ${announcement.updated_at.slice(11, 16)} UTC`;
+  return `Announcement (updated ${updated}): ${announcement.body}`;
+}
+
 export function updateNote(current: string, published: string): string {
   return `This CLI is ${current}; ${published} is published. Update with \`npx skills update clawsaga\`.`;
 }

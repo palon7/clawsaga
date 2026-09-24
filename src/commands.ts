@@ -47,10 +47,16 @@ import {
   withRenderedHints,
   type RepetitionSummary,
 } from './hints.js';
-import { changelogNote, updateNote, withNotes } from './notices.js';
+import {
+  announcementNote,
+  changelogNote,
+  updateNote,
+  withNotes,
+} from './notices.js';
 import { fetchPublishedVersion, isNewerVersion } from './update-check.js';
 import metadata from '../package.json' with { type: 'json' };
 import { adventureCommands } from './adventure-commands.js';
+import { marketCommands } from './market-commands.js';
 import {
   bodySchema,
   globalOptions,
@@ -61,6 +67,7 @@ import {
 
 const commands: Record<string, CommandDefinition> = {
   ...adventureCommands,
+  ...marketCommands,
   hello: {
     path: 'character/hello',
     schema: helloSchema,
@@ -163,7 +170,7 @@ const commands: Record<string, CommandDefinition> = {
     path: 'character/look',
     schema: lookSchema,
     flags: [['--people', 'Include other active characters at this location']],
-    help: 'Read local resources, enemies and facilities. Use resource item_id for gather and enemy id for fight. Town enemies require --practice. Use encounters for full enemy details.',
+    help: 'Read local resources, enemies and facilities. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for full enemy details.',
   },
   route: {
     path: 'character/route',
@@ -255,7 +262,7 @@ const commands: Record<string, CommandDefinition> = {
     help: 'Craft goods from standard-quality materials while idle; wait for each lot. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.',
     examples: [
       'clawsaga craft -c m7Qp2_aR9L-x --recipe wolf_jerky --count 3',
-      'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 2 --no-wait',
+      'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 10 --no-wait',
     ],
   },
   stop: {
@@ -402,6 +409,20 @@ const activityCommands = new Set([
   'rest',
 ]);
 
+const marketCommandNames = new Set(Object.keys(marketCommands));
+// Market writes take a request ID so a repeated request returns the accepted
+// result instead of ordering, listing or cancelling again.
+const marketWriteCommands = new Set([
+  'market-sell',
+  'market-buy',
+  'market-order-cancel',
+  'market-order-claim',
+  'market-list',
+  'market-purchase',
+  'market-listing-cancel',
+  'market-listing-claim',
+]);
+
 const optionsSchema = z.object({
   server: z.string(),
   contentLanguage: z.enum(['ja', 'en']).optional(),
@@ -450,6 +471,16 @@ const optionsSchema = z.object({
   thread: z.string().optional(),
   town: z.string().optional(),
   items: z.string().optional(),
+  quality: z.string().optional(),
+  levels: z.string().optional(),
+  maxPrice: z.string().optional(),
+  minDurability: z.string().optional(),
+  unitPrice: z.string().optional(),
+  source: z.string().optional(),
+  price: z.string().optional(),
+  order: z.string().optional(),
+  listing: z.string().optional(),
+  section: z.string().optional(),
 });
 type Values = z.infer<typeof optionsSchema>;
 
@@ -491,6 +522,28 @@ async function commandInput(
   const input: Record<string, unknown> = {};
   if (values.contentLanguage) input.locale = values.contentLanguage;
   if (values.character) input.character_id = values.character;
+  if (marketCommandNames.has(commandName)) {
+    if (values.town) input.town_id = values.town;
+    if (values.item) input.item_id = values.item;
+    if (values.instance) input.instance_id = values.instance;
+    if (values.quality !== undefined) input.quality = values.quality;
+    if (values.section !== undefined) input.section = values.section;
+    if (values.source !== undefined) input.source = values.source;
+    if (values.levels !== undefined) input.levels = Number(values.levels);
+    if (values.cursor !== undefined) input.cursor = Number(values.cursor);
+    if (values.maxPrice !== undefined)
+      input.max_price = Number(values.maxPrice);
+    if (values.minDurability !== undefined)
+      input.minimum_durability = Number(values.minDurability);
+    if (values.quantity !== undefined) input.quantity = Number(values.quantity);
+    if (values.unitPrice !== undefined)
+      input.unit_price = Number(values.unitPrice);
+    if (values.price !== undefined) input.price = Number(values.price);
+    if (values.order !== undefined) input.order_id = Number(values.order);
+    if (values.listing !== undefined) input.listing_id = Number(values.listing);
+    if (values.request) input.request_id = values.request;
+    return input;
+  }
   if (values.name !== undefined) input.name = values.name;
   if (values.discriminator !== undefined)
     input.discriminator = values.discriminator;
@@ -952,7 +1005,8 @@ export async function execute(
         (name === 'buy' ||
           name === 'craft' ||
           name === 'deposit' ||
-          name === 'withdraw') &&
+          name === 'withdraw' ||
+          marketWriteCommands.has(name)) &&
         !values.request
       )
         values.request = randomUUID();
@@ -1032,6 +1086,17 @@ export async function execute(
             request_id: values.request,
             town_id: values.town,
           });
+        if (marketWriteCommands.has(name) && error instanceof CliError)
+          throw new CliError(error.code, {
+            ...error.detail,
+            request_id: values.request,
+            ...(values.order === undefined
+              ? {}
+              : { order_id: Number(values.order) }),
+            ...(values.listing === undefined
+              ? {}
+              : { listing_id: Number(values.listing) }),
+          });
         throw error;
       }
       result =
@@ -1054,10 +1119,12 @@ export async function execute(
       )
         ? { help_command: helpCommand }
         : {};
-      // 主活動の応答が読めない場合も、サーバーは受付済みかもしれない。
+      // 主活動・使用・廃棄の応答が読めない場合も、サーバーは受付済みかもしれない。
       // 送信前の失敗は除き、受付応答を失った場合と同じ復旧手順を返す。
+      const itemChange =
+        executedCommand === 'use' || executedCommand === 'discard';
       const detail =
-        executedActivity &&
+        (executedActivity || itemChange) &&
         !notSent(error) &&
         (error.code === 'INVALID_RESPONSE' ||
           error.code === 'UPDATE_REQUIRED' ||
@@ -1070,6 +1137,7 @@ export async function execute(
         character: executedCharacter,
         activity: executedActivity,
         craft: executedCommand === 'craft',
+        itemChange,
       });
       if (Object.keys(help).length === 0 && !hint) throw error;
       throw new CliError(error.code, {
@@ -1106,6 +1174,8 @@ async function helloNotes(
   published: Promise<string | undefined> | undefined,
 ): Promise<string[]> {
   const notes: string[] = [];
+  if (response.data.announcement)
+    notes.push(announcementNote(response.data.announcement));
   if (response.data.changelog)
     notes.push(changelogNote(response.data.changelog));
   const latest = await published;

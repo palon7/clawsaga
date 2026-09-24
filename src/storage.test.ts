@@ -16,7 +16,7 @@ const character = 'm7Qp2_aR9L-x';
 const instance = '22222222-2222-4222-8222-222222222222';
 const transfer = {
   ok: true,
-  schema_version: '3.6',
+  schema_version: '3.7',
   server_time: '2026-09-20T00:00:00.000Z',
   data: {
     storage: {
