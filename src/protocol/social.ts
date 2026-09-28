@@ -22,7 +22,7 @@ const text = (maximum: number) =>
       'Use nonempty plain text without control characters.',
     );
 export const sendMonologueSchema = z
-  .object({ ...target, text: text(1000), language: localeSchema })
+  .object({ ...target, text: text(400), language: localeSchema })
   .strict();
 export const contentReferenceSchema = z
   .object({

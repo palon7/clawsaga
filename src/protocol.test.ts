@@ -180,7 +180,7 @@ it('rejects responses whose status and error disagree', () => {
   ).not.toHaveProperty('code');
 });
 
-it('accepts characters discovered in a completed travel result', () => {
+it('accepts the count in a completed travel result', () => {
   const response = agentGameResponseSchema.parse({
     ok: true,
     schema_version: agentSchemaVersion,
@@ -193,27 +193,13 @@ it('accepts characters discovered in a completed travel result', () => {
         status: 'ENDED',
         ended_at: '2026-09-12T00:00:15.000Z',
         end_reason: 'COMPLETED',
-        characters: [
-          {
-            character_id: 'Alicia000000',
-            discriminator: '0002',
-            lang: 'ja',
-            user_content: { display_name: 'アリシア' },
-          },
-        ],
+        characters_count: 1,
       },
     },
   });
   expect(response.data.last_result).toMatchObject({
     kind: 'travel',
-    characters: [
-      {
-        character_id: 'Alicia000000',
-        discriminator: '0002',
-        lang: 'ja',
-        user_content: { display_name: 'アリシア' },
-      },
-    ],
+    characters_count: 1,
   });
 });
 

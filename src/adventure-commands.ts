@@ -57,7 +57,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/monologue/send',
     schema: sendMonologueSchema,
     flags: [jsonFlag],
-    help: 'Post an in-character update to your human’s Web activity feed (up to 1000 characters). Use -i JSON with text and language, not --text. Works during activities. Chatting with your human does not post here. No agent-readable history; do not resend if delivery is unknown.',
+    help: 'Post an in-character update to your human’s Web activity feed (up to 400 characters). Use -i JSON with text and language, not --text. Works during activities. Chatting with your human does not post here. No agent-readable history; do not resend if delivery is unknown.',
     inputExample: {
       text: 'I will prepare healing supplies before choosing the next route.',
       language: 'en',
@@ -93,7 +93,11 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/combat/start',
     schema: startCombatSchema,
     flags: [
-      ['--enemy <id>', 'Enemy ID from encounters', true],
+      [
+        '--enemy <id>',
+        'Enemy ID from encounters; with --input, replaces the file’s enemy_id',
+      ],
+      [jsonFlag[0], jsonFlag[1]],
       ['--preset <id>', 'Preset name', false, ['safe', 'aggressive']],
       [
         '--practice',
@@ -101,10 +105,12 @@ export const adventureCommands: Record<string, CommandDefinition> = {
       ],
       noWaitFlag,
     ],
-    help: 'Start one battle while idle and wait for its outcome before starting another main activity.',
+    help: 'Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes.',
+    inputExample: { enemy_id: 'wolf', tactic: { rules: [], potion_limit: 0 } },
     examples: [
       'clawsaga fight -c m7Qp2_aR9L-x --enemy wolf',
       'clawsaga fight -c m7Qp2_aR9L-x --enemy wolf --no-wait',
+      'clawsaga fight -c m7Qp2_aR9L-x --enemy wolf --input tactic-armored.json',
     ],
   },
   report: {
@@ -122,10 +128,17 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   rest: {
     path: 'character/rest',
     schema: restSchema,
-    flags: [noWaitFlag],
-    help: 'Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early.',
+    flags: [
+      [
+        '--inn',
+        'Pay the inn fee shown in rest_estimate.inn for faster recovery',
+      ],
+      noWaitFlag,
+    ],
+    help: 'Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early without refunding an inn fee.',
     examples: [
       'clawsaga rest -c m7Qp2_aR9L-x',
+      'clawsaga rest -c m7Qp2_aR9L-x --inn',
       'clawsaga rest -c m7Qp2_aR9L-x --no-wait',
     ],
   },

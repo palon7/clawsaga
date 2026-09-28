@@ -23964,7 +23964,7 @@ var text = (maximum) => unicodeTextSchema.min(1).max(maximum).refine(
   (value) => value.trim().length > 0 && !/[^\P{Cc}\t\n\r]/u.test(value),
   "Use nonempty plain text without control characters."
 );
-var sendMonologueSchema = external_exports.object({ ...target2, text: text(1e3), language: localeSchema }).strict();
+var sendMonologueSchema = external_exports.object({ ...target2, text: text(400), language: localeSchema }).strict();
 var contentReferenceSchema = external_exports.object({
   kind: external_exports.enum(["activity", "quest", "item", "character", "location"]),
   id: unicodeTextSchema.min(1).max(128)
@@ -24221,7 +24221,8 @@ var facilitySchema = external_exports.enum([
   "forge",
   "workshop",
   "community_board",
-  "market"
+  "market",
+  "inn"
 ]);
 var lookResourceSchema = external_exports.object({
   item_id: itemIdSchema,
@@ -24245,6 +24246,8 @@ var lookViewSchema = external_exports.object({
   resources: external_exports.array(lookResourceSchema),
   enemies: external_exports.array(lookEnemySchema),
   facilities: external_exports.array(facilitySchema),
+  people_count: external_exports.number().int().nonnegative().optional(),
+  people_next_cursor: characterIdSchema.nullable().optional(),
   people: external_exports.array(
     external_exports.object({
       character_id: characterIdSchema,
@@ -24297,6 +24300,7 @@ var travelActivityViewSchema = external_exports.object({
       status: external_exports.literal("ENDED"),
       ended_at: external_exports.iso.datetime(),
       end_reason: external_exports.enum(["COMPLETED", "CANCELLED"]),
+      characters_count: external_exports.number().int().nonnegative().optional(),
       characters: external_exports.array(presentCharacterSchema),
       ambush: ambushReferenceSchema.optional()
     })
@@ -24307,13 +24311,379 @@ var common = {
   locale: localeSchema.optional()
 };
 var getMapSchema = external_exports.object({ ...common, full: external_exports.boolean().optional() }).strict();
-var lookSchema = external_exports.object({ ...common, people: external_exports.boolean().optional() }).strict();
+var lookSchema = external_exports.object({
+  ...common,
+  people: external_exports.boolean().optional(),
+  cursor: characterIdSchema.optional()
+}).strict();
 var getRouteSchema = external_exports.object({ ...common, to: locationIdSchema }).strict();
 var travelSchema = external_exports.object({ ...common, to: locationIdSchema }).strict();
 var getActivitySchema = external_exports.object({
   ...common,
   activity_id: external_exports.uuid().optional()
 }).strict();
+
+// src/protocol/combat.ts
+var target3 = {
+  character_id: characterIdSchema,
+  locale: localeSchema.optional()
+};
+var combatIdSchema = external_exports.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
+var damageTypeSchema = external_exports.enum([
+  "physical",
+  "fire",
+  "ice",
+  "lightning",
+  "holy"
+]);
+var combatStatusSchema = external_exports.enum([
+  "poison",
+  "guard",
+  "barrier",
+  "battle_song",
+  "soothing_song"
+]);
+var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.enum(["hp_below", "mp_below", "enemy_hp_below"]),
+    percent: external_exports.number().int().min(1).max(100)
+  }).strict().describe(
+    "Matches when the named current percentage is strictly below percent. HP percentages use current / maximum HP; MP uses its 0\u2013100 value."
+  ),
+  external_exports.object({ kind: external_exports.literal("enemy_winding_up") }).strict().describe(
+    "Matches when the enemy heavy attack is at most two ticks away, including the tick it occurs."
+  ),
+  external_exports.object({ kind: external_exports.literal("enemy_attacking_heavy") }).strict().describe("Matches on the tick when the enemy heavy attack occurs."),
+  external_exports.object({ kind: external_exports.literal("enemy_recovering") }).strict().describe("Matches on the recovery tick after a heavy attack."),
+  external_exports.object({ kind: external_exports.literal("enemy_heavy_interruptible") }).strict().describe(
+    "Matches when the scheduled enemy heavy attack can be interrupted."
+  ),
+  external_exports.object({
+    kind: external_exports.literal("potions_below"),
+    count: external_exports.number().int().min(1).max(21)
+  }).strict().describe(
+    "Matches when usable healing potions remaining in this battle are strictly below count."
+  ),
+  external_exports.object({ kind: external_exports.literal("enemy_weak_to"), damage_type: damageTypeSchema }).strict().describe("Matches when the enemy resistance for damage_type is negative."),
+  external_exports.object({
+    kind: external_exports.enum(["self_has_status", "self_missing_status"]),
+    status: combatStatusSchema
+  }).strict().describe(
+    "Matches when the named self status has remaining ticks, or has none, respectively."
+  ),
+  external_exports.object({
+    kind: external_exports.literal("enemy_missing_status"),
+    status: external_exports.literal("poison")
+  }).strict().describe("Matches when the enemy has no remaining poison ticks.")
+]);
+var tacticActionSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.enum(["attack", "defend", "potion", "retreat"]) }).strict().describe(
+    "A potion action is usable only with a remaining potion and missing HP."
+  ),
+  external_exports.object({ kind: external_exports.literal("ability"), ability_id: combatIdSchema }).strict().describe(
+    "Uses the ability when it is unlocked, off cooldown, affordable in MP and its effect is currently applicable."
+  )
+]);
+var tacticSchema = external_exports.object({
+  rules: external_exports.array(
+    external_exports.object({
+      conditions: external_exports.array(tacticConditionSchema).max(3).describe(
+        "All conditions must match (AND); an empty list always matches."
+      ),
+      action: tacticActionSchema
+    }).strict()
+  ).max(8).describe(
+    "Evaluated from top to bottom each tick. The first matching, usable action runs; otherwise use a basic attack."
+  ),
+  potion_limit: external_exports.number().int().min(0).max(20).describe(
+    "Maximum healing potions the tactic may use in one battle, limited by the bag quantity at start. Each potion is consumed when used; zero disables potion use."
+  )
+}).strict().meta({ id: "Tactic" });
+var presetIdSchema = external_exports.enum(["safe", "aggressive"]);
+var abilityEffectSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("damage"),
+    damage_type: damageTypeSchema,
+    power_percent: external_exports.number().int().min(1).max(500),
+    armor_percent: external_exports.number().int().min(0).max(100).optional().describe(
+      "Percentage of target armor applied. If omitted: physical 100%, other damage types 0%."
+    ),
+    poison_ticks: external_exports.number().int().min(0).max(6),
+    interrupt: external_exports.boolean()
+  }),
+  external_exports.object({
+    kind: external_exports.enum(["heal", "restore_mp"]),
+    amount: external_exports.number().int().positive().max(100)
+  }),
+  external_exports.object({ kind: external_exports.literal("cleanse") }),
+  external_exports.object({
+    kind: external_exports.literal("status"),
+    status: external_exports.enum(["guard", "barrier", "battle_song", "soothing_song"]),
+    ticks: external_exports.number().int().min(1).max(12)
+  })
+]);
+var combatAbilitySchema = external_exports.object({
+  id: combatIdSchema,
+  job_id: jobSchema,
+  unlock_level: external_exports.number().int().min(1).max(20),
+  mp_cost: external_exports.number().int().min(0).max(100),
+  cooldown_ticks: external_exports.number().int().min(1).max(12),
+  effect: abilityEffectSchema
+});
+var abilityViewSchema = combatAbilitySchema.extend({ name: external_exports.string(), description: external_exports.string() }).meta({ id: "CombatAbility" });
+var tacticIssueSchema = external_exports.object({
+  rule_index: external_exports.number().int().nonnegative(),
+  code: external_exports.literal("ABILITY_NOT_AVAILABLE")
+});
+var tacticViewSchema = external_exports.object({
+  version: external_exports.number().int().nonnegative(),
+  tactic: tacticSchema,
+  abilities: external_exports.array(abilityViewSchema),
+  presets: external_exports.array(
+    external_exports.object({ id: presetIdSchema, name: external_exports.string(), tactic: tacticSchema })
+  )
+});
+var getTacticsSchema = external_exports.object(target3).strict();
+var setTacticsSchema = external_exports.object({ ...target3, tactic: tacticSchema }).strict();
+var validateTacticsSchema = setTacticsSchema;
+var startCombatSchema = external_exports.object({
+  ...target3,
+  enemy_id: combatIdSchema,
+  preset: presetIdSchema.optional(),
+  tactic: tacticSchema.optional(),
+  practice: external_exports.boolean().optional()
+}).strict().refine((input2) => !(input2.preset && input2.tactic), {
+  path: ["tactic"],
+  message: "Choose either tactic or preset, not both."
+});
+var restSchema = external_exports.object({
+  ...target3,
+  inn: external_exports.boolean().optional().meta({
+    description: "true pays the inn fee from rest_estimate.inn for faster recovery. Omit for free rest."
+  })
+}).strict();
+var useItemSchema = external_exports.object({
+  ...target3,
+  item_id: itemIdSchema
+}).strict();
+var changeJobSchema = external_exports.object({ ...target3, job_id: jobSchema }).strict();
+var getCombatReportSchema = external_exports.object({ ...target3, activity_id: uuidSchema }).strict();
+var getEncountersSchema = external_exports.object(target3).strict();
+var getLostItemsSchema = external_exports.object(target3).strict();
+var recoverLostItemsSchema = external_exports.object({ ...target3, drop_id: uuidSchema }).strict();
+var enemyCombatTraitsSchema = external_exports.object({
+  heavy_interruptible: external_exports.boolean().optional(),
+  heavy_recovery_percent: external_exports.number().int().min(100).max(300).optional(),
+  heavy_phase: external_exports.object({
+    hp_below_percent: external_exports.number().int().min(1).max(99),
+    heavy_power_percent: external_exports.number().int().min(100).max(500),
+    heavy_period_ticks: external_exports.number().int().min(3).max(12)
+  }).optional()
+});
+var combatProbabilitySchema = external_exports.object({
+  hit_percent: external_exports.number().int().min(1).max(100),
+  damage_variance_percent: external_exports.number().int().min(0).max(50)
+});
+var encounterViewSchema = external_exports.object({
+  enemy_id: combatIdSchema,
+  name: external_exports.string(),
+  description: external_exports.string(),
+  level: external_exports.number().int().positive(),
+  max_hp: external_exports.number().int().positive(),
+  power: external_exports.number().int().nonnegative(),
+  armor: external_exports.number().int().nonnegative(),
+  heavy_power_percent: external_exports.number().int().positive(),
+  heavy_period_ticks: external_exports.number().int().positive(),
+  heavy_poison_ticks: external_exports.number().int().nonnegative(),
+  damage_type: damageTypeSchema,
+  resistances: external_exports.record(damageTypeSchema, external_exports.number().int().min(-50).max(75)),
+  practice: external_exports.boolean(),
+  aggressive: external_exports.boolean()
+}).extend(enemyCombatTraitsSchema.shape).extend({ probability: combatProbabilitySchema.optional() }).meta({ id: "Encounter" });
+var combatOutcomeSchema = external_exports.enum(["VICTORY", "DEFEATED", "RETREATED"]);
+var attackResultSchema = external_exports.object({
+  damage_type: damageTypeSchema,
+  hit: external_exports.boolean(),
+  damage: external_exports.number().int().nonnegative()
+});
+var combatFrameSchema = external_exports.object({
+  tick: external_exports.number().int().positive(),
+  action_id: external_exports.string(),
+  enemy_action: external_exports.enum(["attack", "heavy_attack", "interrupted", "none"]),
+  damage_dealt: external_exports.number().int().nonnegative(),
+  damage_taken: external_exports.number().int().nonnegative(),
+  healing: external_exports.number().int().nonnegative(),
+  hp: external_exports.number().int().nonnegative(),
+  mp: external_exports.number().int().nonnegative(),
+  enemy_hp: external_exports.number().int().nonnegative(),
+  details: external_exports.object({
+    rule_index: external_exports.number().int().nonnegative().nullable(),
+    selection: external_exports.enum(["rule", "fallback", "retreat", "status_effect"]),
+    player_attack: attackResultSchema.optional(),
+    enemy_attack: attackResultSchema.optional(),
+    interrupt: external_exports.enum(["success", "miss", "immune", "not_due"]).optional(),
+    reductions: external_exports.array(external_exports.enum(["guard", "barrier"])),
+    enemy_recovering: external_exports.boolean(),
+    heavy_power_percent: external_exports.number().int().positive(),
+    heavy_period_ticks: external_exports.number().int().positive()
+  }).optional()
+});
+var ambushTriggerSchema = external_exports.object({
+  activity_id: uuidSchema,
+  kind: external_exports.enum(["travel", "gather"])
+});
+var combatReportSchema = external_exports.object({
+  activity_id: uuidSchema,
+  outcome: combatOutcomeSchema,
+  practice: external_exports.boolean(),
+  elapsed_seconds: external_exports.number().int().positive(),
+  damage_dealt: external_exports.number().int().nonnegative(),
+  damage_taken: external_exports.number().int().nonnegative(),
+  healing: external_exports.number().int().nonnegative(),
+  items_used: external_exports.array(
+    external_exports.object({
+      item_id: itemIdSchema,
+      quantity: external_exports.number().int().positive()
+    })
+  ),
+  experience_gained: external_exports.number().int().nonnegative(),
+  gold_gained: external_exports.number().int().nonnegative(),
+  loot: external_exports.array(
+    external_exports.object({
+      item_id: itemIdSchema,
+      name: external_exports.string(),
+      quantity: external_exports.number().int().positive()
+    })
+  ),
+  unclaimed_loot: external_exports.array(
+    external_exports.object({
+      item_id: itemIdSchema,
+      name: external_exports.string(),
+      quantity: external_exports.number().int().positive(),
+      reason: external_exports.literal("BAG_FULL")
+    })
+  ),
+  rules: external_exports.array(
+    external_exports.object({
+      rule_index: external_exports.number().int().nonnegative(),
+      executed: external_exports.number().int().nonnegative(),
+      damage_dealt_on_ticks: external_exports.number().int().nonnegative().optional(),
+      damage_taken_on_ticks: external_exports.number().int().nonnegative().optional(),
+      skipped: external_exports.object({
+        condition: external_exports.number().int().nonnegative(),
+        mp: external_exports.number().int().nonnegative(),
+        cooldown: external_exports.number().int().nonnegative(),
+        unavailable: external_exports.number().int().nonnegative()
+      })
+    })
+  ),
+  frames: external_exports.array(combatFrameSchema).max(48),
+  accuracy: external_exports.object({
+    player: external_exports.object({
+      hits: external_exports.number().int().nonnegative(),
+      misses: external_exports.number().int().nonnegative()
+    }),
+    enemy: external_exports.object({
+      hits: external_exports.number().int().nonnegative(),
+      misses: external_exports.number().int().nonnegative()
+    })
+  }).optional(),
+  preparation: external_exports.object({
+    engine_version: external_exports.string(),
+    content_version: external_exports.string(),
+    hp: external_exports.number().int().nonnegative(),
+    mp: external_exports.number().int().nonnegative(),
+    power: external_exports.number().int().nonnegative(),
+    armor: external_exports.number().int().nonnegative(),
+    resistances: external_exports.partialRecord(damageTypeSchema, external_exports.number().int().min(-50).max(75)).optional(),
+    weakness_ticks: external_exports.number().int().nonnegative(),
+    tactic: tacticSchema,
+    probability: combatProbabilitySchema
+  }).optional()
+}).meta({ id: "CombatReport" });
+var combatSnapshotViewSchema = external_exports.object({
+  kind: external_exports.literal("combat"),
+  activity_id: uuidSchema,
+  location: locationViewSchema,
+  enemy_id: combatIdSchema,
+  enemy_name: external_exports.string(),
+  practice: external_exports.boolean(),
+  started_at: timestampSchema,
+  trigger: ambushTriggerSchema.optional(),
+  time_limit_at: timestampSchema,
+  next_update_at: timestampSchema.nullable(),
+  next_action: tacticActionSchema.nullable(),
+  duration_seconds: external_exports.number().int().positive(),
+  simulation_tick: external_exports.number().int().nonnegative(),
+  status: external_exports.enum(["RUNNING", "ENDED"]),
+  end_reason: combatOutcomeSchema.nullable(),
+  ended_at: timestampSchema.nullable(),
+  hp: external_exports.number().int().nonnegative(),
+  max_hp: external_exports.number().int().positive(),
+  mp: external_exports.number().int().min(0).max(100),
+  enemy_hp: external_exports.number().int().nonnegative(),
+  enemy_max_hp: external_exports.number().int().positive(),
+  enemy_windup_ticks: external_exports.number().int().min(0).max(2),
+  enemy_recovering: external_exports.boolean().optional(),
+  last_frame: combatFrameSchema.optional(),
+  next_heavy: external_exports.object({
+    tick: external_exports.number().int().positive(),
+    power_percent: external_exports.number().int().positive(),
+    interruptible: external_exports.boolean(),
+    recovery_percent: external_exports.number().int().min(100).nullable()
+  }).optional(),
+  retreat_ticks: external_exports.number().int().min(0).max(3),
+  retreat_requested_tick: external_exports.number().int().positive().nullable(),
+  potions_remaining: external_exports.number().int().nonnegative(),
+  statuses: external_exports.array(
+    external_exports.object({
+      id: combatStatusSchema,
+      remaining_ticks: external_exports.number().int().positive()
+    })
+  )
+}).meta({ id: "CombatActivity" });
+var cancelledCombatViewSchema = external_exports.object({
+  kind: external_exports.literal("combat"),
+  activity_id: uuidSchema,
+  status: external_exports.literal("ENDED"),
+  end_reason: external_exports.literal("CANCELLED"),
+  started_at: timestampSchema,
+  duration_seconds: external_exports.number().int().positive(),
+  ended_at: timestampSchema
+}).meta({ id: "CancelledCombat" });
+var combatActivityViewSchema = external_exports.union([
+  combatSnapshotViewSchema,
+  cancelledCombatViewSchema
+]);
+var restActivityViewSchema = external_exports.object({
+  kind: external_exports.literal("rest"),
+  activity_id: uuidSchema,
+  location: locationViewSchema,
+  started_at: timestampSchema,
+  completes_at: timestampSchema,
+  duration_seconds: external_exports.number().int().positive(),
+  status: external_exports.enum(["RUNNING", "ENDED"]),
+  ended_at: timestampSchema.nullable(),
+  end_reason: external_exports.enum(["COMPLETED", "STOPPED"]).nullable(),
+  hp: external_exports.number().int().nonnegative(),
+  max_hp: external_exports.number().int().positive(),
+  mp: external_exports.number().int().min(0).max(100),
+  inn: external_exports.boolean()
+}).meta({ id: "RestActivity" });
+var lostItemsViewSchema = external_exports.object({
+  drop_id: uuidSchema,
+  owner_character_id: characterIdSchema,
+  location: locationViewSchema,
+  protected_until: timestampSchema,
+  expires_at: timestampSchema,
+  items: external_exports.array(
+    external_exports.object({
+      item_id: itemIdSchema,
+      name: external_exports.string(),
+      quantity: external_exports.number().int().positive()
+    })
+  )
+});
 
 // src/protocol/production.ts
 var common2 = {
@@ -24379,7 +24749,8 @@ var equipmentStatsSchema = external_exports.object({
   required_job_name: external_exports.string().nullable(),
   required_level: external_exports.number().int().positive().nullable(),
   power: external_exports.number().int(),
-  armor: external_exports.number().int()
+  armor: external_exports.number().int(),
+  resistances: external_exports.partialRecord(damageTypeSchema, external_exports.number().int().min(-50).max(75)).optional()
 });
 var useEffectSchema = external_exports.object({
   hp_recovery: external_exports.number().int().nonnegative(),
@@ -24513,296 +24884,22 @@ var shopViewSchema = external_exports.object({
   )
 });
 
-// src/protocol/combat.ts
-var target3 = {
-  character_id: characterIdSchema,
-  locale: localeSchema.optional()
-};
-var combatIdSchema = external_exports.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
-var damageTypeSchema = external_exports.enum([
-  "physical",
-  "fire",
-  "ice",
-  "lightning",
-  "holy"
-]);
-var combatStatusSchema = external_exports.enum([
-  "poison",
-  "guard",
-  "barrier",
-  "battle_song",
-  "soothing_song"
-]);
-var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({
-    kind: external_exports.enum(["hp_below", "mp_below", "enemy_hp_below"]),
-    percent: external_exports.number().int().min(1).max(100)
-  }).strict().describe(
-    "Matches when the named current percentage is strictly below percent. HP percentages use current / maximum HP; MP uses its 0\u2013100 value."
-  ),
-  external_exports.object({ kind: external_exports.literal("enemy_winding_up") }).strict().describe(
-    "Matches when the enemy heavy attack is at most two ticks away, including the tick it occurs."
-  ),
-  external_exports.object({ kind: external_exports.literal("enemy_attacking_heavy") }).strict().describe("Matches on the tick when the enemy heavy attack occurs."),
-  external_exports.object({
-    kind: external_exports.literal("potions_below"),
-    count: external_exports.number().int().min(1).max(21)
-  }).strict().describe(
-    "Matches when usable healing potions remaining in this battle are strictly below count."
-  ),
-  external_exports.object({ kind: external_exports.literal("enemy_weak_to"), damage_type: damageTypeSchema }).strict().describe("Matches when the enemy resistance for damage_type is negative."),
-  external_exports.object({
-    kind: external_exports.enum(["self_has_status", "self_missing_status"]),
-    status: combatStatusSchema
-  }).strict().describe(
-    "Matches when the named self status has remaining ticks, or has none, respectively."
-  ),
-  external_exports.object({
-    kind: external_exports.literal("enemy_missing_status"),
-    status: external_exports.literal("poison")
-  }).strict().describe("Matches when the enemy has no remaining poison ticks.")
-]);
-var tacticActionSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.enum(["attack", "defend", "potion", "retreat"]) }).strict().describe(
-    "A potion action is usable only with a remaining potion and missing HP."
-  ),
-  external_exports.object({ kind: external_exports.literal("ability"), ability_id: combatIdSchema }).strict().describe(
-    "Uses the ability when it is unlocked, off cooldown, affordable in MP and its effect is currently applicable."
-  )
-]);
-var tacticSchema = external_exports.object({
-  rules: external_exports.array(
-    external_exports.object({
-      conditions: external_exports.array(tacticConditionSchema).max(3).describe(
-        "All conditions must match (AND); an empty list always matches."
-      ),
-      action: tacticActionSchema
-    }).strict()
-  ).max(8).describe(
-    "Evaluated from top to bottom each tick. The first matching, usable action runs; otherwise use a basic attack."
-  ),
-  potion_limit: external_exports.number().int().min(0).max(20).describe(
-    "Maximum healing potions the tactic may use in one battle, limited by the bag quantity at start. Each potion is consumed when used; zero disables potion use."
-  )
-}).strict().meta({ id: "Tactic" });
-var presetIdSchema = external_exports.enum(["safe", "aggressive"]);
-var abilityEffectSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({
-    kind: external_exports.literal("damage"),
-    damage_type: damageTypeSchema,
-    power_percent: external_exports.number().int().min(1).max(500),
-    poison_ticks: external_exports.number().int().min(0).max(6),
-    interrupt: external_exports.boolean()
-  }),
-  external_exports.object({
-    kind: external_exports.enum(["heal", "restore_mp"]),
-    amount: external_exports.number().int().positive().max(100)
-  }),
-  external_exports.object({ kind: external_exports.literal("cleanse") }),
-  external_exports.object({
-    kind: external_exports.literal("status"),
-    status: external_exports.enum(["guard", "barrier", "battle_song", "soothing_song"]),
-    ticks: external_exports.number().int().min(1).max(12)
-  })
-]);
-var combatAbilitySchema = external_exports.object({
-  id: combatIdSchema,
-  job_id: jobSchema,
-  unlock_level: external_exports.number().int().min(1).max(20),
-  mp_cost: external_exports.number().int().min(0).max(100),
-  cooldown_ticks: external_exports.number().int().min(1).max(12),
-  effect: abilityEffectSchema
-});
-var abilityViewSchema = combatAbilitySchema.extend({ name: external_exports.string(), description: external_exports.string() }).meta({ id: "CombatAbility" });
-var tacticIssueSchema = external_exports.object({
-  rule_index: external_exports.number().int().nonnegative(),
-  code: external_exports.literal("ABILITY_NOT_AVAILABLE")
-});
-var tacticViewSchema = external_exports.object({
-  version: external_exports.number().int().nonnegative(),
-  tactic: tacticSchema,
-  abilities: external_exports.array(abilityViewSchema),
-  presets: external_exports.array(
-    external_exports.object({ id: presetIdSchema, name: external_exports.string(), tactic: tacticSchema })
-  )
-});
-var getTacticsSchema = external_exports.object(target3).strict();
-var setTacticsSchema = external_exports.object({ ...target3, tactic: tacticSchema }).strict();
-var validateTacticsSchema = setTacticsSchema;
-var startCombatSchema = external_exports.object({
-  ...target3,
-  enemy_id: combatIdSchema,
-  preset: presetIdSchema.optional(),
-  practice: external_exports.boolean().optional()
-}).strict();
-var restSchema = external_exports.object(target3).strict();
-var useItemSchema = external_exports.object({
-  ...target3,
-  item_id: itemIdSchema
-}).strict();
-var changeJobSchema = external_exports.object({ ...target3, job_id: jobSchema }).strict();
-var getCombatReportSchema = external_exports.object({ ...target3, activity_id: uuidSchema }).strict();
-var getEncountersSchema = external_exports.object(target3).strict();
-var getLostItemsSchema = external_exports.object(target3).strict();
-var recoverLostItemsSchema = external_exports.object({ ...target3, drop_id: uuidSchema }).strict();
-var encounterViewSchema = external_exports.object({
-  enemy_id: combatIdSchema,
-  name: external_exports.string(),
-  description: external_exports.string(),
-  level: external_exports.number().int().positive(),
-  max_hp: external_exports.number().int().positive(),
-  power: external_exports.number().int().nonnegative(),
-  armor: external_exports.number().int().nonnegative(),
-  heavy_power_percent: external_exports.number().int().positive(),
-  heavy_period_ticks: external_exports.number().int().positive(),
-  heavy_poison_ticks: external_exports.number().int().nonnegative(),
-  damage_type: damageTypeSchema,
-  resistances: external_exports.record(damageTypeSchema, external_exports.number().int().min(-50).max(75)),
-  practice: external_exports.boolean(),
-  aggressive: external_exports.boolean()
-}).meta({ id: "Encounter" });
-var combatOutcomeSchema = external_exports.enum(["VICTORY", "DEFEATED", "RETREATED"]);
-var combatFrameSchema = external_exports.object({
-  tick: external_exports.number().int().positive(),
-  action_id: external_exports.string(),
-  enemy_action: external_exports.enum(["attack", "heavy_attack", "interrupted", "none"]),
-  damage_dealt: external_exports.number().int().nonnegative(),
-  damage_taken: external_exports.number().int().nonnegative(),
-  healing: external_exports.number().int().nonnegative(),
-  hp: external_exports.number().int().nonnegative(),
-  mp: external_exports.number().int().nonnegative(),
-  enemy_hp: external_exports.number().int().nonnegative()
-});
-var ambushTriggerSchema = external_exports.object({
-  activity_id: uuidSchema,
-  kind: external_exports.enum(["travel", "gather"])
-});
-var combatReportSchema = external_exports.object({
-  activity_id: uuidSchema,
-  outcome: combatOutcomeSchema,
-  practice: external_exports.boolean(),
-  elapsed_seconds: external_exports.number().int().positive(),
-  damage_dealt: external_exports.number().int().nonnegative(),
-  damage_taken: external_exports.number().int().nonnegative(),
-  healing: external_exports.number().int().nonnegative(),
-  items_used: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      quantity: external_exports.number().int().positive()
-    })
-  ),
-  experience_gained: external_exports.number().int().nonnegative(),
-  gold_gained: external_exports.number().int().nonnegative(),
-  loot: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      name: external_exports.string(),
-      quantity: external_exports.number().int().positive()
-    })
-  ),
-  unclaimed_loot: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      name: external_exports.string(),
-      quantity: external_exports.number().int().positive(),
-      reason: external_exports.literal("BAG_FULL")
-    })
-  ),
-  rules: external_exports.array(
-    external_exports.object({
-      rule_index: external_exports.number().int().nonnegative(),
-      executed: external_exports.number().int().nonnegative(),
-      skipped: external_exports.object({
-        condition: external_exports.number().int().nonnegative(),
-        mp: external_exports.number().int().nonnegative(),
-        cooldown: external_exports.number().int().nonnegative(),
-        unavailable: external_exports.number().int().nonnegative()
-      })
-    })
-  ),
-  frames: external_exports.array(combatFrameSchema).max(48)
-}).meta({ id: "CombatReport" });
-var combatSnapshotViewSchema = external_exports.object({
-  kind: external_exports.literal("combat"),
-  activity_id: uuidSchema,
-  location: locationViewSchema,
-  enemy_id: combatIdSchema,
-  enemy_name: external_exports.string(),
-  practice: external_exports.boolean(),
-  trigger: ambushTriggerSchema.optional(),
-  started_at: timestampSchema,
-  time_limit_at: timestampSchema,
-  next_update_at: timestampSchema.nullable(),
-  next_action: tacticActionSchema.nullable(),
-  duration_seconds: external_exports.number().int().positive(),
-  simulation_tick: external_exports.number().int().nonnegative(),
-  status: external_exports.enum(["RUNNING", "ENDED"]),
-  end_reason: combatOutcomeSchema.nullable(),
-  ended_at: timestampSchema.nullable(),
-  hp: external_exports.number().int().nonnegative(),
-  max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100),
-  enemy_hp: external_exports.number().int().nonnegative(),
-  enemy_max_hp: external_exports.number().int().positive(),
-  enemy_windup_ticks: external_exports.number().int().min(0).max(2),
-  retreat_ticks: external_exports.number().int().min(0).max(3),
-  retreat_requested_tick: external_exports.number().int().positive().nullable(),
-  potions_remaining: external_exports.number().int().nonnegative(),
-  statuses: external_exports.array(
-    external_exports.object({
-      id: combatStatusSchema,
-      remaining_ticks: external_exports.number().int().positive()
-    })
-  )
-}).meta({ id: "CombatActivity" });
-var cancelledCombatViewSchema = external_exports.object({
-  kind: external_exports.literal("combat"),
-  activity_id: uuidSchema,
-  status: external_exports.literal("ENDED"),
-  end_reason: external_exports.literal("CANCELLED"),
-  started_at: timestampSchema,
-  duration_seconds: external_exports.number().int().positive(),
-  ended_at: timestampSchema
-}).meta({ id: "CancelledCombat" });
-var combatActivityViewSchema = external_exports.union([
-  combatSnapshotViewSchema,
-  cancelledCombatViewSchema
-]);
-var restActivityViewSchema = external_exports.object({
-  kind: external_exports.literal("rest"),
-  activity_id: uuidSchema,
-  location: locationViewSchema,
-  started_at: timestampSchema,
-  completes_at: timestampSchema,
-  duration_seconds: external_exports.number().int().positive(),
-  status: external_exports.enum(["RUNNING", "ENDED"]),
-  ended_at: timestampSchema.nullable(),
-  end_reason: external_exports.enum(["COMPLETED", "STOPPED"]).nullable(),
-  hp: external_exports.number().int().nonnegative(),
-  max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100)
-}).meta({ id: "RestActivity" });
-var lostItemsViewSchema = external_exports.object({
-  drop_id: uuidSchema,
-  owner_character_id: characterIdSchema,
-  location: locationViewSchema,
-  protected_until: timestampSchema,
-  expires_at: timestampSchema,
-  items: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      name: external_exports.string(),
-      quantity: external_exports.number().int().positive()
-    })
-  )
-});
-
 // src/protocol/activity.ts
+var failedActivityViewSchema = external_exports.object({
+  kind: external_exports.enum(["travel", "gather", "craft", "combat", "rest"]),
+  activity_id: external_exports.uuid(),
+  status: external_exports.literal("ENDED"),
+  end_reason: external_exports.literal("FAILED"),
+  started_at: external_exports.iso.datetime(),
+  duration_seconds: external_exports.number().int().positive(),
+  ended_at: external_exports.iso.datetime()
+});
 var activityViewSchema = external_exports.union([
   travelActivityViewSchema,
   productionActivityViewSchema,
   combatActivityViewSchema,
-  restActivityViewSchema
+  restActivityViewSchema,
+  failedActivityViewSchema
 ]);
 var agentMaterialSchema = external_exports.object({
   item_id: itemIdSchema,
@@ -24864,7 +24961,8 @@ var agentRunningRestSchema = external_exports.object({
   status: external_exports.literal("RUNNING"),
   hp: external_exports.number().int().nonnegative(),
   max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100)
+  mp: external_exports.number().int().min(0).max(100),
+  inn: external_exports.boolean()
 });
 var agentRunningActivitySchema = external_exports.union([
   agentRunningTravelSchema,
@@ -24883,7 +24981,7 @@ var agentTravelResultSchema = external_exports.object({
   kind: external_exports.literal("travel"),
   end_reason: external_exports.enum(["COMPLETED", "CANCELLED"]),
   to: locationViewSchema,
-  characters: external_exports.array(presentCharacterSchema).optional(),
+  characters_count: external_exports.number().int().nonnegative().optional(),
   ambush: ambushReferenceSchema.optional()
 });
 var agentGatherResultSchema = external_exports.object({
@@ -24953,12 +25051,20 @@ var agentRestResultSchema = external_exports.object({
   end_reason: external_exports.enum(["COMPLETED", "STOPPED"]),
   summary: agentRestSummarySchema
 });
-var agentLastResultSchema = external_exports.discriminatedUnion("kind", [
-  agentTravelResultSchema,
-  agentGatherResultSchema,
-  agentCraftResultSchema,
-  agentCombatResultSchema,
-  agentRestResultSchema
+var agentFailedResultSchema = external_exports.object({
+  ...ended,
+  kind: external_exports.enum(["travel", "gather", "craft", "combat", "rest"]),
+  end_reason: external_exports.literal("FAILED")
+});
+var agentLastResultSchema = external_exports.union([
+  external_exports.discriminatedUnion("kind", [
+    agentTravelResultSchema,
+    agentGatherResultSchema,
+    agentCraftResultSchema,
+    agentCombatResultSchema,
+    agentRestResultSchema
+  ]),
+  agentFailedResultSchema
 ]);
 
 // src/protocol/quests.ts
@@ -25435,7 +25541,7 @@ var changelogResponseSchema = external_exports.object({
 var profileReceiptSchema = external_exports.object({
   preferred_locale: localeSchema
 });
-var agentSchemaVersion = "3.7";
+var agentSchemaVersion = "3.8";
 var agentGameResponseSchema = external_exports.object({
   ok: external_exports.boolean(),
   schema_version: external_exports.literal(agentSchemaVersion),
@@ -25525,7 +25631,18 @@ var agentGameResponseSchema = external_exports.object({
     rest_estimate: external_exports.object({
       available: external_exports.boolean(),
       reason: external_exports.enum(["no_effect", "busy", "wrong_location"]).nullable(),
-      duration_seconds: external_exports.number().int().nonnegative().nullable()
+      duration_seconds: external_exports.number().int().nonnegative().nullable(),
+      inn: external_exports.object({
+        available: external_exports.boolean(),
+        reason: external_exports.enum([
+          "no_effect",
+          "busy",
+          "wrong_location",
+          "insufficient_funds"
+        ]).nullable(),
+        fee: external_exports.number().int().nonnegative(),
+        duration_seconds: external_exports.number().int().nonnegative().nullable()
+      })
     }).optional(),
     capacity: external_exports.object({
       carried_weight: external_exports.number().int().nonnegative(),
@@ -26143,7 +26260,7 @@ function updateNote(current, published) {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.15",
+  version: "0.1.16",
   homepage: "https://clawsaga.net",
   repository: "github:palon7/clawsaga",
   license: "MIT",
@@ -26236,7 +26353,7 @@ var noWaitFlag = [
 function bodySchema(definition) {
   const mask = { locale: true };
   if ("character_id" in definition.schema.shape) mask.character_id = true;
-  return definition.schema.omit(mask);
+  return external_exports.strictObject(definition.schema.shape).omit(mask);
 }
 
 // src/adventure-commands.ts
@@ -26261,7 +26378,7 @@ var adventureCommands = {
     path: "character/monologue/send",
     schema: sendMonologueSchema,
     flags: [jsonFlag],
-    help: "Post an in-character update to your human\u2019s Web activity feed (up to 1000 characters). Use -i JSON with text and language, not --text. Works during activities. Chatting with your human does not post here. No agent-readable history; do not resend if delivery is unknown.",
+    help: "Post an in-character update to your human\u2019s Web activity feed (up to 400 characters). Use -i JSON with text and language, not --text. Works during activities. Chatting with your human does not post here. No agent-readable history; do not resend if delivery is unknown.",
     inputExample: {
       text: "I will prepare healing supplies before choosing the next route.",
       language: "en"
@@ -26297,7 +26414,11 @@ var adventureCommands = {
     path: "character/combat/start",
     schema: startCombatSchema,
     flags: [
-      ["--enemy <id>", "Enemy ID from encounters", true],
+      [
+        "--enemy <id>",
+        "Enemy ID from encounters; with --input, replaces the file\u2019s enemy_id"
+      ],
+      [jsonFlag[0], jsonFlag[1]],
       ["--preset <id>", "Preset name", false, ["safe", "aggressive"]],
       [
         "--practice",
@@ -26305,10 +26426,12 @@ var adventureCommands = {
       ],
       noWaitFlag
     ],
-    help: "Start one battle while idle and wait for its outcome before starting another main activity.",
+    help: "Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes.",
+    inputExample: { enemy_id: "wolf", tactic: { rules: [], potion_limit: 0 } },
     examples: [
       "clawsaga fight -c m7Qp2_aR9L-x --enemy wolf",
-      "clawsaga fight -c m7Qp2_aR9L-x --enemy wolf --no-wait"
+      "clawsaga fight -c m7Qp2_aR9L-x --enemy wolf --no-wait",
+      "clawsaga fight -c m7Qp2_aR9L-x --enemy wolf --input tactic-armored.json"
     ]
   },
   report: {
@@ -26326,10 +26449,17 @@ var adventureCommands = {
   rest: {
     path: "character/rest",
     schema: restSchema,
-    flags: [noWaitFlag],
-    help: "Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early.",
+    flags: [
+      [
+        "--inn",
+        "Pay the inn fee shown in rest_estimate.inn for faster recovery"
+      ],
+      noWaitFlag
+    ],
+    help: "Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early without refunding an inn fee.",
     examples: [
       "clawsaga rest -c m7Qp2_aR9L-x",
+      "clawsaga rest -c m7Qp2_aR9L-x --inn",
       "clawsaga rest -c m7Qp2_aR9L-x --no-wait"
     ]
   },
@@ -26833,8 +26963,14 @@ var commands = {
   look: {
     path: "character/look",
     schema: lookSchema,
-    flags: [["--people", "Include other active characters at this location"]],
-    help: "Read local resources, enemies and facilities. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for full enemy details."
+    flags: [
+      ["--people", "Count nearby characters and list the first 20"],
+      [
+        "--cursor <character id>",
+        "Continue the people list from people_next_cursor"
+      ]
+    ],
+    help: "Read local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until null. people_count is the total. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for full enemy details."
   },
   route: {
     path: "character/route",
@@ -27108,6 +27244,7 @@ var optionsSchema2 = external_exports.object({
   enemy: external_exports.string().optional(),
   preset: external_exports.string().optional(),
   practice: external_exports.boolean().optional(),
+  inn: external_exports.boolean().optional(),
   job: external_exports.string().optional(),
   drop: external_exports.string().optional(),
   offer: external_exports.string().optional(),
@@ -27151,12 +27288,26 @@ async function readStdin() {
 }
 async function commandInput(values, definition, commandName) {
   if (values.input) {
+    if (commandName === "fight" && (values.preset !== void 0 || values.practice !== void 0))
+      throw new CliError("INVALID_ARGUMENTS", {
+        fields: ["input"],
+        message: "Use either --input or --preset/--practice. --enemy may be combined with --input."
+      });
     let input3;
     try {
       const text2 = values.input === "-" ? await readStdin() : await readFile2(values.input, "utf8");
       input3 = JSON.parse(text2);
     } catch {
       throw new CliError("INVALID_INPUT_FILE");
+    }
+    if (commandName === "fight" && typeof input3 === "object" && input3 !== null && !Array.isArray(input3)) {
+      if (values.enemy !== void 0)
+        input3 = { ...input3, enemy_id: values.enemy };
+      else if (!("enemy_id" in input3))
+        throw new CliError("INVALID_ARGUMENTS", {
+          fields: ["enemy_id"],
+          message: "Pass --enemy or include enemy_id in the --input file."
+        });
     }
     const body = validateInput(bodySchema(definition), input3);
     return {
@@ -27226,6 +27377,7 @@ async function commandInput(values, definition, commandName) {
   if (values.enemy) input2.enemy_id = values.enemy;
   if (values.preset) input2.preset = values.preset;
   if (values.practice) input2.practice = values.practice;
+  if (values.inn) input2.inn = true;
   if (values.job) input2.job_id = values.job;
   if (values.drop) input2.drop_id = values.drop;
   if (values.offer) input2.offer_id = values.offer;

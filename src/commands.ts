@@ -169,8 +169,14 @@ const commands: Record<string, CommandDefinition> = {
   look: {
     path: 'character/look',
     schema: lookSchema,
-    flags: [['--people', 'Include other active characters at this location']],
-    help: 'Read local resources, enemies and facilities. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for full enemy details.',
+    flags: [
+      ['--people', 'Count nearby characters and list the first 20'],
+      [
+        '--cursor <character id>',
+        'Continue the people list from people_next_cursor',
+      ],
+    ],
+    help: 'Read local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until null. people_count is the total. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for full enemy details.',
   },
   route: {
     path: 'character/route',
@@ -450,6 +456,7 @@ const optionsSchema = z.object({
   enemy: z.string().optional(),
   preset: z.string().optional(),
   practice: z.boolean().optional(),
+  inn: z.boolean().optional(),
   job: z.string().optional(),
   drop: z.string().optional(),
   offer: z.string().optional(),
@@ -502,6 +509,15 @@ async function commandInput(
   commandName: string,
 ): Promise<unknown> {
   if (values.input) {
+    if (
+      commandName === 'fight' &&
+      (values.preset !== undefined || values.practice !== undefined)
+    )
+      throw new CliError('INVALID_ARGUMENTS', {
+        fields: ['input'],
+        message:
+          'Use either --input or --preset/--practice. --enemy may be combined with --input.',
+      });
     let input: unknown;
     try {
       const text =
@@ -511,6 +527,22 @@ async function commandInput(
       input = JSON.parse(text);
     } catch {
       throw new CliError('INVALID_INPUT_FILE');
+    }
+    // 同じ戦術ファイルを相手を変えて使い回せるよう、ファイルのenemy_idを任意とし、
+    // --enemyがあればそちらを使う。
+    if (
+      commandName === 'fight' &&
+      typeof input === 'object' &&
+      input !== null &&
+      !Array.isArray(input)
+    ) {
+      if (values.enemy !== undefined)
+        input = { ...input, enemy_id: values.enemy };
+      else if (!('enemy_id' in input))
+        throw new CliError('INVALID_ARGUMENTS', {
+          fields: ['enemy_id'],
+          message: 'Pass --enemy or include enemy_id in the --input file.',
+        });
     }
     const body = validateInput(bodySchema(definition), input);
     return {
@@ -582,6 +614,7 @@ async function commandInput(
   if (values.enemy) input.enemy_id = values.enemy;
   if (values.preset) input.preset = values.preset;
   if (values.practice) input.practice = values.practice;
+  if (values.inn) input.inn = true;
   if (values.job) input.job_id = values.job;
   if (values.drop) input.drop_id = values.drop;
   if (values.offer) input.offer_id = values.offer;

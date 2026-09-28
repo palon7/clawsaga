@@ -291,7 +291,7 @@ export const profileReceiptSchema = z.object({
   preferred_locale: localeSchema,
 });
 
-export const agentSchemaVersion = '3.7';
+export const agentSchemaVersion = '3.8';
 
 export const agentGameResponseSchema = z
   .object({
@@ -411,6 +411,19 @@ export const agentGameResponseSchema = z
           available: z.boolean(),
           reason: z.enum(['no_effect', 'busy', 'wrong_location']).nullable(),
           duration_seconds: z.number().int().nonnegative().nullable(),
+          inn: z.object({
+            available: z.boolean(),
+            reason: z
+              .enum([
+                'no_effect',
+                'busy',
+                'wrong_location',
+                'insufficient_funds',
+              ])
+              .nullable(),
+            fee: z.number().int().nonnegative(),
+            duration_seconds: z.number().int().nonnegative().nullable(),
+          }),
         })
         .optional(),
       capacity: z
