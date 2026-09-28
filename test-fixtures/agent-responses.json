@@ -3,7 +3,7 @@
     "name": "cancelled_travel",
     "response": {
       "ok": true,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "activity": null,
@@ -14,7 +14,7 @@
           "ended_at": "2026-09-22T01:02:03Z",
           "end_reason": "CANCELLED",
           "to": { "id": "mossway", "name": "Mossway", "kind": "field" },
-          "characters": []
+          "characters_count": 0
         }
       }
     }
@@ -23,7 +23,7 @@
     "name": "gather_actual_experience",
     "response": {
       "ok": true,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "last_result": {
@@ -42,7 +42,7 @@
     "name": "craft_actual_experience",
     "response": {
       "ok": true,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "last_result": {
@@ -67,7 +67,7 @@
     "name": "settled_result_with_current_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-19T01:02:03.456Z",
       "next_poll_after_seconds": 7,
       "data": {
@@ -129,7 +129,13 @@
         "rest_estimate": {
           "available": false,
           "reason": "busy",
-          "duration_seconds": null
+          "duration_seconds": null,
+          "inn": {
+            "available": false,
+            "reason": "busy",
+            "fee": 8,
+            "duration_seconds": null
+          }
         },
         "activity": {
           "kind": "rest",
@@ -140,7 +146,8 @@
           "status": "RUNNING",
           "hp": 73,
           "max_hp": 120,
-          "mp": 41
+          "mp": 41,
+          "inn": false
         },
         "last_result": {
           "kind": "combat",
@@ -171,7 +178,7 @@
     "name": "accepted_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-19T01:08:00.456Z",
       "next_poll_after_seconds": 5,
       "data": {
@@ -204,7 +211,7 @@
     "name": "cancelled_result",
     "response": {
       "ok": true,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-19T02:03:04.567Z",
       "data": {
         "activity": null,
@@ -223,7 +230,7 @@
     "name": "location_chat",
     "response": {
       "ok": true,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-19T03:04:05.678Z",
       "attention": {
         "unread_direct_messages": 0,
@@ -258,7 +265,7 @@
     "name": "business_failure",
     "response": {
       "ok": false,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-19T04:05:06.789Z",
       "data": {},
       "error": {
@@ -271,7 +278,7 @@
     "name": "delivery_shortage",
     "response": {
       "ok": false,
-      "schema_version": "3.7",
+      "schema_version": "3.8",
       "server_time": "2026-09-19T04:06:07.890Z",
       "data": {},
       "error": {

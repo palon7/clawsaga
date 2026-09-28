@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { damageTypeSchema } from './combat.js';
 import {
   itemIdSchema as itemId,
   localeSchema,
@@ -100,6 +101,9 @@ export const equipmentStatsSchema = z.object({
   required_level: z.number().int().positive().nullable(),
   power: z.number().int(),
   armor: z.number().int(),
+  resistances: z
+    .partialRecord(damageTypeSchema, z.number().int().min(-50).max(75))
+    .optional(),
 });
 const useEffectSchema = z.object({
   hp_recovery: z.number().int().nonnegative(),
