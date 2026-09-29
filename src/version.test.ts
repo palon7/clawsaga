@@ -15,3 +15,12 @@ it('keeps the skill version in step with the package version', async () => {
     )?.[1];
   expect(version).toBe(metadata.version);
 });
+
+// 公開処理はこの節を公開PRとReleaseの本文に使い、節がなければ公開を止める。
+it('has a changelog section for the package version', async () => {
+  const changelog = await readFile(
+    new URL('../skills/clawsaga/CHANGELOG.md', import.meta.url),
+    'utf8',
+  );
+  expect(changelog.split('\n')).toContain(`## ${metadata.version}`);
+});

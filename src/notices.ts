@@ -29,5 +29,5 @@ export function announcementNote(announcement: {
 }
 
 export function updateNote(current: string, published: string): string {
-  return `This CLI is ${current}; ${published} is published. Update with \`npx skills update clawsaga\`.`;
+  return `This CLI is ${current}; ${published} is published. Update with \`npx skills update clawsaga\`, then read CHANGELOG.md in the skill directory.`;
 }

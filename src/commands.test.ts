@@ -58,6 +58,78 @@ it('uses one selected origin for authorization and game commands, with explicit 
   expect(origins).toHaveLength(4);
 });
 
+it('accepts a reusable one-battle tactic file and rejects ambiguous or incomplete fight inputs', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  const tactic = {
+    rules: [
+      {
+        conditions: [{ kind: 'enemy_recovering' }],
+        action: { kind: 'attack' },
+      },
+    ],
+    potion_limit: 0,
+  };
+  vi.mocked(readFile).mockResolvedValue(
+    JSON.stringify({ enemy_id: 'wolf', tactic }),
+  );
+  await execute(
+    ['fight', '-c', 'Traveler0000', '--input', 'fight.json', '--no-wait'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenCalledWith('character/combat/start', {
+    character_id: 'Traveler0000',
+    enemy_id: 'wolf',
+    tactic,
+  });
+  vi.mocked(readFile).mockResolvedValue(JSON.stringify({ tactic }));
+  await execute(
+    [
+      'fight',
+      '-c',
+      'Traveler0000',
+      '--input',
+      'fight.json',
+      '--enemy',
+      'boar',
+      '--no-wait',
+    ],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith('character/combat/start', {
+    character_id: 'Traveler0000',
+    enemy_id: 'boar',
+    tactic,
+  });
+  for (const flags of [['--preset', 'safe'], ['--practice']])
+    await expect(
+      execute(
+        ['fight', '-c', 'Traveler0000', '--input', 'fight.json', ...flags],
+        vi.fn(),
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
+  for (const body of [
+    { tactic },
+    { enemy_id: 'wolf', tactic, preset: 'safe' },
+  ]) {
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(body));
+    await expect(
+      execute(
+        ['fight', '-c', 'Traveler0000', '--input', 'fight.json'],
+        vi.fn(),
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
+  }
+  await expect(
+    execute(['fight', '-c', 'Traveler0000'], vi.fn()),
+  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
+  expect(invoke).toHaveBeenCalledTimes(2);
+  expect(await execute(['schema', 'fight'], vi.fn())).toMatchObject({
+    input_schema: { properties: { tactic: expect.any(Object) } },
+  });
+});
+
 it('resolves a named character to a Character ID without -c or a JSON body', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
@@ -435,6 +507,7 @@ it('validates JSON examples and keeps character and locale outside the body', as
     if (!inputExample) continue;
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(inputExample));
     const args = [name, '-i', 'body.json', '-l', 'ja'];
+    if (name === 'fight') args.push('--no-wait');
     if (help.help.usage.includes('-c <id>')) args.push('-c', 'Traveler0000');
     await execute(args, vi.fn());
     expect(invoke.mock.lastCall?.[1]).toMatchObject({
@@ -593,9 +666,10 @@ it('returns one acceptance for --no-wait travel, fight and rest without polling 
     character_id: 'Traveler0000',
     enemy_id: 'wolf',
   });
-  await execute(['rest', '-c', 'Traveler0000', '--no-wait'], notify);
+  await execute(['rest', '-c', 'Traveler0000', '--inn', '--no-wait'], notify);
   expect(invoke).toHaveBeenLastCalledWith('character/rest', {
     character_id: 'Traveler0000',
+    inn: true,
   });
   // 開始1回ずつ。活動照会もstderr診断も出さない。
   expect(invoke).toHaveBeenCalledTimes(3);
@@ -866,6 +940,14 @@ it('sends map scope, look people and route or travel destinations', async () => 
   expect(invoke).toHaveBeenLastCalledWith('character/look', {
     character_id: 'Traveler0000',
     people: true,
+  });
+  await execute(
+    ['look', '-c', 'Traveler0000', '--cursor', 'Nearby000000'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith('character/look', {
+    character_id: 'Traveler0000',
+    cursor: 'Nearby000000',
   });
   await execute(['route', '-c', 'Traveler0000', '--to', 'openpit'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('character/route', {

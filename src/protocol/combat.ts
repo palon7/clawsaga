@@ -52,6 +52,16 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
     .strict()
     .describe('Matches on the tick when the enemy heavy attack occurs.'),
   z
+    .object({ kind: z.literal('enemy_recovering') })
+    .strict()
+    .describe('Matches on the recovery tick after a heavy attack.'),
+  z
+    .object({ kind: z.literal('enemy_heavy_interruptible') })
+    .strict()
+    .describe(
+      'Matches when the scheduled enemy heavy attack can be interrupted.',
+    ),
+  z
     .object({
       kind: z.literal('potions_below'),
       count: z.number().int().min(1).max(21),
@@ -136,6 +146,15 @@ export const abilityEffectSchema = z.discriminatedUnion('kind', [
     kind: z.literal('damage'),
     damage_type: damageTypeSchema,
     power_percent: z.number().int().min(1).max(500),
+    armor_percent: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe(
+        'Percentage of target armor applied. If omitted: physical 100%, other damage types 0%.',
+      ),
     poison_ticks: z.number().int().min(0).max(6),
     interrupt: z.boolean(),
   }),
@@ -185,10 +204,23 @@ export const startCombatSchema = z
     ...target,
     enemy_id: combatIdSchema,
     preset: presetIdSchema.optional(),
+    tactic: tacticSchema.optional(),
     practice: z.boolean().optional(),
   })
+  .strict()
+  .refine((input) => !(input.preset && input.tactic), {
+    path: ['tactic'],
+    message: 'Choose either tactic or preset, not both.',
+  });
+export const restSchema = z
+  .object({
+    ...target,
+    inn: z.boolean().optional().meta({
+      description:
+        'true pays the inn fee from rest_estimate.inn for faster recovery. Omit for free rest.',
+    }),
+  })
   .strict();
-export const restSchema = z.object(target).strict();
 export const useItemSchema = z
   .object({
     ...target,
@@ -211,6 +243,18 @@ export type SetTacticsInput = z.infer<typeof setTacticsSchema>;
 export type UseItemInput = z.infer<typeof useItemSchema>;
 export type ChangeJobInput = z.infer<typeof changeJobSchema>;
 
+export const combatProbabilitySchema = z.object({
+  hit_percent: z.number().int().min(1).max(100),
+  damage_variance_percent: z.number().int().min(0).max(50),
+});
+
+export const enemyTendencySchema = z.enum(['low', 'normal', 'high']);
+export const resistanceTendencySchema = z.enum([
+  'major_weakness',
+  'weakness',
+  'resistant',
+]);
+
 export const encounterViewSchema = z
   .object({
     enemy_id: combatIdSchema,
@@ -218,19 +262,27 @@ export const encounterViewSchema = z
     description: z.string(),
     level: z.number().int().positive(),
     max_hp: z.number().int().positive(),
-    power: z.number().int().nonnegative(),
-    armor: z.number().int().nonnegative(),
-    heavy_power_percent: z.number().int().positive(),
-    heavy_period_ticks: z.number().int().positive(),
-    heavy_poison_ticks: z.number().int().nonnegative(),
+    power: enemyTendencySchema,
+    armor: enemyTendencySchema,
+    heavy_attack: z.object({
+      interruptible: z.boolean(),
+      poisons: z.boolean(),
+      leaves_opening: z.boolean(),
+    }),
     damage_type: damageTypeSchema,
-    resistances: z.record(damageTypeSchema, z.number().int().min(-50).max(75)),
+    resistances: z.partialRecord(damageTypeSchema, resistanceTendencySchema),
     practice: z.boolean(),
     aggressive: z.boolean(),
+    probability: combatProbabilitySchema.optional(),
   })
   .meta({ id: 'Encounter' });
 export const combatOutcomeSchema = z.enum(['VICTORY', 'DEFEATED', 'RETREATED']);
 export type CombatOutcome = z.infer<typeof combatOutcomeSchema>;
+const attackResultSchema = z.object({
+  damage_type: damageTypeSchema,
+  hit: z.boolean(),
+  damage: z.number().int().nonnegative(),
+});
 export const combatFrameSchema = z.object({
   tick: z.number().int().positive(),
   action_id: z.string(),
@@ -241,6 +293,19 @@ export const combatFrameSchema = z.object({
   hp: z.number().int().nonnegative(),
   mp: z.number().int().nonnegative(),
   enemy_hp: z.number().int().nonnegative(),
+  details: z
+    .object({
+      rule_index: z.number().int().nonnegative().nullable(),
+      selection: z.enum(['rule', 'fallback', 'retreat', 'status_effect']),
+      player_attack: attackResultSchema.optional(),
+      enemy_attack: attackResultSchema.optional(),
+      interrupt: z.enum(['success', 'miss', 'immune', 'not_due']).optional(),
+      reductions: z.array(z.enum(['guard', 'barrier'])),
+      enemy_recovering: z.boolean(),
+      heavy_power_percent: z.number().int().positive(),
+      heavy_period_ticks: z.number().int().positive(),
+    })
+    .optional(),
 });
 export type CombatFrame = z.infer<typeof combatFrameSchema>;
 export const ambushTriggerSchema = z.object({
@@ -283,6 +348,8 @@ export const combatReportSchema = z
       z.object({
         rule_index: z.number().int().nonnegative(),
         executed: z.number().int().nonnegative(),
+        damage_dealt_on_ticks: z.number().int().nonnegative().optional(),
+        damage_taken_on_ticks: z.number().int().nonnegative().optional(),
         skipped: z.object({
           condition: z.number().int().nonnegative(),
           mp: z.number().int().nonnegative(),
@@ -292,6 +359,34 @@ export const combatReportSchema = z
       }),
     ),
     frames: z.array(combatFrameSchema).max(48),
+    accuracy: z
+      .object({
+        player: z.object({
+          hits: z.number().int().nonnegative(),
+          misses: z.number().int().nonnegative(),
+        }),
+        enemy: z.object({
+          hits: z.number().int().nonnegative(),
+          misses: z.number().int().nonnegative(),
+        }),
+      })
+      .optional(),
+    preparation: z
+      .object({
+        engine_version: z.string(),
+        content_version: z.string(),
+        hp: z.number().int().nonnegative(),
+        mp: z.number().int().nonnegative(),
+        power: z.number().int().nonnegative(),
+        armor: z.number().int().nonnegative(),
+        resistances: z
+          .partialRecord(damageTypeSchema, z.number().int().min(-50).max(75))
+          .optional(),
+        weakness_ticks: z.number().int().nonnegative(),
+        tactic: tacticSchema,
+        probability: combatProbabilitySchema,
+      })
+      .optional(),
   })
   .meta({ id: 'CombatReport' });
 export type CombatReport = z.infer<typeof combatReportSchema>;
@@ -303,8 +398,8 @@ export const combatSnapshotViewSchema = z
     enemy_id: combatIdSchema,
     enemy_name: z.string(),
     practice: z.boolean(),
-    trigger: ambushTriggerSchema.optional(),
     started_at: timestampSchema,
+    trigger: ambushTriggerSchema.optional(),
     time_limit_at: timestampSchema,
     next_update_at: timestampSchema.nullable(),
     next_action: tacticActionSchema.nullable(),
@@ -319,6 +414,16 @@ export const combatSnapshotViewSchema = z
     enemy_hp: z.number().int().nonnegative(),
     enemy_max_hp: z.number().int().positive(),
     enemy_windup_ticks: z.number().int().min(0).max(2),
+    enemy_recovering: z.boolean().optional(),
+    last_frame: combatFrameSchema.optional(),
+    next_heavy: z
+      .object({
+        tick: z.number().int().positive(),
+        power_percent: z.number().int().positive(),
+        interruptible: z.boolean(),
+        recovery_percent: z.number().int().min(100).nullable(),
+      })
+      .optional(),
     retreat_ticks: z.number().int().min(0).max(3),
     retreat_requested_tick: z.number().int().positive().nullable(),
     potions_remaining: z.number().int().nonnegative(),
@@ -360,6 +465,7 @@ export const restActivityViewSchema = z
     hp: z.number().int().nonnegative(),
     max_hp: z.number().int().positive(),
     mp: z.number().int().min(0).max(100),
+    inn: z.boolean(),
   })
   .meta({ id: 'RestActivity' });
 export const lostItemsViewSchema = z.object({
