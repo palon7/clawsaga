@@ -3,7 +3,6 @@ import { itemIdSchema, jobSchema } from './ids.js';
 import {
   ambushReferenceSchema,
   locationViewSchema,
-  presentCharacterSchema,
   travelActivityViewSchema,
 } from './movement.js';
 import {
@@ -12,11 +11,23 @@ import {
 } from './production.js';
 import { combatActivityViewSchema, restActivityViewSchema } from './combat.js';
 
+// 期限の確定がサーバー側の失敗で続けられず終了した活動。成果を持たず、資産・位置・
+// HP・MPは開始時点のまま変えない。
+export const failedActivityViewSchema = z.object({
+  kind: z.enum(['travel', 'gather', 'craft', 'combat', 'rest']),
+  activity_id: z.uuid(),
+  status: z.literal('ENDED'),
+  end_reason: z.literal('FAILED'),
+  started_at: z.iso.datetime(),
+  duration_seconds: z.number().int().positive(),
+  ended_at: z.iso.datetime(),
+});
 export const activityViewSchema = z.union([
   travelActivityViewSchema,
   productionActivityViewSchema,
   combatActivityViewSchema,
   restActivityViewSchema,
+  failedActivityViewSchema,
 ]);
 export type ActivityView = z.infer<typeof activityViewSchema>;
 
@@ -83,6 +94,7 @@ export const agentRunningRestSchema = z.object({
   hp: z.number().int().nonnegative(),
   max_hp: z.number().int().positive(),
   mp: z.number().int().min(0).max(100),
+  inn: z.boolean(),
 });
 export const agentRunningActivitySchema = z.union([
   agentRunningTravelSchema,
@@ -104,7 +116,7 @@ export const agentTravelResultSchema = z.object({
   kind: z.literal('travel'),
   end_reason: z.enum(['COMPLETED', 'CANCELLED']),
   to: locationViewSchema,
-  characters: z.array(presentCharacterSchema).optional(),
+  characters_count: z.number().int().nonnegative().optional(),
   ambush: ambushReferenceSchema.optional(),
 });
 export const agentGatherResultSchema = z.object({
@@ -179,11 +191,19 @@ export const agentRestResultSchema = z.object({
   end_reason: z.enum(['COMPLETED', 'STOPPED']),
   summary: agentRestSummarySchema,
 });
-export const agentLastResultSchema = z.discriminatedUnion('kind', [
-  agentTravelResultSchema,
-  agentGatherResultSchema,
-  agentCraftResultSchema,
-  agentCombatResultSchema,
-  agentRestResultSchema,
+export const agentFailedResultSchema = z.object({
+  ...ended,
+  kind: z.enum(['travel', 'gather', 'craft', 'combat', 'rest']),
+  end_reason: z.literal('FAILED'),
+});
+export const agentLastResultSchema = z.union([
+  z.discriminatedUnion('kind', [
+    agentTravelResultSchema,
+    agentGatherResultSchema,
+    agentCraftResultSchema,
+    agentCombatResultSchema,
+    agentRestResultSchema,
+  ]),
+  agentFailedResultSchema,
 ]);
 export type AgentLastResult = z.infer<typeof agentLastResultSchema>;

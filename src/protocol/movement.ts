@@ -34,6 +34,7 @@ export const facilitySchema = z.enum([
   'workshop',
   'community_board',
   'market',
+  'inn',
 ]);
 export const lookResourceSchema = z.object({
   item_id: itemIdSchema,
@@ -57,6 +58,8 @@ export const lookViewSchema = z.object({
   resources: z.array(lookResourceSchema),
   enemies: z.array(lookEnemySchema),
   facilities: z.array(facilitySchema),
+  people_count: z.number().int().nonnegative().optional(),
+  people_next_cursor: characterIdSchema.nullable().optional(),
   people: z
     .array(
       z.object({
@@ -114,6 +117,7 @@ export const travelActivityViewSchema = z
         status: z.literal('ENDED'),
         ended_at: z.iso.datetime(),
         end_reason: z.enum(['COMPLETED', 'CANCELLED']),
+        characters_count: z.number().int().nonnegative().optional(),
         characters: z.array(presentCharacterSchema),
         ambush: ambushReferenceSchema.optional(),
       }),
@@ -129,7 +133,11 @@ export const getMapSchema = z
   .object({ ...common, full: z.boolean().optional() })
   .strict();
 export const lookSchema = z
-  .object({ ...common, people: z.boolean().optional() })
+  .object({
+    ...common,
+    people: z.boolean().optional(),
+    cursor: characterIdSchema.optional(),
+  })
   .strict();
 export const getRouteSchema = z
   .object({ ...common, to: locationIdSchema })

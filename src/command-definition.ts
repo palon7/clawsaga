@@ -58,5 +58,6 @@ export const noWaitFlag = [
 export function bodySchema(definition: CommandDefinition) {
   const mask: Record<string, true> = { locale: true };
   if ('character_id' in definition.schema.shape) mask.character_id = true;
-  return definition.schema.omit(mask);
+  // Cross-field checks run on the complete input after -c and -l are added.
+  return z.strictObject(definition.schema.shape).omit(mask);
 }
