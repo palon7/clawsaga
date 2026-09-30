@@ -29,7 +29,7 @@ const contractFixtures = JSON.parse(
     ),
     'utf8',
   ),
-) as { name: string; response: { ok: boolean } }[];
+) as { name: string; response: { ok: boolean; schema_version: string } }[];
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -298,12 +298,11 @@ it('preserves success and failure fixtures through the built CLI', async () => {
           note: expect.stringContaining('00000000-0000-4000-8000-000000000006'),
         },
       ]);
-      const response = structuredClone(output);
-      delete response.hints;
-      expect(response).toEqual(fixture.response);
-    } else {
-      expect(output).toEqual(fixture.response);
+      delete output.hints;
     }
+    const expected: Record<string, unknown> = { ...fixture.response };
+    delete expected.schema_version;
+    expect(output).toEqual(expected);
   }
   expect(requests).toHaveLength(contractFixtures.length);
   expect(

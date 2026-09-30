@@ -292,6 +292,37 @@ it('reports UPDATE_REQUIRED only when the server schema is newer', async () => {
   }
 });
 
+it('returns unknown content values and unknown fields from the server unchanged', async () => {
+  const { store } = await fixture();
+  await store.update((entries) => {
+    entries[origin]!.expires_at = Date.now() + 3600_000;
+  });
+  const body = {
+    ok: true,
+    schema_version: agentSchemaVersion,
+    server_time: '2026-09-11T00:00:00.000Z',
+    future_envelope_field: true,
+    data: {
+      position: { id: 'new_outpost', name: 'New Outpost', kind: 'harbor' },
+      character: { job_id: 'necromancer', max_mp: 250 },
+      last_result: {
+        kind: 'gather',
+        activity_id: '00000000-0000-4000-8000-000000000001',
+        status: 'ENDED',
+        end_reason: 'COMPLETED',
+        output: { item_id: 'sea_salt', quantity: 1, rarity: 'rare' },
+        damage: { type: 'void', amount: 3 },
+      },
+    },
+  };
+  const client = new GameClient(
+    origin,
+    store,
+    vi.fn<typeof fetch>().mockResolvedValue(Response.json(body)),
+  );
+  expect(await client.invoke('character/activity', {})).toEqual(body);
+});
+
 it('marks a failure before the start as not sent, not as an unknown outcome', async () => {
   const { store } = await fixture();
   const requests = [
@@ -316,7 +347,7 @@ it('marks a failure before the start as not sent, not as an unknown outcome', as
     expect(error.detail.outcome).toBe('not_sent');
     // Only the token refresh was attempted; the game start was never sent.
     expect(request).toHaveBeenCalledTimes(1);
-    expect(String(request.mock.calls[0]?.[0])).toBe(
+    expect(request.mock.calls[0]?.[0] as string).toBe(
       `${origin}/api/auth/oauth2/token`,
     );
   }

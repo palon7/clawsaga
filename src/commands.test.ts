@@ -1,9 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
+import { initial } from './test-responses.js';
 import { GameClient } from './client.js';
-import { execute, waitForActivity } from './commands.js';
-import { CliError } from './errors.js';
+import { execute } from './commands.js';
 
 vi.mock('node:timers/promises', () => ({
   setTimeout: (delay: number) =>
@@ -58,7 +58,7 @@ it('uses one selected origin for authorization and game commands, with explicit 
   expect(origins).toHaveLength(4);
 });
 
-it('accepts a reusable one-battle tactic file and rejects ambiguous or incomplete fight inputs', async () => {
+it('accepts a reusable one-battle tactic file and rejects fight inputs the CLI cannot build', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
@@ -109,20 +109,9 @@ it('accepts a reusable one-battle tactic file and rejects ambiguous or incomplet
         vi.fn(),
       ),
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  for (const body of [
-    { tactic },
-    { enemy_id: 'wolf', tactic, preset: 'safe' },
-  ]) {
-    vi.mocked(readFile).mockResolvedValue(JSON.stringify(body));
-    await expect(
-      execute(
-        ['fight', '-c', 'Traveler0000', '--input', 'fight.json'],
-        vi.fn(),
-      ),
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  }
+  vi.mocked(readFile).mockResolvedValue(JSON.stringify({ tactic }));
   await expect(
-    execute(['fight', '-c', 'Traveler0000'], vi.fn()),
+    execute(['fight', '-c', 'Traveler0000', '--input', 'fight.json'], vi.fn()),
   ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
   expect(invoke).toHaveBeenCalledTimes(2);
   expect(await execute(['schema', 'fight'], vi.fn())).toMatchObject({
@@ -406,23 +395,28 @@ it('maps stack and individual discard flags', async () => {
   });
 });
 
-it('rejects a command option value outside its request schema enum', async () => {
-  const invoke = vi.spyOn(GameClient.prototype, 'invoke');
-  await expect(
-    execute(
-      [
-        'fight',
-        '-c',
-        'Aster0000000',
-        '--enemy',
-        'wolf',
-        '--preset',
-        'reckless',
-      ],
-      vi.fn(),
-    ),
-  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  expect(invoke).not.toHaveBeenCalled();
+it('sends a value outside the documented enum to the server instead of rejecting it locally', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  await execute(
+    [
+      'fight',
+      '-c',
+      'Aster0000000',
+      '--enemy',
+      'wolf',
+      '--preset',
+      'reckless',
+      '--no-wait',
+    ],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenCalledWith('character/combat/start', {
+    character_id: 'Aster0000000',
+    enemy_id: 'wolf',
+    preset: 'reckless',
+  });
 });
 
 it('returns the parser reason and command-specific help without sending a request', async () => {
@@ -483,7 +477,7 @@ it('names the missing required option and points to concise help', async () => {
   expect(invoke).not.toHaveBeenCalled();
 });
 
-it('validates JSON examples and keeps character and locale outside the body', async () => {
+it('sends JSON examples with the character and locale flags added to the body', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
@@ -516,31 +510,17 @@ it('validates JSON examples and keeps character and locale outside the body', as
         ? { character_id: 'Traveler0000' }
         : {}),
     });
-    const schema = await execute(['schema', name], vi.fn());
-    expect(schema).toMatchObject({ input_kind: 'json_body' });
-    if (!('input_schema' in schema) || !schema.input_schema)
-      throw new Error('Expected input schema');
+    const schema = (await execute(['schema', name], vi.fn())) as unknown as {
+      input_kind: string;
+      input_schema: { properties: object };
+    };
+    expect(schema.input_kind).toBe('json_body');
     expect(schema.input_schema.properties).not.toHaveProperty('character_id');
     expect(schema.input_schema.properties).not.toHaveProperty('locale');
     checked += 1;
   }
   expect(checked).toBeGreaterThan(0);
   invoke.mockClear();
-  for (const extra of [{ character_id: 'SomeoneElse0' }, { locale: 'en' }]) {
-    vi.mocked(readFile).mockResolvedValue(
-      JSON.stringify({ text: '', language: 'en', ...extra }),
-    );
-    await expect(
-      execute(['plan-set', '-c', 'Traveler0000', '-i', 'body.json'], vi.fn()),
-    ).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENTS',
-      detail: {
-        fields: Object.keys(extra),
-        help_command: 'clawsaga plan-set --help',
-      },
-    });
-  }
-  expect(invoke).not.toHaveBeenCalled();
   vi.mocked(readFile).mockResolvedValue(
     JSON.stringify({ text: '', language: 'en' }),
   );
@@ -552,16 +532,10 @@ it('validates JSON examples and keeps character and locale outside the body', as
   });
 });
 
-it('rejects invalid Unicode in journal searches before making a request', async () => {
+it('sends a journal search with non-BMP text as given', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
-  for (const query of ['\u0000', '\ud800', '\udfff']) {
-    await expect(
-      execute(['journal', '-c', 'Traveler0000', '--query', query], vi.fn()),
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  }
-  expect(invoke).not.toHaveBeenCalled();
   await execute(
     ['journal', '-c', 'Traveler0000', '--query', '𠮷野🧙'],
     vi.fn(),
@@ -570,361 +544,6 @@ it('rejects invalid Unicode in journal searches before making a request', async 
     character_id: 'Traveler0000',
     query: '𠮷野🧙',
   });
-});
-
-const initial: AgentGameResponse = {
-  ok: true,
-  schema_version: agentSchemaVersion,
-  server_time: '2026-09-09T00:00:00.000Z',
-  next_poll_after_seconds: 5,
-  data: {
-    activity: {
-      kind: 'travel',
-      activity_id: '00000000-0000-4000-8000-000000000001',
-      from: { id: 'dolgan', name: 'Dolgan', kind: 'town' },
-      to: { id: 'openpit', name: 'Open pit', kind: 'field' },
-      started_at: '2026-09-09T00:00:00.000Z',
-      arrives_at: '2026-09-09T00:00:15.000Z',
-      duration_seconds: 15,
-      status: 'RUNNING',
-    },
-  },
-};
-
-it('waits the server interval and queries only the accepted activity until completion', async () => {
-  vi.useFakeTimers();
-  if (initial.data.activity?.kind !== 'travel')
-    throw new Error('Expected travel fixture');
-  const completed: AgentGameResponse = {
-    ...initial,
-    data: {
-      activity: null,
-      last_result: {
-        kind: 'travel',
-        activity_id: initial.data.activity.activity_id,
-        status: 'ENDED',
-        end_reason: 'COMPLETED',
-        ended_at: '2026-09-09T00:00:15.000Z',
-        to: initial.data.activity.to,
-      },
-    },
-  };
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValueOnce(initial)
-    .mockResolvedValueOnce({ ...initial, next_poll_after_seconds: 10 })
-    .mockResolvedValueOnce(completed);
-  const notify = vi.fn();
-  const pending = execute(
-    ['travel', '-c', 'Traveler0000', '--to', 'openpit', '-l', 'en'],
-    notify,
-  );
-  await vi.advanceTimersByTimeAsync(4999);
-  expect(invoke).toHaveBeenCalledTimes(1);
-  expect(notify).toHaveBeenCalledTimes(1);
-  expect(notify).toHaveBeenCalledWith({
-    event: 'activity_accepted',
-    activity_id: initial.data.activity!.activity_id,
-    kind: 'travel',
-    started_at: '2026-09-09T00:00:00.000Z',
-    arrives_at: '2026-09-09T00:00:15.000Z',
-    next_poll_after_seconds: 5,
-  });
-  await vi.advanceTimersByTimeAsync(1);
-  expect(invoke).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(10000);
-  expect(await pending).toEqual(completed);
-  expect(invoke).toHaveBeenCalledTimes(3);
-  expect(notify).toHaveBeenCalledTimes(1);
-  expect(invoke).toHaveBeenLastCalledWith('character/activity', {
-    character_id: 'Traveler0000',
-    activity_id: initial.data.activity!.activity_id,
-    locale: 'en',
-  });
-});
-
-it('returns one acceptance for --no-wait travel, fight and rest without polling or a wait input', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
-  const notify = vi.fn();
-  const travel = await execute(
-    ['travel', '-c', 'Traveler0000', '--to', 'openpit', '--no-wait'],
-    notify,
-  );
-  expect(travel).toMatchObject({ ok: true, data: initial.data });
-  expect(invoke).toHaveBeenCalledTimes(1);
-  expect(invoke).toHaveBeenLastCalledWith('character/travel', {
-    character_id: 'Traveler0000',
-    to: 'openpit',
-  });
-  await execute(
-    ['fight', '-c', 'Traveler0000', '--enemy', 'wolf', '--no-wait'],
-    notify,
-  );
-  expect(invoke).toHaveBeenLastCalledWith('character/combat/start', {
-    character_id: 'Traveler0000',
-    enemy_id: 'wolf',
-  });
-  await execute(['rest', '-c', 'Traveler0000', '--inn', '--no-wait'], notify);
-  expect(invoke).toHaveBeenLastCalledWith('character/rest', {
-    character_id: 'Traveler0000',
-    inn: true,
-  });
-  // 開始1回ずつ。活動照会もstderr診断も出さない。
-  expect(invoke).toHaveBeenCalledTimes(3);
-  expect(notify).not.toHaveBeenCalled();
-});
-
-it('points an unknown accepted start at the current or latest activity', async () => {
-  vi.spyOn(GameClient.prototype, 'invoke').mockRejectedValue(
-    new CliError('NETWORK_ERROR', { outcome: 'unknown' }),
-  );
-  const error = await execute(
-    ['travel', '-c', 'Traveler0000', '--to', 'openpit'],
-    vi.fn(),
-  ).catch((thrown: unknown) => thrown);
-  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
-  const hint = String(error.detail.hint);
-  expect(error.code).toBe('NETWORK_ERROR');
-  expect(hint).toContain('may have produced output');
-  expect(hint).toContain('activity -c Traveler0000');
-  expect(hint).toContain('match its kind and time');
-  expect(hint).toContain('ambiguous');
-  // The activity ID is unknown, so the hint must not pin one with -a.
-  expect(hint).not.toMatch(/-a /);
-});
-
-it('recovers a main activity whose start response could not be read', async () => {
-  vi.spyOn(GameClient.prototype, 'accessToken').mockResolvedValue('test-token');
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() =>
-      Promise.resolve(
-        new Response('private upstream details', { status: 200 }),
-      ),
-    ),
-  );
-  const travel = await execute(
-    ['travel', '-c', 'Traveler0000', '--to', 'openpit'],
-    vi.fn(),
-  ).catch((thrown: unknown) => thrown);
-  if (!(travel instanceof CliError)) throw new Error('Expected a CliError');
-  // 応答が読めなくてもサーバーは受付済みかもしれないため、結果不明として扱う。
-  expect(travel.code).toBe('INVALID_RESPONSE');
-  expect(travel.detail.outcome).toBe('unknown');
-  const hint = String(travel.detail.hint);
-  expect(hint).toContain('may have produced output');
-  expect(hint).toContain('activity -c Traveler0000');
-  // The activity ID is unknown, so the hint must not pin one with -a.
-  expect(hint).not.toMatch(/-a /);
-
-  // A read keeps its own diagnostics; only a main activity gets the step.
-  const map = await execute(['map', '-c', 'Traveler0000'], vi.fn()).catch(
-    (thrown: unknown) => thrown,
-  );
-  if (!(map instanceof CliError)) throw new Error('Expected a CliError');
-  expect(map.code).toBe('INVALID_RESPONSE');
-  expect(map.detail).not.toHaveProperty('outcome');
-  expect(map.detail).not.toHaveProperty('hint');
-});
-
-it('recovers a main activity whose start returned 503', async () => {
-  vi.spyOn(GameClient.prototype, 'accessToken').mockResolvedValue('test-token');
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.resolve(new Response(null, { status: 503 }))),
-  );
-  const error = await execute(
-    ['travel', '-c', 'Traveler0000', '--to', 'openpit'],
-    vi.fn(),
-  ).catch((thrown: unknown) => thrown);
-  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
-  expect(error).toMatchObject({
-    code: 'SERVICE_UNAVAILABLE',
-    detail: { outcome: 'unknown' },
-  });
-  expect(error.detail.hint).toContain('activity -c Traveler0000');
-});
-
-it('recovers a main activity whose response has a newer server schema', async () => {
-  const [major = 0, minor = 0] = agentSchemaVersion.split('.').map(Number);
-  vi.spyOn(GameClient.prototype, 'accessToken').mockResolvedValue('test-token');
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() =>
-      Promise.resolve(
-        Response.json({
-          ok: true,
-          schema_version: `${major}.${minor + 1}`,
-          server_time: '2026-09-19T00:00:00.000Z',
-          data: {},
-        }),
-      ),
-    ),
-  );
-  const travel = await execute(
-    ['travel', '-c', 'Traveler0000', '--to', 'openpit'],
-    vi.fn(),
-  ).catch((thrown: unknown) => thrown);
-  if (!(travel instanceof CliError)) throw new Error('Expected a CliError');
-  // 更新した後に開始し直すのではなく、受付済みかもしれない活動を先に照合する。
-  expect(travel.code).toBe('UPDATE_REQUIRED');
-  expect(travel.detail).toMatchObject({
-    operation: 'character/travel',
-    http_status: 200,
-    outcome: 'unknown',
-  });
-  const hint = String(travel.detail.hint);
-  expect(hint).toContain('may have produced output');
-  expect(hint).toContain('activity -c Traveler0000');
-  // The activity ID is unknown, so the hint must not pin one with -a.
-  expect(hint).not.toMatch(/-a /);
-
-  // A read keeps its own diagnostics; only a main activity gets the step.
-  const map = await execute(['map', '-c', 'Traveler0000'], vi.fn()).catch(
-    (thrown: unknown) => thrown,
-  );
-  if (!(map instanceof CliError)) throw new Error('Expected a CliError');
-  expect(map.code).toBe('UPDATE_REQUIRED');
-  expect(map.detail).not.toHaveProperty('outcome');
-  expect(map.detail).not.toHaveProperty('hint');
-});
-
-it('does not offer activity recovery when the start was never sent', async () => {
-  const request = vi.fn();
-  vi.stubGlobal('fetch', request);
-  vi.spyOn(GameClient.prototype, 'accessToken').mockRejectedValue(
-    new CliError('INVALID_RESPONSE'),
-  );
-  const error = await execute(
-    ['travel', '-c', 'Traveler0000', '--to', 'openpit'],
-    vi.fn(),
-  ).catch((thrown: unknown) => thrown);
-  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
-  expect(error.code).toBe('INVALID_RESPONSE');
-  // 送信前の失敗はゲームを変えていないため、結果不明の復旧手順を付けない。
-  expect(error.detail.outcome).not.toBe('unknown');
-  expect(error.detail).not.toHaveProperty('hint');
-  expect(request).not.toHaveBeenCalled();
-});
-
-const useArgs = ['use', '-c', 'Traveler0000', '--item', 'healing_potion'];
-const itemChanges = [
-  useArgs,
-  ['discard', '-c', 'Traveler0000', '--item', 'wolf_meat', '--quantity', '2'],
-];
-const lostItemResponses: [string, string, () => Promise<Response>][] = [
-  [
-    'NETWORK_ERROR',
-    'a connection failure',
-    () => Promise.reject(new TypeError('fetch failed')),
-  ],
-  [
-    'NETWORK_ERROR',
-    'a timeout',
-    () => Promise.reject(new DOMException('timed out', 'TimeoutError')),
-  ],
-  [
-    'SERVICE_UNAVAILABLE',
-    'a 5xx',
-    () => Promise.resolve(new Response(null, { status: 502 })),
-  ],
-  [
-    'INVALID_RESPONSE',
-    'invalid JSON',
-    () => Promise.resolve(new Response('upstream', { status: 200 })),
-  ],
-  [
-    'INVALID_RESPONSE',
-    'an unexpected schema',
-    () => Promise.resolve(Response.json({ ok: true })),
-  ],
-];
-
-it.each(
-  itemChanges.flatMap((args) =>
-    lostItemResponses.map(
-      ([code, label, respond]) =>
-        [args[0], label, args, code, respond] as const,
-    ),
-  ),
-)(
-  'warns against resending %s after %s',
-  async (_name, _label, args, code, respond) => {
-    vi.spyOn(GameClient.prototype, 'accessToken').mockResolvedValue(
-      'test-token',
-    );
-    const request = vi.fn(respond);
-    vi.stubGlobal('fetch', request);
-    const error = await execute(args, vi.fn()).catch(
-      (thrown: unknown) => thrown,
-    );
-    if (!(error instanceof CliError)) throw new Error('Expected a CliError');
-    // 使用・廃棄は要求IDを持たないため、自動で再送せず、受理済みの可能性を残す。
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(error.code).toBe(code);
-    expect(error.detail.outcome).toBe('unknown');
-    const hint = String(error.detail.hint);
-    expect(hint).toContain('do not resend');
-    expect(hint).toContain('character -c Traveler0000 --include inventory');
-    expect(hint).toContain('Unchanged state does not prove it failed');
-    expect(hint).not.toContain('--request');
-  },
-);
-
-it('does not mark an item change unknown when it was never sent', async () => {
-  const request = vi.fn();
-  vi.stubGlobal('fetch', request);
-  vi.spyOn(GameClient.prototype, 'accessToken').mockRejectedValue(
-    new CliError('AUTH_REQUIRED'),
-  );
-  const error = await execute(useArgs, vi.fn()).catch(
-    (thrown: unknown) => thrown,
-  );
-  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
-  expect(error.detail.outcome).toBe('not_sent');
-  expect(error.detail).not.toHaveProperty('hint');
-  expect(request).not.toHaveBeenCalled();
-});
-
-it('returns a rejected or successful item change without recovery steps', async () => {
-  const response = (ok: boolean): AgentGameResponse => ({
-    ok,
-    schema_version: agentSchemaVersion,
-    server_time: '2026-09-20T00:00:00.000Z',
-    data: {},
-    ...(ok ? {} : { error: { message: 'That item has no effect now.' } }),
-  });
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValueOnce(response(false))
-    .mockResolvedValueOnce(response(true));
-  for (const ok of [false, true]) {
-    const result = (await execute(useArgs, vi.fn())) as AgentGameResponse;
-    expect(result.ok).toBe(ok);
-    expect(result).not.toHaveProperty('hints');
-  }
-  // 正常応答の後に人物の再取得を追加しない。
-  expect(invoke).toHaveBeenCalledTimes(2);
-});
-
-it('lists the --no-wait option and example in structured help', async () => {
-  const help = (await execute(['travel', '--help'], vi.fn())) as unknown as {
-    help: { options: { flags: string }[]; examples: string[] };
-  };
-  expect(help.help.options).toEqual(
-    expect.arrayContaining([expect.objectContaining({ flags: '--no-wait' })]),
-  );
-  expect(help.help.examples).toContain(
-    'clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait',
-  );
-  // The wait choice is local; the game request schema never carries it.
-  const schema = (await execute(['schema', 'travel'], vi.fn())) as unknown as {
-    input_schema: { properties: Record<string, unknown> };
-  };
-  expect(schema.input_schema.properties).not.toHaveProperty('wait');
-  expect(schema.input_schema.properties).not.toHaveProperty('no_wait');
 });
 
 it('sends map scope, look people and route or travel destinations', async () => {
@@ -966,182 +585,10 @@ it('sends map scope, look people and route or travel destinations', async () => 
   });
 });
 
-it('stops on lost authorization and preserves the accepted ID without restarting travel', async () => {
-  vi.useFakeTimers();
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockRejectedValue(new CliError('AUTH_REQUIRED'));
-  const pending = waitForActivity(
-    new GameClient('https://example.com'),
-    { character: 'Traveler0000' },
-    initial,
-  );
-  const assertion = expect(pending).rejects.toMatchObject({
-    code: 'AUTH_REQUIRED',
-    detail: { activity_id: initial.data.activity!.activity_id },
-  });
-  await vi.advanceTimersByTimeAsync(5000);
-  await assertion;
-  expect(invoke).toHaveBeenCalledTimes(1);
-});
-
-it('reports wait contract failures without resubmitting accepted activities', async () => {
-  vi.useFakeTimers();
-  const client = new GameClient('https://example.com');
-  const invoke = vi.spyOn(client, 'invoke');
-  await expect(
-    waitForActivity(
-      client,
-      { character: 'Traveler0000' },
-      {
-        ...initial,
-        next_poll_after_seconds: undefined,
-      },
-    ),
-  ).rejects.toMatchObject({
-    code: 'INVALID_RESPONSE',
-    detail: {
-      reason: 'missing_poll_interval',
-      activity_id: initial.data.activity!.activity_id,
-    },
-  });
-  expect(invoke).not.toHaveBeenCalled();
-
-  invoke.mockResolvedValue({ ...initial, data: { activity: null } });
-  const mismatched = expect(
-    waitForActivity(client, { character: 'Traveler0000' }, initial),
-  ).rejects.toMatchObject({
-    code: 'INVALID_RESPONSE',
-    detail: {
-      reason: 'activity_id_mismatch',
-      activity_id: initial.data.activity!.activity_id,
-    },
-  });
-  await vi.advanceTimersByTimeAsync(5000);
-  await mismatched;
-  expect(invoke).toHaveBeenCalledTimes(1);
-
-  invoke.mockClear().mockRejectedValue(
-    new CliError('INVALID_RESPONSE', {
-      reason: 'invalid_response',
-      operation: 'character/activity',
-      http_status: 200,
-      fields: ['data.activity'],
-    }),
-  );
-  const invalid = expect(
-    waitForActivity(client, { character: 'Traveler0000' }, initial),
-  ).rejects.toMatchObject({
-    code: 'INVALID_RESPONSE',
-    detail: {
-      reason: 'invalid_response',
-      operation: 'character/activity',
-      http_status: 200,
-      fields: ['data.activity'],
-      activity_id: initial.data.activity!.activity_id,
-    },
-  });
-  await vi.advanceTimersByTimeAsync(5000);
-  await invalid;
-  expect(invoke).toHaveBeenCalledTimes(1);
-});
-
-it('waits for an accepted fight and returns a cancellation without starting another battle', async () => {
-  vi.useFakeTimers();
-  const battle: AgentGameResponse = {
-    ...initial,
-    next_poll_after_seconds: 10,
-    data: {
-      activity: {
-        kind: 'combat',
-        activity_id: '00000000-0000-4000-8000-000000000002',
-        enemy_id: 'wolf',
-        enemy_name: 'Wolf',
-        practice: true,
-        started_at: initial.server_time,
-        time_limit_at: '2026-09-09T00:08:00.000Z',
-        next_update_at: '2026-09-09T00:00:10.000Z',
-        duration_seconds: 480,
-        status: 'RUNNING',
-        hp: 120,
-        max_hp: 120,
-        mp: 100,
-        enemy_hp: 120,
-        enemy_max_hp: 120,
-        retreat_ticks: 0,
-        retreat_requested_tick: null,
-      },
-    },
-  };
-  const cancelled: AgentGameResponse = {
-    ...initial,
-    data: {
-      activity: null,
-      last_result: {
-        kind: 'combat',
-        activity_id: battle.data.activity!.activity_id,
-        status: 'ENDED',
-        end_reason: 'CANCELLED',
-        ended_at: '2026-09-09T00:00:10.000Z',
-        summary: null,
-      },
-    },
-  };
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValueOnce(battle)
-    .mockResolvedValueOnce(cancelled);
-  const pending = execute(
-    [
-      'fight',
-      '-c',
-      'Traveler0000',
-      '--enemy',
-      'wolf',
-      '--practice',
-      '--preset',
-      'safe',
-    ],
-    vi.fn(),
-  );
-  await vi.advanceTimersByTimeAsync(9999);
-  expect(invoke).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(1);
-  expect(await pending).toEqual(cancelled);
-  expect(invoke.mock.calls).toEqual([
-    [
-      'character/combat/start',
-      {
-        character_id: 'Traveler0000',
-        enemy_id: 'wolf',
-        practice: true,
-        preset: 'safe',
-      },
-    ],
-    [
-      'character/activity',
-      {
-        character_id: 'Traveler0000',
-        activity_id: battle.data.activity!.activity_id,
-      },
-    ],
-  ]);
-});
-
-it('validates quest identifiers and cursors before sending requests', async () => {
+it('sends the accepted quest offer', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
-  for (const args of [
-    ['quest-claim', '-c', 'Traveler0000', '--quest', 'not-a-uuid'],
-    ['quests', '-c', 'Traveler0000', '--before', '1.5'],
-    ['quest-accept', '-c', 'Traveler0000'],
-  ]) {
-    await expect(execute(args, vi.fn())).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENTS',
-    });
-  }
-  expect(invoke).not.toHaveBeenCalled();
   await execute(
     [
       'quest-accept',
@@ -1176,20 +623,6 @@ it('maps item, recipe and active quest discovery flags', async () => {
     ],
     ['character/quests', { character_id: 'Traveler0000', active_only: true }],
   ]);
-  await expect(
-    execute(
-      [
-        'items',
-        '-c',
-        'Traveler0000',
-        '--query',
-        'potion',
-        '--item',
-        'healing_potion',
-      ],
-      vi.fn(),
-    ),
-  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
 });
 
 it('passes item IDs to the server, including definitions unknown to this CLI', async () => {
@@ -1272,7 +705,7 @@ it('keeps hello quiet when the published version is not newer', async () => {
 it('reads the guide index, one topic or a search from the document route', async () => {
   const read = vi
     .spyOn(GameClient.prototype, 'readDocument')
-    .mockResolvedValue({ guide: { topics: [] } } as never);
+    .mockResolvedValue({ guide: { topics: [] } });
   await execute(['guide'], vi.fn());
   expect(read).toHaveBeenLastCalledWith('guide', expect.anything());
   await execute(['guide', '--topic', 'overview'], vi.fn());

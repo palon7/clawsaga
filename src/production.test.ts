@@ -5,56 +5,9 @@ import {
   type AgentGameResponse,
 } from './protocol.js';
 import { GameClient } from './client.js';
-import { execute, repeatActivity } from './commands.js';
+import { execute } from './commands.js';
+import { repeatActivity } from './activity-wait.js';
 import { CliError } from './errors.js';
-import {
-  buySchema,
-  craftSchema,
-  shopViewSchema,
-} from './protocol/production.js';
-
-it('accepts purchasable weapons in shop responses and purchase inputs', () => {
-  for (const item_id of [
-    'iron_sword',
-    'iron_dagger',
-    'oak_staff',
-    'iron_mace',
-    'wooden_lyre',
-  ]) {
-    expect(
-      shopViewSchema.safeParse({
-        location: { id: 'dolgan', name: 'Dolgan', kind: 'town' },
-        offers: [
-          {
-            item_id,
-            name: item_id,
-            unit_weight: 8,
-            tradeable: true,
-            price: 10,
-            quantity: 1,
-            recovery_seconds: 60,
-            equipment: {
-              equip_slot: 'main_hand',
-              required_job: 'warrior',
-              required_job_name: 'Warrior',
-              required_level: null,
-              power: 9,
-              armor: 0,
-            },
-          },
-        ],
-      }).success,
-    ).toBe(true);
-    expect(
-      buySchema.safeParse({
-        character_id: 'Miner0000000',
-        item_id,
-        max_payment: 10,
-        request_id: '11111111-1111-4111-8111-111111111111',
-      }).success,
-    ).toBe(true);
-  }
-});
 
 vi.mock('node:timers/promises', () => ({
   setTimeout: () => Promise.resolve(),
@@ -132,14 +85,6 @@ it('accepts counts above five without sending the repetition count to the API', 
     character_id: 'Maker0000000',
     item_id: 'herb',
   });
-});
-
-it('rejects location arguments before starting an activity', async () => {
-  const invoke = vi.spyOn(GameClient.prototype, 'invoke');
-  await expect(
-    execute([...args, '--location', 'mossway'], vi.fn()),
-  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  expect(invoke).not.toHaveBeenCalled();
 });
 
 it('rejects invalid counts before starting an activity', async () => {
@@ -252,7 +197,7 @@ it('keeps the confirmed harvests but claims no output when the next start is not
   // 開始していない回を「成果が出たかもしれない」と案内しない。
   expect(error.detail).not.toHaveProperty('hint');
   expect(
-    request.mock.calls.map(([url]) => new URL(String(url)).pathname),
+    request.mock.calls.map(([url]) => new URL(url as string).pathname),
   ).toEqual(['/api/v1/character/gather', '/api/v1/character/activity']);
 });
 
@@ -339,25 +284,6 @@ it('keeps the confirmed output and server failure when a repetition wait fails',
   expect(notes?.[0]).toContain('is not confirmed');
   expect(notes?.[0]).toContain('may have produced output');
   expect(invoke).toHaveBeenCalledTimes(4);
-});
-
-it('rejects purchase limits above the server storage range before sending', async () => {
-  const invoke = vi.spyOn(GameClient.prototype, 'invoke');
-  await expect(
-    execute(
-      [
-        'buy',
-        '-c',
-        'Maker0000000',
-        '--item',
-        'basic_pickaxe',
-        '--max-payment',
-        '2147483648',
-      ],
-      vi.fn(),
-    ),
-  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  expect(invoke).not.toHaveBeenCalled();
 });
 
 it('retains a generated purchase ID and payment arguments when the reply is lost', async () => {
@@ -650,25 +576,6 @@ it('recovers a replayed craft while a newer activity keeps running', async () =>
   });
   // The newer activity is not polled; the stored result answers this lot.
   expect(invoke.mock.calls.map(([path]) => path)).toEqual(['character/craft']);
-});
-
-it('rejects craft fee limits above the server storage range before sending', async () => {
-  const invoke = vi.spyOn(GameClient.prototype, 'invoke');
-  await expect(
-    execute(
-      [
-        'craft',
-        '-c',
-        'Maker0000000',
-        '--recipe',
-        'metal_ingot',
-        '--max-fee-per-lot',
-        '2147483648',
-      ],
-      vi.fn(),
-    ),
-  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  expect(invoke).not.toHaveBeenCalled();
 });
 
 it('reports a replayed craft whose accepted activity had stopped', async () => {
@@ -1041,22 +948,4 @@ it('reports each waited acceptance to stderr, with the craft request ID', async 
       request_id: bodies[0]?.request_id,
     }),
   );
-});
-
-it('requires a request ID in the craft protocol schema', () => {
-  expect(
-    craftSchema.safeParse({
-      character_id: 'Maker0000000',
-      recipe_id: 'metal_ingot',
-      max_fee_per_lot: 2,
-    }).success,
-  ).toBe(false);
-  expect(
-    craftSchema.safeParse({
-      character_id: 'Maker0000000',
-      recipe_id: 'metal_ingot',
-      max_fee_per_lot: 2,
-      request_id: '44444444-4444-4444-8444-444444444444',
-    }).success,
-  ).toBe(true);
 });

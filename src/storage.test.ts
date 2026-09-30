@@ -16,7 +16,7 @@ const character = 'm7Qp2_aR9L-x';
 const instance = '22222222-2222-4222-8222-222222222222';
 const transfer = {
   ok: true,
-  schema_version: '3.8',
+  schema_version: '3.9',
   server_time: '2026-09-20T00:00:00.000Z',
   data: {
     storage: {
@@ -47,7 +47,7 @@ const batch = JSON.stringify([
 it('sends the whole storage batch as one request and generates a request ID', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(transfer) as never);
+    .mockResolvedValue(structuredClone(transfer));
   const result = await execute(
     ['deposit', '-c', character, '--town', 'selene', '--items', batch],
     vi.fn(),
@@ -70,7 +70,7 @@ it('sends the whole storage batch as one request and generates a request ID', as
 it('keeps a supplied request ID and the withdrawal path', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(transfer) as never);
+    .mockResolvedValue(structuredClone(transfer));
   const request = '44444444-4444-4444-8444-444444444444';
   await execute(
     [
@@ -121,7 +121,7 @@ it('retains the request ID in an uncertain-result error and rejects a malformed 
 it('reads one town and searches across towns', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(transfer) as never);
+    .mockResolvedValue(structuredClone(transfer));
   await execute(['storage', '-c', character, '--town', 'selene'], vi.fn());
   expect(invoke.mock.calls[0]![0]).toBe('character/storage');
   expect(invoke.mock.calls[0]![1]).toMatchObject({ town_id: 'selene' });

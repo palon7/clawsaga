@@ -11,6 +11,7 @@ import {
   claimMarketListingSchema,
 } from './protocol.js';
 import type { CommandDefinition } from './command-definition.js';
+import type { Values } from './command-input.js';
 
 const qualityChoices = ['standard', 'fine', 'superior'] as const;
 const sourceChoices = ['carried', 'storage'] as const;
@@ -19,10 +20,33 @@ const requestFlag = [
   'Reuse the same ID and arguments after an uncertain result',
 ] as const;
 
+const requestInput = { request: 'request_id' } as const;
+
+// Market writes take a request ID so a repeated request returns the accepted
+// result instead of ordering, listing or cancelling again.
+function marketWriteContext(values: Values) {
+  return {
+    request_id: values.request,
+    ...(values.order === undefined ? {} : { order_id: Number(values.order) }),
+    ...(values.listing === undefined
+      ? {}
+      : { listing_id: Number(values.listing) }),
+  };
+}
+
 export const marketCommands: Record<string, CommandDefinition> = {
   market: {
     path: 'character/market',
     schema: getMarketSchema,
+    input: {
+      town: 'town_id',
+      item: 'item_id',
+      quality: 'quality',
+      levels: ['levels', 'number'],
+      cursor: ['cursor', 'number'],
+      maxPrice: ['max_price', 'number'],
+      minDurability: ['minimum_durability', 'number'],
+    },
     flags: [
       ['--town <id>', 'Market town location ID', true],
       ['--item <id>', 'Optional item ID for board detail'],
@@ -52,6 +76,7 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'my-market': {
     path: 'character/market/mine',
     schema: getMyMarketSchema,
+    input: { section: 'section', cursor: ['cursor', 'number'] },
     flags: [
       [
         '--section <section>',
@@ -70,6 +95,16 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'market-sell': {
     path: 'character/market/orders/sell',
     schema: placeMarketSellOrderSchema,
+    input: {
+      item: 'item_id',
+      quality: 'quality',
+      quantity: ['quantity', 'number'],
+      unitPrice: ['unit_price', 'number'],
+      source: 'source',
+      ...requestInput,
+    },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
     flags: [
       ['--item <id>', 'Item ID to sell', true],
       ['--quality <quality>', 'Stack quality', true, qualityChoices],
@@ -91,6 +126,15 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'market-buy': {
     path: 'character/market/orders/buy',
     schema: placeMarketBuyOrderSchema,
+    input: {
+      item: 'item_id',
+      quality: 'quality',
+      quantity: ['quantity', 'number'],
+      unitPrice: ['unit_price', 'number'],
+      ...requestInput,
+    },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
     flags: [
       ['--item <id>', 'Item ID to bid for', true],
       ['--quality <quality>', 'Stack quality', true, qualityChoices],
@@ -106,6 +150,9 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'market-order-cancel': {
     path: 'character/market/orders/cancel',
     schema: cancelMarketOrderSchema,
+    input: { order: ['order_id', 'number'], ...requestInput },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
     flags: [
       ['--order <number>', 'Numeric order ID from my-market', true],
       requestFlag,
@@ -116,6 +163,9 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'market-order-claim': {
     path: 'character/market/orders/claim',
     schema: claimMarketOrderSchema,
+    input: { order: ['order_id', 'number'], ...requestInput },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
     flags: [
       ['--order <number>', 'Numeric order ID from my-market', true],
       requestFlag,
@@ -126,6 +176,14 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'market-list': {
     path: 'character/market/listings/create',
     schema: createMarketListingSchema,
+    input: {
+      instance: 'instance_id',
+      price: ['price', 'number'],
+      source: 'source',
+      ...requestInput,
+    },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
     flags: [
       ['--instance <uuid>', 'Item instance ID from inventory', true],
       ['--price <gold>', 'Fixed price for the individual', true],
@@ -145,6 +203,14 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'market-purchase': {
     path: 'character/market/listings/buy',
     schema: buyMarketListingSchema,
+    input: {
+      listing: ['listing_id', 'number'],
+      maxPrice: ['max_price', 'number'],
+      minDurability: ['minimum_durability', 'number'],
+      ...requestInput,
+    },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
     flags: [
       ['--listing <number>', 'Numeric listing ID from market', true],
       ['--max-price <gold>', 'Highest price you accept', true],
@@ -159,6 +225,9 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'market-listing-cancel': {
     path: 'character/market/listings/cancel',
     schema: cancelMarketListingSchema,
+    input: { listing: ['listing_id', 'number'], ...requestInput },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
     flags: [
       ['--listing <number>', 'Numeric listing ID from my-market', true],
       requestFlag,
@@ -169,6 +238,9 @@ export const marketCommands: Record<string, CommandDefinition> = {
   'market-listing-claim': {
     path: 'character/market/listings/claim',
     schema: claimMarketListingSchema,
+    input: { listing: ['listing_id', 'number'], ...requestInput },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
     flags: [
       ['--listing <number>', 'Numeric listing ID from my-market', true],
       requestFlag,

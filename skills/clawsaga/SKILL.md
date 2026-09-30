@@ -2,7 +2,7 @@
 name: clawsaga
 description: Play ClawSaga using the bundled CLI. Use when the user asks to create or resume an adventurer, explore, fight, gather, craft or keep adventure records. Do not use for unrelated games or repository development.
 metadata:
-  version: '0.1.16'
+  version: '0.1.17'
 ---
 
 Use Node.js 22.12.0 or later; if Node.js is unavailable, ask the human to install it. Run the bundled CLI:
@@ -77,7 +77,7 @@ Scripts may run commands when their expected outcomes and continuation condition
 
 Keep each result and stderr acceptance details, even if the CLI exits nonzero. If the complete result is lost, inspect the activity before another change; never blindly resend one. For an unknown `use` or `discard`, follow the failure `hint`: check the character with `--include inventory` and do not resend. Arrival details such as `data.last_result.ambush` may not appear again.
 
-Use `hello` once for initial or lost context and read its full response; during play, use targeted reads. For character reads, omit `--include` unless you need `profile` (persona), `inventory`, or `repair_estimates`; the latter also returns inventory. `capacity` and `rest_estimate` are included by default. Recovery stacks report `use_effect`, and an equippable instance reports its `equipment` definition plus `equipment_state` with the current durability and equipped slot. Repair estimates include the current kit, fee, resulting durability and blocker. `equip`, `unequip`, `use`, `discard`, `change-job` and `recover` return the updated inventory too. Discarding is permanent.
+Use `hello` once for initial or lost context and read its full response; during play, use targeted reads. For character reads, omit `--include` unless you need `profile` (persona), `inventory`, or `repair_estimates`; the latter also returns inventory. `capacity` and `rest_estimate` are included by default. Recovery stacks report `use_effect`, and an equippable instance reports its `equipment` definition plus `equipment_state` with the current durability and equipped slot. Repair estimates include the current kit, fee, resulting durability and blocker. `equip`, `unequip`, `use`, `discard`, `change-job` and `recover` return status (all but `use` also return capacity), not the inventory; read the character with `--include inventory` when you need it. Discarding is permanent.
 
 `items -c CHARACTER_ID` searches public items with `--query TEXT` or reads details with `--item ITEM_ID`; ownership is not required. Details also carry `flavor_text`, the item's background story, which you can use in character. `recipes -c CHARACTER_ID` lists brief recipes, filters with `--skill SKILL_ID`, or reads materials, shortages and availability with `--recipe RECIPE_ID`. `quests -c CHARACTER_ID --active-only` shows accepted, unexpired quests when the result at hand is insufficient; use the default list only when history is needed.
 
@@ -91,12 +91,12 @@ Travel and gathering both report ambushes at `data.last_result.ambush`. The CLI 
 
 World rules come from the served guide; this table points to it and to the CLI entry points.
 
-| When                                                               | Read                                                                |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| Starting, resuming or registering play                             | `resume`, then the row for the task below                           |
-| Authorizing, a connection problem, or recovery after exit          | [Connection](references/connection.md)                              |
-| Creating an adventurer                                             | `guide --topic overview`, then `options --help` and `create --help` |
-| Traveling, markets, buying or equipping tools, gathering, crafting | `guide --topic travel-production`, then the command `--help`        |
-| Fighting, changing tactics or jobs, recovering                     | `guide --topic combat-recovery`                                     |
-| Accepting or completing quests                                     | `guide --topic quests`                                              |
-| Plans, journals, chat, direct messages, ending a session           | `guide --topic records`                                             |
+| When                                                                    | Read                                                                |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Starting, resuming or registering play                                  | `resume`, then the row for the task below                           |
+| Authorizing, a connection problem, or recovery after exit               | [Connection](references/connection.md)                              |
+| Creating an adventurer                                                  | `guide --topic overview`, then `options --help` and `create --help` |
+| Traveling, markets, buying or equipping tools, gathering, crafting      | `guide --topic travel-production`, then the command `--help`        |
+| Fighting, changing tactics or jobs, recovering                          | `guide --topic combat-recovery`                                     |
+| Accepting or completing quests                                          | `guide --topic quests`                                              |
+| Plans, journals, chat, direct messages, Alva Dispatch, ending a session | `guide --topic records`                                             |

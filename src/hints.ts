@@ -1,7 +1,6 @@
 import type {
   AgentGameResponse,
   AgentHint,
-  AgentLastResult,
   AgentRunningActivity,
 } from './protocol.js';
 
@@ -20,8 +19,9 @@ const command: Record<
 };
 
 function renderHint(hint: AgentHint, character?: string): string {
-  if ('note' in hint) return hint.note;
-  const render = command[hint.operation];
+  if (hint.note !== undefined) return hint.note;
+  const render =
+    hint.operation === undefined ? undefined : command[hint.operation];
   if (!render || !hint.arguments) return `Use the ${hint.operation} operation.`;
   return render(hint.arguments, character);
 }
@@ -39,14 +39,44 @@ function activityCommand(activityId: string, character?: string) {
   return `activity -a ${activityId}${character ? ` -c ${character}` : ''}`;
 }
 
-function ambushOf(lastResult: AgentLastResult | undefined) {
-  return lastResult && 'ambush' in lastResult ? lastResult.ambush : undefined;
-}
-
 function repetitionOf(
   response: AgentGameResponse,
 ): RepetitionSummary | undefined {
   return (response as { repetition?: RepetitionSummary }).repetition;
+}
+
+function ambushNotes(
+  response: AgentGameResponse,
+  character: string | undefined,
+): { notes: string[]; supersededActivityId?: string } {
+  const notes: string[] = [];
+  const lastResult = response.data.last_result;
+  const activity: AgentRunningActivity | undefined =
+    response.data.activity ?? undefined;
+  const ambush = lastResult?.ambush;
+  if (!lastResult || !ambush) return { notes };
+  // The server always suggests reading the ambush combat. Phrase the read
+  // here instead, so it only appears when that combat is not already the
+  // response's current activity.
+  if (
+    activity?.kind === 'combat' &&
+    activity.activity_id === ambush.activity_id
+  ) {
+    // The response already shows this combat, so do not tell the agent to
+    // read it again.
+    notes.push(
+      `The ${lastResult.kind} result is confirmed and combat ${ambush.activity_id} is the current activity; continue or stop that battle instead of repeating the finished activity.`,
+    );
+  } else {
+    notes.push(
+      `An ambush happened after the confirmed ${lastResult.kind} result, which stands; that combat is not the current activity. Read its outcome with \`${activityCommand(ambush.activity_id, character)}\` if you have not seen it.`,
+    );
+    if (activity)
+      notes.push(
+        `A different ${activity.kind} activity (${activity.activity_id}) is running now.`,
+      );
+  }
+  return { notes, supersededActivityId: ambush.activity_id };
 }
 
 // CLI-only notes: the local wait choice, the repetition summary, and how a
@@ -57,36 +87,10 @@ function stateNotes(
   character: string | undefined,
   wait: boolean,
 ) {
-  const notes: string[] = [];
+  const { notes, supersededActivityId } = ambushNotes(response, character);
   const lastResult = response.data.last_result;
   const activity: AgentRunningActivity | undefined =
     response.data.activity ?? undefined;
-  let supersededActivityId: string | undefined;
-  const ambush = ambushOf(lastResult);
-  if (lastResult && ambush) {
-    // The server always suggests reading the ambush combat. Phrase the read
-    // here instead, so it only appears when that combat is not already the
-    // response's current activity.
-    supersededActivityId = ambush.activity_id;
-    if (
-      activity?.kind === 'combat' &&
-      activity.activity_id === ambush.activity_id
-    ) {
-      // The response already shows this combat, so do not tell the agent to
-      // read it again.
-      notes.push(
-        `The ${lastResult.kind} result is confirmed and combat ${ambush.activity_id} is the current activity; continue or stop that battle instead of repeating the finished activity.`,
-      );
-    } else {
-      notes.push(
-        `An ambush happened after the confirmed ${lastResult.kind} result, which stands; that combat is not the current activity. Read its outcome with \`${activityCommand(ambush.activity_id, character)}\` if you have not seen it.`,
-      );
-      if (activity)
-        notes.push(
-          `A different ${activity.kind} activity (${activity.activity_id}) is running now.`,
-        );
-    }
-  }
   const repetition = repetitionOf(response);
   if (repetition && repetition.completed_count < repetition.requested_count) {
     // A failed read leaves the attempt that was in progress unconfirmed, so the
@@ -113,7 +117,6 @@ function stateNotes(
 
 function supersededAmbushHint(hint: AgentHint, activityId: string) {
   return (
-    'operation' in hint &&
     hint.operation === 'get_activity' &&
     hint.arguments?.activity_id === activityId
   );
