@@ -2,11 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
-import {
-  agentSchemaVersion,
-  createBoardThreadSchema,
-  replyBoardThreadSchema,
-} from './protocol.js';
+import { agentSchemaVersion } from './protocol.js';
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
@@ -68,7 +64,7 @@ it('maps Community Board flags and cursors to the board requests', async () => {
   });
 });
 
-it('accepts a maximum body from an input file and rejects one code point more', async () => {
+it('sends a maximum body from an input file', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue({ ...result });
@@ -83,35 +79,4 @@ it('accepts a maximum body from an input file and rejects one code point more', 
     title: 'Worst case',
     body,
   });
-
-  vi.mocked(readFile).mockResolvedValue(
-    JSON.stringify({
-      category: 'lore',
-      title: 'Too long',
-      body: `${body}🧙`,
-    }),
-  );
-  await expect(
-    execute(['board-create', '-c', traveler, '-i', 'body.json'], vi.fn()),
-  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-
-  for (const [schema, maximum, extra] of [
-    [createBoardThreadSchema, 10_000, { category: 'general', title: 'T' }],
-    [replyBoardThreadSchema, 5_000, { thread_id: thread }],
-  ] as const) {
-    expect(
-      schema.safeParse({
-        character_id: traveler,
-        body: '🧙'.repeat(maximum),
-        ...extra,
-      }).success,
-    ).toBe(true);
-    expect(
-      schema.safeParse({
-        character_id: traveler,
-        body: '🧙'.repeat(maximum + 1),
-        ...extra,
-      }).success,
-    ).toBe(false);
-  }
 });

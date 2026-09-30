@@ -143,12 +143,14 @@ it.each([
       );
     expect(request).toHaveBeenCalledTimes((before + 1) * 2);
     for (const [index, sourceId] of sourceIds.entries()) {
-      expect(new URL(String(request.mock.calls[index * 2]?.[0])).pathname).toBe(
-        '/api/v1/character/gather',
-      );
+      expect(
+        new URL(request.mock.calls[index * 2]?.[0] as string).pathname,
+      ).toBe('/api/v1/character/gather');
       const [url, options] = request.mock.calls[index * 2 + 1]!;
-      expect(new URL(String(url)).pathname).toBe('/api/v1/character/activity');
-      expect(JSON.parse(String(options?.body))).toEqual({
+      expect(new URL(url as string).pathname).toBe(
+        '/api/v1/character/activity',
+      );
+      expect(JSON.parse(options?.body as string)).toEqual({
         character_id: 'Traveler0000',
         activity_id: sourceId,
       });
@@ -211,7 +213,7 @@ it('returns arrival with the ambush result and the active combat', async () => {
     },
   });
   expect(request).toHaveBeenCalledTimes(2);
-  expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body))).toEqual({
+  expect(JSON.parse(request.mock.calls[1]?.[1]?.body as string)).toEqual({
     character_id: 'Traveler0000',
     activity_id: travelId,
   });
@@ -483,7 +485,7 @@ it('adds a recovery hint when a wait outcome is unknown', async () => {
   // The start is sent once; the CLI never re-sends the activity.
   expect(
     request.mock.calls.filter(
-      ([url]) => new URL(String(url)).pathname === '/api/v1/character/gather',
+      ([url]) => new URL(url as string).pathname === '/api/v1/character/gather',
     ),
   ).toHaveLength(1);
 });

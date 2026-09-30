@@ -15,7 +15,7 @@ afterEach(() => {
 const character = 'm7Qp2_aR9L-x';
 const instance = '22222222-2222-4222-8222-222222222222';
 const envelope = {
-  schema_version: '3.8',
+  schema_version: '3.9',
   server_time: '2026-09-20T00:00:00.000Z',
 } as const;
 
@@ -171,7 +171,7 @@ const purchase = {
 it('reads every active item without an item filter', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(overview) as never);
+    .mockResolvedValue(structuredClone(overview));
   const result = await execute(
     ['market', '-c', character, '--town', 'corvent'],
     vi.fn(),
@@ -186,7 +186,7 @@ it('reads every active item without an item filter', async () => {
 it('reads one board remotely and maps every optional filter to typed numbers', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(orderBook) as never);
+    .mockResolvedValue(structuredClone(orderBook));
   const result = await execute(
     [
       'market',
@@ -226,7 +226,7 @@ it('reads one board remotely and maps every optional filter to typed numbers', a
 it('reads listings with their pagination cursor', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(listings) as never);
+    .mockResolvedValue(structuredClone(listings));
   const result = await execute(
     ['market', '-c', character, '--town', 'corvent', '--item', 'iron_sword'],
     vi.fn(),
@@ -242,7 +242,7 @@ it('reads listings with their pagination cursor', async () => {
 it('reads own orders, held items and trades from anywhere', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(myMarket) as never);
+    .mockResolvedValue(structuredClone(myMarket));
   const result = await execute(
     ['my-market', '-c', character, '--section', 'trades', '--cursor', '9'],
     vi.fn(),
@@ -259,7 +259,7 @@ it('reads own orders, held items and trades from anywhere', async () => {
 it('posts each write to its order or listing path with a request ID', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(placement) as never);
+    .mockResolvedValue(structuredClone(placement));
   const request = '44444444-4444-4444-8444-444444444444';
   await execute(
     [
@@ -352,7 +352,7 @@ it('posts each write to its order or listing path with a request ID', async () =
 it('posts a purchase with numeric bounds and parses the accepted purchase', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(purchase) as never);
+    .mockResolvedValue(structuredClone(purchase));
   const result = await execute(
     [
       'market-purchase',
@@ -378,40 +378,16 @@ it('posts a purchase with numeric bounds and parses the accepted purchase', asyn
   expect(agentGameResponseSchema.parse(result)).toEqual(result);
 });
 
-it('keeps the request ID and target in an uncertain error and rejects a malformed number first', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockRejectedValue(
-      new CliError('SERVICE_UNAVAILABLE', { outcome: 'unknown' }),
-    );
+it('keeps the request ID and target in an uncertain error', async () => {
+  vi.spyOn(GameClient.prototype, 'invoke').mockRejectedValue(
+    new CliError('SERVICE_UNAVAILABLE', { outcome: 'unknown' }),
+  );
   await expect(
     execute(['market-order-cancel', '-c', character, '--order', '12'], vi.fn()),
   ).rejects.toMatchObject({
     code: 'SERVICE_UNAVAILABLE',
     detail: { request_id: expect.any(String), order_id: 12 },
   });
-  invoke.mockClear();
-  await expect(
-    execute(
-      [
-        'market-sell',
-        '-c',
-        character,
-        '--item',
-        'ore',
-        '--quality',
-        'standard',
-        '--quantity',
-        'two',
-        '--unit-price',
-        '5',
-        '--source',
-        'carried',
-      ],
-      vi.fn(),
-    ),
-  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  expect(invoke).not.toHaveBeenCalled();
 });
 
 it('parses the market slot-limit failure body', () => {

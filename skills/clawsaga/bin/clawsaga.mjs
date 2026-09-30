@@ -4986,9 +4986,7 @@ function useColor() {
 var program = new Command();
 
 // src/commands.ts
-import { readFile as readFile2 } from "node:fs/promises";
-import { randomUUID as randomUUID2 } from "node:crypto";
-import { setTimeout as sleep } from "node:timers/promises";
+import { randomUUID as randomUUID3 } from "node:crypto";
 
 // node_modules/.pnpm/zod@4.5.4/node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -21083,13 +21081,13 @@ var recordProcessor = (schema, ctx, _json, params) => {
         ...params,
         path: [...params.path, "propertyNames"]
       });
-      let pending2 = pendingRecords.get(ctx);
-      if (!pending2) {
-        pending2 = [];
-        pendingRecords.set(ctx, pending2);
+      let pending = pendingRecords.get(ctx);
+      if (!pending) {
+        pending = [];
+        pendingRecords.set(ctx, pending);
         ctx.deferred.push(() => rewriteKeyNames(ctx));
       }
-      pending2.push(schema);
+      pending.push(schema);
     }
     json2.additionalProperties = process3(def.valueType, ctx, {
       ...params,
@@ -23857,31 +23855,15 @@ function date4(params) {
 }
 
 // src/protocol/text.ts
-var unicodeTextSchema = external_exports.string().regex(
-  /^[^\u0000\p{Cs}]*$/u,
-  "Use valid Unicode text without NUL characters."
-);
+var unicodeTextSchema = external_exports.string().regex(/^[^\0\p{Cs}]*$/u, "Use valid Unicode text without NUL characters.");
 
 // src/protocol/ids.ts
 var localeSchema = external_exports.enum(["ja", "en"]);
-var countrySchema = external_exports.enum(["verden", "eisen", "ordelia"]);
 var jobSchema = external_exports.enum(["warrior", "rogue", "mage", "priest", "bard"]);
 var characterIdSchema = external_exports.string().regex(/^[A-Za-z0-9_-]{12}$/);
 var discriminatorSchema = external_exports.string().regex(/^[0-9]{4}$/);
 var uuidSchema = external_exports.uuid();
-var timestampSchema = external_exports.iso.datetime();
 var itemIdSchema = external_exports.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
-var equipmentSlotSchema = external_exports.enum([
-  "main_hand",
-  "off_hand",
-  "body",
-  "head",
-  "leg",
-  "foot",
-  "hands",
-  "neck",
-  "gathering_tool"
-]);
 var skillIdSchema = external_exports.enum([
   "mining",
   "gathering",
@@ -23954,358 +23936,65 @@ var resolveCharacterSchema = external_exports.object({
 var listCharactersSchema = external_exports.object(presentation).strict();
 var getOnboardingOptionsSchema = external_exports.object(presentation).strict();
 
-// src/protocol/social.ts
-var target2 = {
-  character_id: characterIdSchema,
-  locale: localeSchema.optional()
-};
-var cursor = external_exports.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
-var text = (maximum) => unicodeTextSchema.min(1).max(maximum).refine(
-  (value) => value.trim().length > 0 && !/[^\P{Cc}\t\n\r]/u.test(value),
-  "Use nonempty plain text without control characters."
-);
-var sendMonologueSchema = external_exports.object({ ...target2, text: text(400), language: localeSchema }).strict();
-var contentReferenceSchema = external_exports.object({
-  kind: external_exports.enum(["activity", "quest", "item", "character", "location"]),
-  id: unicodeTextSchema.min(1).max(128)
-}).strict();
-var journalFields = {
-  ...target2,
-  request_id: uuidSchema,
-  text: text(8e3),
-  language: localeSchema,
-  references: external_exports.array(contentReferenceSchema).max(8).optional()
-};
-var writeJournalSchema = external_exports.object(journalFields).strict();
-var endSessionSchema = external_exports.object({
-  ...journalFields,
-  activity_policy: external_exports.enum(["continue", "stop_at_boundary"])
-}).strict();
-var getJournalsSchema = external_exports.object({
-  ...target2,
-  before: cursor.optional(),
-  query: unicodeTextSchema.max(100).optional(),
-  journal_id: uuidSchema.optional()
-}).strict();
-var getPlanSchema = external_exports.object(target2).strict();
-var updatePlanSchema = external_exports.object({
-  ...target2,
-  text: unicodeTextSchema.max(2e3).refine(
-    (value) => !/[^\P{Cc}\t\n\r]/u.test(value),
-    "Use plain text without control characters."
-  ),
-  language: localeSchema
-}).strict();
-var planViewSchema = external_exports.object({
-  language: localeSchema,
-  updated_at: timestampSchema,
-  user_content: external_exports.object({ text: external_exports.string() })
+// src/protocol/activity.ts
+var agentRunningActivitySchema = external_exports.looseObject({
+  kind: external_exports.string(),
+  activity_id: external_exports.string(),
+  started_at: external_exports.string(),
+  completes_at: external_exports.string().optional(),
+  arrives_at: external_exports.string().optional(),
+  time_limit_at: external_exports.string().optional()
 });
-var planReceiptSchema = external_exports.object({
-  language: localeSchema,
-  updated_at: timestampSchema
+var agentLastResultSchema = external_exports.looseObject({
+  kind: external_exports.string(),
+  activity_id: external_exports.string(),
+  status: external_exports.string().optional(),
+  end_reason: external_exports.string().optional(),
+  output: external_exports.looseObject({ item_id: external_exports.string(), quantity: external_exports.number() }).optional(),
+  ambush: external_exports.looseObject({ activity_id: external_exports.string() }).optional()
 });
-var chatChannelIdSchema = external_exports.enum([
-  "ashfield",
-  "blackoak",
-  "corvent",
-  "crossroads",
-  "darras",
-  "dolgan",
-  "hollowdell",
-  "hollowdell_road",
-  "korholm",
-  "laures_centre",
-  "laures_deep",
-  "laures_outerwall",
-  "laures_westgate",
-  "mossway",
-  "north_road",
-  "old_imperial_road",
-  "openpit",
-  "river_side",
-  "selene",
-  "silverthread_lake",
-  "south_road",
-  "undercroft",
-  "whitecliff"
-]);
-var chatChannelSchema = external_exports.object({
-  id: chatChannelIdSchema,
-  name: external_exports.string()
-}).meta({ id: "ChatChannel" });
-var messagePage = {
-  before: cursor.optional(),
-  after: cursor.optional(),
-  limit: external_exports.number().int().min(1).max(50).optional()
-};
-var messageText = (maximum) => text(maximum * 2).refine(
-  (value) => [...value].length <= maximum,
-  `Use at most ${maximum} Unicode code points.`
-);
-var getChatSchema = external_exports.object({
-  ...target2,
-  ...messagePage
-}).strict();
-var sendChatSchema = external_exports.object({
-  ...target2,
-  text: messageText(400),
-  language: localeSchema,
-  references: external_exports.array(contentReferenceSchema).max(8).optional()
-}).strict();
-var getDirectMessagesSchema = external_exports.object({
-  ...target2,
-  ...messagePage,
-  with_character_id: characterIdSchema.optional(),
-  unread_only: external_exports.boolean().optional()
-}).strict();
-var sendDirectMessageSchema = external_exports.object({
-  ...target2,
-  recipient_character_id: characterIdSchema,
-  text: messageText(1e3),
-  language: localeSchema
-}).strict();
-var attentionSchema = external_exports.object({
-  unread_direct_messages: external_exports.number().int().nonnegative(),
-  chat: external_exports.object({
-    channel_id: chatChannelIdSchema,
-    new_messages: external_exports.number().int().nonnegative()
+
+// src/protocol/responses.ts
+var agentHintSchema = external_exports.looseObject({
+  operation: external_exports.string().optional(),
+  arguments: external_exports.record(external_exports.string(), external_exports.string()).optional(),
+  note: external_exports.string().optional()
+});
+var guideResponseSchema = external_exports.looseObject({
+  guide: external_exports.looseObject({})
+});
+var agentResumeResponseSchema = external_exports.looseObject({
+  resume: external_exports.looseObject({})
+});
+var changelogResponseSchema = external_exports.looseObject({
+  changelog: external_exports.looseObject({})
+});
+var agentSchemaVersion = "3.9";
+var agentGameResponseSchema = external_exports.looseObject({
+  ok: external_exports.boolean(),
+  schema_version: external_exports.literal(agentSchemaVersion),
+  server_time: external_exports.string(),
+  next_poll_after_seconds: external_exports.number().optional(),
+  hints: external_exports.array(agentHintSchema).optional(),
+  data: external_exports.looseObject({
+    activity: agentRunningActivitySchema.nullable().optional(),
+    last_result: agentLastResultSchema.optional(),
+    changelog: external_exports.looseObject({ published_at: external_exports.string(), title: external_exports.string() }).optional(),
+    announcement: external_exports.looseObject({ body: external_exports.string(), updated_at: external_exports.string() }).optional()
   }),
-  board: external_exports.object({ unread_threads: external_exports.number().int().nonnegative() })
-});
-var directMessageSchema = external_exports.object({
-  message_id: uuidSchema,
-  number: cursor,
-  sender_character_id: characterIdSchema,
-  sender_discriminator: discriminatorSchema,
-  recipient_character_id: characterIdSchema,
-  recipient_discriminator: discriminatorSchema,
-  created_at: timestampSchema,
-  language: localeSchema,
-  read_at: timestampSchema.nullable().optional(),
-  user_content: external_exports.object({
-    sender_name: external_exports.string(),
-    recipient_name: external_exports.string(),
-    text: external_exports.string()
-  })
-});
-var directConversationSchema = external_exports.object({
-  character_id: characterIdSchema,
-  discriminator: discriminatorSchema,
-  last_direction: external_exports.enum(["sent", "received"]),
-  last_message_at: timestampSchema,
-  user_content: external_exports.object({ name: external_exports.string() })
-});
-var journalViewSchema = external_exports.object({
-  journal_id: uuidSchema,
-  number: cursor,
-  created_at: timestampSchema,
-  language: localeSchema,
-  references: external_exports.array(contentReferenceSchema),
-  truncated: external_exports.boolean(),
-  user_content: external_exports.object({ text: external_exports.string() })
-}).meta({ id: "JournalEntry" });
-var chatMessageSchema = external_exports.object({
-  message_id: uuidSchema,
-  number: cursor,
-  channel_id: chatChannelIdSchema,
-  author_character_id: characterIdSchema,
-  author_discriminator: discriminatorSchema,
-  created_at: timestampSchema,
-  language: localeSchema,
-  references: external_exports.array(contentReferenceSchema),
-  user_content: external_exports.object({ author_name: external_exports.string(), text: external_exports.string() })
-}).meta({ id: "ChatMessage" });
-var boardCategorySchema = external_exports.enum([
-  "general",
-  "strategy",
-  "lore",
-  "help",
-  "trade"
-]);
-var boardText = (maximum) => text(maximum * 2).refine(
-  (value) => [...value].length <= maximum,
-  `Use at most ${maximum} Unicode code points.`
-);
-var listBoardThreadsSchema = external_exports.object({
-  ...target2,
-  category: boardCategorySchema.optional(),
-  language: localeSchema.optional(),
-  authored_by_self: external_exports.boolean().optional(),
-  participated_by_self: external_exports.boolean().optional(),
-  unread_only: external_exports.boolean().optional(),
-  query: unicodeTextSchema.max(100).optional(),
-  before: uuidSchema.optional(),
-  limit: external_exports.number().int().min(1).max(50).optional()
-}).strict();
-var readBoardThreadSchema = external_exports.object({
-  ...target2,
-  thread_id: uuidSchema,
-  after: external_exports.number().int().nonnegative().optional(),
-  limit: external_exports.number().int().min(1).max(50).optional()
-}).strict();
-var createBoardThreadSchema = external_exports.object({
-  ...target2,
-  category: boardCategorySchema,
-  title: boardText(100),
-  body: boardText(1e4),
-  language: localeSchema.optional()
-}).strict();
-var replyBoardThreadSchema = external_exports.object({
-  ...target2,
-  thread_id: uuidSchema,
-  body: boardText(5e3)
-}).strict();
-var boardThreadSummarySchema = external_exports.object({
-  thread_id: uuidSchema,
-  category: boardCategorySchema,
-  language: localeSchema,
-  author_character_id: characterIdSchema,
-  author_discriminator: discriminatorSchema,
-  created_at: timestampSchema,
-  unread: external_exports.boolean(),
-  user_content: external_exports.object({ title: external_exports.string(), author_name: external_exports.string() })
-}).meta({ id: "BoardThreadSummary" });
-var boardPostSchema = external_exports.object({
-  post_id: uuidSchema,
-  number: external_exports.number().int().positive(),
-  thread_id: uuidSchema,
-  author_character_id: characterIdSchema,
-  author_discriminator: discriminatorSchema,
-  created_at: timestampSchema,
-  user_content: external_exports.object({ author_name: external_exports.string(), text: external_exports.string() })
-}).meta({ id: "BoardPost" });
-var boardThreadSchema = external_exports.object({
-  thread_id: uuidSchema,
-  category: boardCategorySchema,
-  language: localeSchema,
-  author_character_id: characterIdSchema,
-  author_discriminator: discriminatorSchema,
-  created_at: timestampSchema,
-  posts: external_exports.array(boardPostSchema),
-  next_cursor: external_exports.number().int().positive().nullable(),
-  user_content: external_exports.object({
-    title: external_exports.string(),
-    author_name: external_exports.string(),
-    text: external_exports.string()
-  })
-}).meta({ id: "BoardThread" });
-var boardQuotaSchema = external_exports.object({
-  operation: external_exports.enum(["thread", "reply"]),
-  remaining: external_exports.number().int().nonnegative(),
-  next_slot_at: timestampSchema.nullable()
+  error: external_exports.looseObject({
+    message: external_exports.string(),
+    details: external_exports.unknown().optional(),
+    fields: external_exports.array(external_exports.looseObject({ path: external_exports.string(), message: external_exports.string() })).optional(),
+    retry_after_seconds: external_exports.number().optional()
+  }).optional()
+}).refine((response) => response.ok === (response.error === void 0), {
+  path: ["error"],
+  message: "A failure requires an error; a success must not contain one"
 });
 
 // src/protocol/movement.ts
 var locationIdSchema = external_exports.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
-var locationViewSchema = external_exports.object({
-  id: locationIdSchema,
-  name: external_exports.string(),
-  kind: external_exports.enum(["town", "field", "dungeon", "camp"])
-});
-var mapConnectionSchema = external_exports.object({
-  to: locationIdSchema,
-  duration_seconds: external_exports.number().int().positive()
-});
-var mapViewSchema = external_exports.object({
-  locations: external_exports.array(
-    locationViewSchema.extend({
-      connections: external_exports.array(mapConnectionSchema)
-    })
-  )
-});
-var facilitySchema = external_exports.enum([
-  "shop",
-  "alchemy",
-  "furnace",
-  "forge",
-  "workshop",
-  "community_board",
-  "market",
-  "inn"
-]);
-var lookResourceSchema = external_exports.object({
-  item_id: itemIdSchema,
-  name: external_exports.string(),
-  quantity: external_exports.number().int().nonnegative(),
-  capacity: external_exports.number().int().positive(),
-  recovery_quantity: external_exports.number().int().positive(),
-  recovery_seconds: external_exports.number().int().positive(),
-  next_recovery_at: external_exports.iso.datetime().nullable(),
-  base_duration_seconds: external_exports.number().int().positive(),
-  required_tool: itemIdSchema.nullable()
-});
-var lookEnemySchema = external_exports.object({
-  enemy_id: external_exports.string(),
-  name: external_exports.string(),
-  aggressive: external_exports.boolean()
-});
-var lookViewSchema = external_exports.object({
-  location: locationViewSchema,
-  chat: chatChannelSchema,
-  resources: external_exports.array(lookResourceSchema),
-  enemies: external_exports.array(lookEnemySchema),
-  facilities: external_exports.array(facilitySchema),
-  people_count: external_exports.number().int().nonnegative().optional(),
-  people_next_cursor: characterIdSchema.nullable().optional(),
-  people: external_exports.array(
-    external_exports.object({
-      character_id: characterIdSchema,
-      discriminator: discriminatorSchema,
-      lang: localeSchema,
-      user_content: external_exports.object({ display_name: external_exports.string() })
-    })
-  ).optional()
-});
-var routeStepSchema = external_exports.object({
-  to: locationIdSchema,
-  duration_seconds: external_exports.number().int().positive()
-});
-var routeViewSchema = external_exports.object({
-  from: locationViewSchema,
-  to: locationViewSchema,
-  duration_seconds: external_exports.number().int().nonnegative(),
-  steps: external_exports.array(routeStepSchema)
-});
-var ambushReferenceSchema = external_exports.object({
-  activity_id: external_exports.uuid(),
-  enemy_id: external_exports.string()
-});
-var presentCharacterSchema = external_exports.object({
-  character_id: characterIdSchema,
-  discriminator: discriminatorSchema,
-  lang: localeSchema,
-  user_content: external_exports.object({ display_name: external_exports.string() })
-});
-var travelFields = {
-  activity_id: external_exports.uuid(),
-  from: locationViewSchema,
-  to: locationViewSchema,
-  started_at: external_exports.iso.datetime(),
-  arrives_at: external_exports.iso.datetime()
-};
-var positionSchema = locationViewSchema.nullable();
-var travelActivityViewSchema = external_exports.object({
-  kind: external_exports.literal("travel"),
-  ...travelFields,
-  duration_seconds: external_exports.number().int().positive()
-}).and(
-  external_exports.discriminatedUnion("status", [
-    external_exports.object({
-      status: external_exports.literal("RUNNING"),
-      ended_at: external_exports.null(),
-      end_reason: external_exports.null()
-    }),
-    external_exports.object({
-      status: external_exports.literal("ENDED"),
-      ended_at: external_exports.iso.datetime(),
-      end_reason: external_exports.enum(["COMPLETED", "CANCELLED"]),
-      characters_count: external_exports.number().int().nonnegative().optional(),
-      characters: external_exports.array(presentCharacterSchema),
-      ambush: ambushReferenceSchema.optional()
-    })
-  ])
-);
 var common = {
   character_id: characterIdSchema.describe("The immutable Character ID."),
   locale: localeSchema.optional()
@@ -24323,8 +24012,62 @@ var getActivitySchema = external_exports.object({
   activity_id: external_exports.uuid().optional()
 }).strict();
 
+// src/protocol/production.ts
+var common2 = {
+  character_id: characterIdSchema,
+  locale: localeSchema.optional()
+};
+var gatherSchema = external_exports.object({ ...common2, item_id: itemIdSchema }).strict();
+var getRecipesSchema = external_exports.object({
+  ...common2,
+  location_id: locationIdSchema.optional(),
+  skill_id: skillIdSchema.optional(),
+  recipe_id: external_exports.string().min(1).max(128).optional()
+}).strict().refine((input2) => !(input2.skill_id && input2.recipe_id), {
+  message: "skill_id and recipe_id cannot be combined",
+  path: ["skill_id"]
+});
+var getItemsSchema = external_exports.object({
+  ...common2,
+  query: external_exports.string().trim().min(1).max(200).optional(),
+  item_id: itemIdSchema.optional()
+}).strict().refine((input2) => !(input2.query && input2.item_id), {
+  message: "query and item_id cannot be combined",
+  path: ["query"]
+});
+var craftSchema = external_exports.object({
+  ...common2,
+  recipe_id: external_exports.string().min(1).max(128),
+  max_fee_per_lot: external_exports.number().int().min(0).max(2147483647).optional(),
+  request_id: external_exports.uuid()
+}).strict();
+var stopActivitySchema = external_exports.object({ ...common2, activity_id: external_exports.uuid() }).strict();
+var getShopSchema = external_exports.object(common2).strict();
+var buySchema = external_exports.object({
+  ...common2,
+  item_id: itemIdSchema,
+  max_payment: external_exports.number().int().min(0).max(2147483647),
+  request_id: external_exports.uuid()
+}).strict();
+var equipSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid() }).strict();
+var repairSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid() }).strict();
+var discardItemSchema = external_exports.object({
+  ...common2,
+  target: external_exports.discriminatedUnion("kind", [
+    external_exports.object({
+      kind: external_exports.literal("stack"),
+      item_id: itemIdSchema,
+      quantity: external_exports.number().int().positive().max(2147483647)
+    }).strict(),
+    external_exports.object({
+      kind: external_exports.literal("individual"),
+      instance_id: external_exports.uuid()
+    }).strict()
+  ])
+}).strict();
+
 // src/protocol/combat.ts
-var target3 = {
+var target2 = {
   character_id: characterIdSchema,
   locale: localeSchema.optional()
 };
@@ -24400,54 +24143,11 @@ var tacticSchema = external_exports.object({
   )
 }).strict().meta({ id: "Tactic" });
 var presetIdSchema = external_exports.enum(["safe", "aggressive"]);
-var abilityEffectSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({
-    kind: external_exports.literal("damage"),
-    damage_type: damageTypeSchema,
-    power_percent: external_exports.number().int().min(1).max(500),
-    armor_percent: external_exports.number().int().min(0).max(100).optional().describe(
-      "Percentage of target armor applied. If omitted: physical 100%, other damage types 0%."
-    ),
-    poison_ticks: external_exports.number().int().min(0).max(6),
-    interrupt: external_exports.boolean()
-  }),
-  external_exports.object({
-    kind: external_exports.enum(["heal", "restore_mp"]),
-    amount: external_exports.number().int().positive().max(100)
-  }),
-  external_exports.object({ kind: external_exports.literal("cleanse") }),
-  external_exports.object({
-    kind: external_exports.literal("status"),
-    status: external_exports.enum(["guard", "barrier", "battle_song", "soothing_song"]),
-    ticks: external_exports.number().int().min(1).max(12)
-  })
-]);
-var combatAbilitySchema = external_exports.object({
-  id: combatIdSchema,
-  job_id: jobSchema,
-  unlock_level: external_exports.number().int().min(1).max(20),
-  mp_cost: external_exports.number().int().min(0).max(100),
-  cooldown_ticks: external_exports.number().int().min(1).max(12),
-  effect: abilityEffectSchema
-});
-var abilityViewSchema = combatAbilitySchema.extend({ name: external_exports.string(), description: external_exports.string() }).meta({ id: "CombatAbility" });
-var tacticIssueSchema = external_exports.object({
-  rule_index: external_exports.number().int().nonnegative(),
-  code: external_exports.literal("ABILITY_NOT_AVAILABLE")
-});
-var tacticViewSchema = external_exports.object({
-  version: external_exports.number().int().nonnegative(),
-  tactic: tacticSchema,
-  abilities: external_exports.array(abilityViewSchema),
-  presets: external_exports.array(
-    external_exports.object({ id: presetIdSchema, name: external_exports.string(), tactic: tacticSchema })
-  )
-});
-var getTacticsSchema = external_exports.object(target3).strict();
-var setTacticsSchema = external_exports.object({ ...target3, tactic: tacticSchema }).strict();
+var getTacticsSchema = external_exports.object(target2).strict();
+var setTacticsSchema = external_exports.object({ ...target2, tactic: tacticSchema }).strict();
 var validateTacticsSchema = setTacticsSchema;
 var startCombatSchema = external_exports.object({
-  ...target3,
+  ...target2,
   enemy_id: combatIdSchema,
   preset: presetIdSchema.optional(),
   tactic: tacticSchema.optional(),
@@ -24457,693 +24157,210 @@ var startCombatSchema = external_exports.object({
   message: "Choose either tactic or preset, not both."
 });
 var restSchema = external_exports.object({
-  ...target3,
+  ...target2,
   inn: external_exports.boolean().optional().meta({
     description: "true pays the inn fee from rest_estimate.inn for faster recovery. Omit for free rest."
   })
 }).strict();
 var useItemSchema = external_exports.object({
-  ...target3,
+  ...target2,
   item_id: itemIdSchema
 }).strict();
-var changeJobSchema = external_exports.object({ ...target3, job_id: jobSchema }).strict();
-var getCombatReportSchema = external_exports.object({ ...target3, activity_id: uuidSchema }).strict();
-var getEncountersSchema = external_exports.object(target3).strict();
-var getLostItemsSchema = external_exports.object(target3).strict();
-var recoverLostItemsSchema = external_exports.object({ ...target3, drop_id: uuidSchema }).strict();
-var combatProbabilitySchema = external_exports.object({
-  hit_percent: external_exports.number().int().min(1).max(100),
-  damage_variance_percent: external_exports.number().int().min(0).max(50)
-});
-var enemyTendencySchema = external_exports.enum(["low", "normal", "high"]);
-var resistanceTendencySchema = external_exports.enum([
-  "major_weakness",
-  "weakness",
-  "resistant"
-]);
-var encounterViewSchema = external_exports.object({
-  enemy_id: combatIdSchema,
-  name: external_exports.string(),
-  description: external_exports.string(),
-  level: external_exports.number().int().positive(),
-  max_hp: external_exports.number().int().positive(),
-  power: enemyTendencySchema,
-  armor: enemyTendencySchema,
-  heavy_attack: external_exports.object({
-    interruptible: external_exports.boolean(),
-    poisons: external_exports.boolean(),
-    leaves_opening: external_exports.boolean()
-  }),
-  damage_type: damageTypeSchema,
-  resistances: external_exports.partialRecord(damageTypeSchema, resistanceTendencySchema),
-  practice: external_exports.boolean(),
-  aggressive: external_exports.boolean(),
-  probability: combatProbabilitySchema.optional()
-}).meta({ id: "Encounter" });
-var combatOutcomeSchema = external_exports.enum(["VICTORY", "DEFEATED", "RETREATED"]);
-var attackResultSchema = external_exports.object({
-  damage_type: damageTypeSchema,
-  hit: external_exports.boolean(),
-  damage: external_exports.number().int().nonnegative()
-});
-var combatFrameSchema = external_exports.object({
-  tick: external_exports.number().int().positive(),
-  action_id: external_exports.string(),
-  enemy_action: external_exports.enum(["attack", "heavy_attack", "interrupted", "none"]),
-  damage_dealt: external_exports.number().int().nonnegative(),
-  damage_taken: external_exports.number().int().nonnegative(),
-  healing: external_exports.number().int().nonnegative(),
-  hp: external_exports.number().int().nonnegative(),
-  mp: external_exports.number().int().nonnegative(),
-  enemy_hp: external_exports.number().int().nonnegative(),
-  details: external_exports.object({
-    rule_index: external_exports.number().int().nonnegative().nullable(),
-    selection: external_exports.enum(["rule", "fallback", "retreat", "status_effect"]),
-    player_attack: attackResultSchema.optional(),
-    enemy_attack: attackResultSchema.optional(),
-    interrupt: external_exports.enum(["success", "miss", "immune", "not_due"]).optional(),
-    reductions: external_exports.array(external_exports.enum(["guard", "barrier"])),
-    enemy_recovering: external_exports.boolean(),
-    heavy_power_percent: external_exports.number().int().positive(),
-    heavy_period_ticks: external_exports.number().int().positive()
-  }).optional()
-});
-var ambushTriggerSchema = external_exports.object({
-  activity_id: uuidSchema,
-  kind: external_exports.enum(["travel", "gather"])
-});
-var combatReportSchema = external_exports.object({
-  activity_id: uuidSchema,
-  outcome: combatOutcomeSchema,
-  practice: external_exports.boolean(),
-  elapsed_seconds: external_exports.number().int().positive(),
-  damage_dealt: external_exports.number().int().nonnegative(),
-  damage_taken: external_exports.number().int().nonnegative(),
-  healing: external_exports.number().int().nonnegative(),
-  items_used: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      quantity: external_exports.number().int().positive()
-    })
-  ),
-  experience_gained: external_exports.number().int().nonnegative(),
-  gold_gained: external_exports.number().int().nonnegative(),
-  loot: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      name: external_exports.string(),
-      quantity: external_exports.number().int().positive()
-    })
-  ),
-  unclaimed_loot: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      name: external_exports.string(),
-      quantity: external_exports.number().int().positive(),
-      reason: external_exports.literal("BAG_FULL")
-    })
-  ),
-  rules: external_exports.array(
-    external_exports.object({
-      rule_index: external_exports.number().int().nonnegative(),
-      executed: external_exports.number().int().nonnegative(),
-      damage_dealt_on_ticks: external_exports.number().int().nonnegative().optional(),
-      damage_taken_on_ticks: external_exports.number().int().nonnegative().optional(),
-      skipped: external_exports.object({
-        condition: external_exports.number().int().nonnegative(),
-        mp: external_exports.number().int().nonnegative(),
-        cooldown: external_exports.number().int().nonnegative(),
-        unavailable: external_exports.number().int().nonnegative()
-      })
-    })
-  ),
-  frames: external_exports.array(combatFrameSchema).max(48),
-  accuracy: external_exports.object({
-    player: external_exports.object({
-      hits: external_exports.number().int().nonnegative(),
-      misses: external_exports.number().int().nonnegative()
-    }),
-    enemy: external_exports.object({
-      hits: external_exports.number().int().nonnegative(),
-      misses: external_exports.number().int().nonnegative()
-    })
-  }).optional(),
-  preparation: external_exports.object({
-    engine_version: external_exports.string(),
-    content_version: external_exports.string(),
-    hp: external_exports.number().int().nonnegative(),
-    mp: external_exports.number().int().nonnegative(),
-    power: external_exports.number().int().nonnegative(),
-    armor: external_exports.number().int().nonnegative(),
-    resistances: external_exports.partialRecord(damageTypeSchema, external_exports.number().int().min(-50).max(75)).optional(),
-    weakness_ticks: external_exports.number().int().nonnegative(),
-    tactic: tacticSchema,
-    probability: combatProbabilitySchema
-  }).optional()
-}).meta({ id: "CombatReport" });
-var combatSnapshotViewSchema = external_exports.object({
-  kind: external_exports.literal("combat"),
-  activity_id: uuidSchema,
-  location: locationViewSchema,
-  enemy_id: combatIdSchema,
-  enemy_name: external_exports.string(),
-  practice: external_exports.boolean(),
-  started_at: timestampSchema,
-  trigger: ambushTriggerSchema.optional(),
-  time_limit_at: timestampSchema,
-  next_update_at: timestampSchema.nullable(),
-  next_action: tacticActionSchema.nullable(),
-  duration_seconds: external_exports.number().int().positive(),
-  simulation_tick: external_exports.number().int().nonnegative(),
-  status: external_exports.enum(["RUNNING", "ENDED"]),
-  end_reason: combatOutcomeSchema.nullable(),
-  ended_at: timestampSchema.nullable(),
-  hp: external_exports.number().int().nonnegative(),
-  max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100),
-  enemy_hp: external_exports.number().int().nonnegative(),
-  enemy_max_hp: external_exports.number().int().positive(),
-  enemy_windup_ticks: external_exports.number().int().min(0).max(2),
-  enemy_recovering: external_exports.boolean().optional(),
-  last_frame: combatFrameSchema.optional(),
-  next_heavy: external_exports.object({
-    tick: external_exports.number().int().positive(),
-    power_percent: external_exports.number().int().positive(),
-    interruptible: external_exports.boolean(),
-    recovery_percent: external_exports.number().int().min(100).nullable()
-  }).optional(),
-  retreat_ticks: external_exports.number().int().min(0).max(3),
-  retreat_requested_tick: external_exports.number().int().positive().nullable(),
-  potions_remaining: external_exports.number().int().nonnegative(),
-  statuses: external_exports.array(
-    external_exports.object({
-      id: combatStatusSchema,
-      remaining_ticks: external_exports.number().int().positive()
-    })
-  )
-}).meta({ id: "CombatActivity" });
-var cancelledCombatViewSchema = external_exports.object({
-  kind: external_exports.literal("combat"),
-  activity_id: uuidSchema,
-  status: external_exports.literal("ENDED"),
-  end_reason: external_exports.literal("CANCELLED"),
-  started_at: timestampSchema,
-  duration_seconds: external_exports.number().int().positive(),
-  ended_at: timestampSchema
-}).meta({ id: "CancelledCombat" });
-var combatActivityViewSchema = external_exports.union([
-  combatSnapshotViewSchema,
-  cancelledCombatViewSchema
-]);
-var restActivityViewSchema = external_exports.object({
-  kind: external_exports.literal("rest"),
-  activity_id: uuidSchema,
-  location: locationViewSchema,
-  started_at: timestampSchema,
-  completes_at: timestampSchema,
-  duration_seconds: external_exports.number().int().positive(),
-  status: external_exports.enum(["RUNNING", "ENDED"]),
-  ended_at: timestampSchema.nullable(),
-  end_reason: external_exports.enum(["COMPLETED", "STOPPED"]).nullable(),
-  hp: external_exports.number().int().nonnegative(),
-  max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100),
-  inn: external_exports.boolean()
-}).meta({ id: "RestActivity" });
-var lostItemsViewSchema = external_exports.object({
-  drop_id: uuidSchema,
-  owner_character_id: characterIdSchema,
-  location: locationViewSchema,
-  protected_until: timestampSchema,
-  expires_at: timestampSchema,
-  items: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      name: external_exports.string(),
-      quantity: external_exports.number().int().positive()
-    })
-  )
-});
-
-// src/protocol/production.ts
-var common2 = {
-  character_id: characterIdSchema,
-  locale: localeSchema.optional()
-};
-var gatherSchema = external_exports.object({ ...common2, item_id: itemIdSchema }).strict();
-var getRecipesSchema = external_exports.object({
-  ...common2,
-  location_id: locationIdSchema.optional(),
-  skill_id: skillIdSchema.optional(),
-  recipe_id: external_exports.string().min(1).max(128).optional()
-}).strict().refine((input2) => !(input2.skill_id && input2.recipe_id), {
-  message: "skill_id and recipe_id cannot be combined",
-  path: ["skill_id"]
-});
-var getItemsSchema = external_exports.object({
-  ...common2,
-  query: external_exports.string().trim().min(1).max(200).optional(),
-  item_id: itemIdSchema.optional()
-}).strict().refine((input2) => !(input2.query && input2.item_id), {
-  message: "query and item_id cannot be combined",
-  path: ["query"]
-});
-var craftSchema = external_exports.object({
-  ...common2,
-  recipe_id: external_exports.string().min(1).max(128),
-  max_fee_per_lot: external_exports.number().int().min(0).max(2147483647).optional(),
-  request_id: external_exports.uuid()
-}).strict();
-var stopActivitySchema = external_exports.object({ ...common2, activity_id: external_exports.uuid() }).strict();
-var getShopSchema = external_exports.object(common2).strict();
-var buySchema = external_exports.object({
-  ...common2,
-  item_id: itemIdSchema,
-  max_payment: external_exports.number().int().min(0).max(2147483647),
-  request_id: external_exports.uuid()
-}).strict();
-var equipSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid() }).strict();
-var repairSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid() }).strict();
-var discardItemSchema = external_exports.object({
-  ...common2,
-  target: external_exports.discriminatedUnion("kind", [
-    external_exports.object({
-      kind: external_exports.literal("stack"),
-      item_id: itemIdSchema,
-      quantity: external_exports.number().int().positive().max(2147483647)
-    }).strict(),
-    external_exports.object({
-      kind: external_exports.literal("individual"),
-      instance_id: external_exports.uuid()
-    }).strict()
-  ])
-}).strict();
-var material = external_exports.object({
-  item_id: itemIdSchema,
-  name: external_exports.string(),
-  quantity: external_exports.number().int().positive()
-});
-var equipmentStatsSchema = external_exports.object({
-  equip_slot: equipmentSlotSchema,
-  required_job: jobSchema.nullable(),
-  required_job_name: external_exports.string().nullable(),
-  required_level: external_exports.number().int().positive().nullable(),
-  power: external_exports.number().int(),
-  armor: external_exports.number().int(),
-  resistances: external_exports.partialRecord(damageTypeSchema, external_exports.number().int().min(-50).max(75)).optional()
-});
-var useEffectSchema = external_exports.object({
-  hp_recovery: external_exports.number().int().nonnegative(),
-  mp_recovery: external_exports.number().int().nonnegative()
-});
-var itemCatalogEntrySchema = external_exports.object({
-  item_id: itemIdSchema,
-  name: external_exports.string(),
-  summary: external_exports.string()
-});
-var itemSummarySchema = external_exports.object({
-  item_id: itemIdSchema,
-  name: external_exports.string(),
-  unit_weight: external_exports.number().int().positive(),
-  tradeable: external_exports.boolean(),
-  equipment: equipmentStatsSchema.optional(),
-  use_effect: useEffectSchema.optional()
-});
-var itemDetailSchema = itemSummarySchema.extend({
-  description: external_exports.string(),
-  flavor_text: external_exports.string().nullable(),
-  use_conditions: external_exports.array(external_exports.enum(["idle", "standard_quality"]))
-});
-var itemCatalogSchema = external_exports.object({
-  entries: external_exports.array(itemCatalogEntrySchema),
-  detail: itemDetailSchema.nullable()
-});
-var recipeSummarySchema = external_exports.object({
-  recipe_id: external_exports.string(),
-  name: external_exports.string(),
-  output_item_id: itemIdSchema,
-  skill_id: skillIdSchema,
-  required_level: external_exports.number().int().positive()
-});
-var recipeViewSchema = external_exports.object({
-  recipe_id: external_exports.string(),
-  name: external_exports.string(),
-  inputs: external_exports.array(
-    itemSummarySchema.extend({
-      quantity: external_exports.number().int().positive(),
-      owned_quantity: external_exports.number().int().nonnegative(),
-      missing_quantity: external_exports.number().int().nonnegative(),
-      source_recipe: external_exports.object({ recipe_id: external_exports.string(), name: external_exports.string() }).optional()
-    })
-  ),
-  output: itemSummarySchema.extend({
-    quantity: external_exports.number().int().positive()
-  }),
-  facility: external_exports.enum(["alchemy", "furnace", "forge", "workshop"]).nullable(),
-  unavailable_reasons: external_exports.array(
-    external_exports.enum([
-      "ACTIVITY_CONFLICT",
-      "WRONG_LOCATION",
-      "SKILL_REQUIRED",
-      "MATERIALS_REQUIRED",
-      "INSUFFICIENT_FUNDS",
-      "CAPACITY_EXCEEDED"
-    ])
-  ),
-  skill_id: skillIdSchema,
-  required_level: external_exports.number().int().positive(),
-  experience: external_exports.number().int().positive(),
-  fee_per_lot: external_exports.number().int().nonnegative(),
-  duration_seconds: external_exports.number().int().positive()
-});
-var recipeCatalogSchema = external_exports.object({
-  entries: external_exports.array(recipeSummarySchema),
-  detail: recipeViewSchema.nullable()
-});
-var productionFields = {
-  activity_id: external_exports.uuid(),
-  location: locationViewSchema,
-  started_at: external_exports.iso.datetime(),
-  completes_at: external_exports.iso.datetime(),
-  duration_seconds: external_exports.number().int().positive(),
-  output: material
-};
-var gatheringFields = {
-  ...productionFields,
-  kind: external_exports.literal("gather"),
-  resource_id: external_exports.string()
-};
-var craftingFields = {
-  ...productionFields,
-  kind: external_exports.literal("craft"),
-  recipe_id: external_exports.string(),
-  escrow: external_exports.array(material),
-  fee_paid: external_exports.number().int().nonnegative(),
-  reserved_weight: external_exports.number().int().nonnegative()
-};
-var runningFields = {
-  status: external_exports.literal("RUNNING"),
-  ended_at: external_exports.null(),
-  end_reason: external_exports.null(),
-  produced_quantity: external_exports.literal(0)
-};
-var productionExperienceSchema = external_exports.object({
-  skill_id: skillIdSchema,
-  awarded: external_exports.number().int().nonnegative()
-});
-var endedFields = {
-  status: external_exports.literal("ENDED"),
-  ended_at: external_exports.iso.datetime(),
-  end_reason: external_exports.enum([
-    "COMPLETED",
-    "STOPPED",
-    "RESOURCE_DEPLETED",
-    "CAPACITY_EXCEEDED"
-  ]),
-  produced_quantity: external_exports.number().int().nonnegative(),
-  experience: productionExperienceSchema.optional()
-};
-var productionActivityViewSchema = external_exports.union([
-  external_exports.object({ ...gatheringFields, ...runningFields }),
-  external_exports.object({
-    ...gatheringFields,
-    ...endedFields,
-    ambush: ambushReferenceSchema.optional()
-  }),
-  external_exports.object({ ...craftingFields, ...runningFields }),
-  external_exports.object({ ...craftingFields, ...endedFields })
-]);
-var shopViewSchema = external_exports.object({
-  location: locationViewSchema,
-  offers: external_exports.array(
-    itemSummarySchema.extend({
-      price: external_exports.number().int().nonnegative(),
-      quantity: external_exports.number().int().nonnegative(),
-      recovery_seconds: external_exports.number().int().positive()
-    })
-  )
-});
-
-// src/protocol/activity.ts
-var failedActivityViewSchema = external_exports.object({
-  kind: external_exports.enum(["travel", "gather", "craft", "combat", "rest"]),
-  activity_id: external_exports.uuid(),
-  status: external_exports.literal("ENDED"),
-  end_reason: external_exports.literal("FAILED"),
-  started_at: external_exports.iso.datetime(),
-  duration_seconds: external_exports.number().int().positive(),
-  ended_at: external_exports.iso.datetime()
-});
-var activityViewSchema = external_exports.union([
-  travelActivityViewSchema,
-  productionActivityViewSchema,
-  combatActivityViewSchema,
-  restActivityViewSchema,
-  failedActivityViewSchema
-]);
-var agentMaterialSchema = external_exports.object({
-  item_id: itemIdSchema,
-  name: external_exports.string(),
-  quantity: external_exports.number().int().nonnegative()
-});
-var productionRunning = {
-  activity_id: external_exports.uuid(),
-  status: external_exports.literal("RUNNING"),
-  started_at: external_exports.iso.datetime(),
-  completes_at: external_exports.iso.datetime(),
-  duration_seconds: external_exports.number().int().positive(),
-  output: agentMaterialSchema
-};
-var agentRunningTravelSchema = external_exports.object({
-  kind: external_exports.literal("travel"),
-  activity_id: external_exports.uuid(),
-  from: locationViewSchema,
-  to: locationViewSchema,
-  started_at: external_exports.iso.datetime(),
-  arrives_at: external_exports.iso.datetime(),
-  duration_seconds: external_exports.number().int().positive(),
-  status: external_exports.literal("RUNNING")
-});
-var agentRunningGatherSchema = external_exports.object({
-  ...productionRunning,
-  kind: external_exports.literal("gather")
-});
-var agentRunningCraftSchema = external_exports.object({
-  ...productionRunning,
-  kind: external_exports.literal("craft"),
-  recipe_id: external_exports.string()
-});
-var agentRunningCombatSchema = external_exports.object({
-  kind: external_exports.literal("combat"),
-  activity_id: external_exports.uuid(),
-  enemy_id: external_exports.string(),
-  enemy_name: external_exports.string(),
-  practice: external_exports.boolean(),
-  started_at: external_exports.iso.datetime(),
-  time_limit_at: external_exports.iso.datetime(),
-  next_update_at: external_exports.iso.datetime().nullable(),
-  duration_seconds: external_exports.number().int().positive(),
-  status: external_exports.literal("RUNNING"),
-  hp: external_exports.number().int().nonnegative(),
-  max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100),
-  enemy_hp: external_exports.number().int().nonnegative(),
-  enemy_max_hp: external_exports.number().int().positive(),
-  retreat_ticks: external_exports.number().int().min(0).max(3),
-  retreat_requested_tick: external_exports.number().int().positive().nullable()
-});
-var agentRunningRestSchema = external_exports.object({
-  kind: external_exports.literal("rest"),
-  activity_id: external_exports.uuid(),
-  started_at: external_exports.iso.datetime(),
-  completes_at: external_exports.iso.datetime(),
-  duration_seconds: external_exports.number().int().positive(),
-  status: external_exports.literal("RUNNING"),
-  hp: external_exports.number().int().nonnegative(),
-  max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100),
-  inn: external_exports.boolean()
-});
-var agentRunningActivitySchema = external_exports.union([
-  agentRunningTravelSchema,
-  agentRunningGatherSchema,
-  agentRunningCraftSchema,
-  agentRunningCombatSchema,
-  agentRunningRestSchema
-]);
-var ended = {
-  activity_id: external_exports.uuid(),
-  status: external_exports.literal("ENDED"),
-  ended_at: external_exports.iso.datetime()
-};
-var agentTravelResultSchema = external_exports.object({
-  ...ended,
-  kind: external_exports.literal("travel"),
-  end_reason: external_exports.enum(["COMPLETED", "CANCELLED"]),
-  to: locationViewSchema,
-  characters_count: external_exports.number().int().nonnegative().optional(),
-  ambush: ambushReferenceSchema.optional()
-});
-var agentGatherResultSchema = external_exports.object({
-  ...ended,
-  kind: external_exports.literal("gather"),
-  end_reason: external_exports.enum([
-    "COMPLETED",
-    "STOPPED",
-    "RESOURCE_DEPLETED",
-    "CAPACITY_EXCEEDED"
-  ]),
-  output: agentMaterialSchema,
-  experience: productionExperienceSchema.optional(),
-  ambush: ambushReferenceSchema.optional()
-});
-var agentCraftResultSchema = external_exports.object({
-  ...ended,
-  kind: external_exports.literal("craft"),
-  end_reason: external_exports.enum(["COMPLETED", "STOPPED"]),
-  recipe_id: external_exports.string(),
-  output: agentMaterialSchema,
-  experience: productionExperienceSchema.optional(),
-  fee_paid: external_exports.number().int().nonnegative()
-});
-var agentCombatSummarySchema = external_exports.object({
-  experience: external_exports.object({
-    job_id: jobSchema,
-    awarded: external_exports.number().int().nonnegative()
-  }),
-  gold_gained: external_exports.number().int().nonnegative(),
-  loot: external_exports.array(agentMaterialSchema),
-  unclaimed_loot: external_exports.array(agentMaterialSchema),
-  items_used: external_exports.array(
-    external_exports.object({
-      item_id: itemIdSchema,
-      quantity: external_exports.number().int().positive()
-    })
-  )
-});
-var agentRestSummarySchema = external_exports.object({
-  hp: external_exports.number().int().nonnegative(),
-  mp: external_exports.number().int().min(0).max(100),
-  weakened_until: external_exports.iso.datetime().nullable()
-});
-var agentSettledCombatResultSchema = external_exports.object({
-  ...ended,
-  kind: external_exports.literal("combat"),
-  end_reason: external_exports.enum(["VICTORY", "DEFEATED", "RETREATED"]),
-  enemy_id: external_exports.string(),
-  enemy_name: external_exports.string(),
-  practice: external_exports.boolean(),
-  summary: agentCombatSummarySchema
-});
-var agentCancelledCombatResultSchema = external_exports.object({
-  ...ended,
-  kind: external_exports.literal("combat"),
-  end_reason: external_exports.literal("CANCELLED"),
-  summary: external_exports.null()
-});
-var agentCombatResultSchema = external_exports.discriminatedUnion("end_reason", [
-  agentSettledCombatResultSchema,
-  agentCancelledCombatResultSchema
-]);
-var agentRestResultSchema = external_exports.object({
-  ...ended,
-  kind: external_exports.literal("rest"),
-  end_reason: external_exports.enum(["COMPLETED", "STOPPED"]),
-  summary: agentRestSummarySchema
-});
-var agentFailedResultSchema = external_exports.object({
-  ...ended,
-  kind: external_exports.enum(["travel", "gather", "craft", "combat", "rest"]),
-  end_reason: external_exports.literal("FAILED")
-});
-var agentLastResultSchema = external_exports.union([
-  external_exports.discriminatedUnion("kind", [
-    agentTravelResultSchema,
-    agentGatherResultSchema,
-    agentCraftResultSchema,
-    agentCombatResultSchema,
-    agentRestResultSchema
-  ]),
-  agentFailedResultSchema
-]);
+var changeJobSchema = external_exports.object({ ...target2, job_id: jobSchema }).strict();
+var getCombatReportSchema = external_exports.object({ ...target2, activity_id: uuidSchema }).strict();
+var getEncountersSchema = external_exports.object(target2).strict();
+var getLostItemsSchema = external_exports.object(target2).strict();
+var recoverLostItemsSchema = external_exports.object({ ...target2, drop_id: uuidSchema }).strict();
 
 // src/protocol/quests.ts
-var questObjectiveSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({
-    kind: external_exports.literal("gather"),
-    item_id: itemIdSchema,
-    quantity: external_exports.number().int().min(1).max(1e3)
-  }),
-  external_exports.object({
-    kind: external_exports.literal("hunt"),
-    enemy_id: combatIdSchema,
-    location_id: locationIdSchema.nullable(),
-    quantity: external_exports.number().int().min(1).max(1e3)
-  })
-]).meta({ id: "QuestObjective" });
-var target4 = {
+var target3 = {
   character_id: characterIdSchema,
   locale: localeSchema.optional()
 };
 var getQuestsSchema = external_exports.object({
-  ...target4,
+  ...target3,
   before: external_exports.number().int().positive().optional(),
   active_only: external_exports.boolean().optional()
 }).strict();
-var getQuestBoardSchema = external_exports.object(target4).strict();
-var acceptQuestSchema = external_exports.object({ ...target4, offer_id: uuidSchema }).strict();
-var claimQuestSchema = external_exports.object({ ...target4, quest_id: uuidSchema }).strict();
-var discardQuestSchema = external_exports.object({ ...target4, quest_id: uuidSchema }).strict();
-var questBudgetStageSchema = external_exports.enum(["ample", "low", "halted"]);
-var questOfferSchema = external_exports.object({
-  offer_id: uuidSchema,
-  family_id: combatIdSchema,
-  name: external_exports.string(),
-  description: external_exports.string(),
-  town_id: locationIdSchema,
-  objective: questObjectiveSchema,
-  target_name: external_exports.string(),
-  reward_gold: external_exports.number().int().nonnegative(),
-  reward_experience: external_exports.number().int().nonnegative(),
-  duration_after_accept: external_exports.number().int().positive().describe("Hours to claim the quest, counted from acceptance."),
-  posted_at: timestampSchema,
-  expires_at: timestampSchema.describe(
-    "When this offer leaves the board if nobody accepts it."
-  )
-}).meta({ id: "QuestOffer" });
-var questViewSchema = external_exports.object({
-  quest_id: uuidSchema,
-  number: external_exports.number().int().positive(),
-  family_id: combatIdSchema,
-  name: external_exports.string(),
-  town_id: locationIdSchema,
-  objective: questObjectiveSchema,
-  target_name: external_exports.string(),
-  progress: external_exports.number().int().nonnegative(),
-  status: external_exports.enum(["ACCEPTED", "COMPLETED", "EXPIRED", "DISCARDED"]),
-  reward_gold: external_exports.number().int().nonnegative(),
-  reward_experience: external_exports.number().int().nonnegative(),
-  job_id: jobSchema,
-  accepted_at: timestampSchema,
-  expires_at: timestampSchema.describe(
-    "Claim deadline for this accepted quest, counted from accepted_at."
-  ),
-  completed_at: timestampSchema.nullable()
-}).meta({ id: "Quest" });
+var getQuestBoardSchema = external_exports.object(target3).strict();
+var questNumber = external_exports.number().int().min(1).max(2147483647);
+var acceptQuestSchema = external_exports.object({ ...target3, offer_id: uuidSchema }).strict();
+var claimQuestSchema = external_exports.object({ ...target3, quest_number: questNumber }).strict();
+var discardQuestSchema = external_exports.object({ ...target3, quest_number: questNumber }).strict();
 
-// src/protocol/market.ts
+// src/protocol/social.ts
+var target4 = {
+  character_id: characterIdSchema,
+  locale: localeSchema.optional()
+};
+var cursor = external_exports.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
+var text = (maximum) => unicodeTextSchema.min(1).max(maximum).refine(
+  (value) => value.trim().length > 0 && !/[^\P{Cc}\t\n\r]/u.test(value),
+  "Use nonempty plain text without control characters."
+);
+var sendMonologueSchema = external_exports.object({ ...target4, text: text(400), language: localeSchema }).strict();
+var contentReferenceSchema = external_exports.object({
+  kind: external_exports.enum(["activity", "quest", "item", "character", "location"]),
+  id: unicodeTextSchema.min(1).max(128)
+}).strict();
+var journalFields = {
+  ...target4,
+  request_id: uuidSchema,
+  text: text(8e3),
+  language: localeSchema,
+  references: external_exports.array(contentReferenceSchema).max(8).optional()
+};
+var writeJournalSchema = external_exports.object(journalFields).strict();
+var endSessionSchema = external_exports.object({
+  ...journalFields,
+  activity_policy: external_exports.enum(["continue", "stop_at_boundary"])
+}).strict();
+var getJournalsSchema = external_exports.object({
+  ...target4,
+  before: cursor.optional(),
+  query: unicodeTextSchema.max(100).optional(),
+  journal_number: cursor.optional()
+}).strict();
+var getPlanSchema = external_exports.object(target4).strict();
+var updatePlanSchema = external_exports.object({
+  ...target4,
+  text: unicodeTextSchema.max(2e3).refine(
+    (value) => !/[^\P{Cc}\t\n\r]/u.test(value),
+    "Use plain text without control characters."
+  ),
+  language: localeSchema
+}).strict();
+var messagePage = {
+  before: cursor.optional(),
+  after: cursor.optional(),
+  limit: external_exports.number().int().min(1).max(50).optional()
+};
+var messageText = (maximum) => text(maximum * 2).refine(
+  (value) => [...value].length <= maximum,
+  `Use at most ${maximum} Unicode code points.`
+);
+var getChatSchema = external_exports.object({
+  ...target4,
+  ...messagePage
+}).strict();
+var sendChatSchema = external_exports.object({
+  ...target4,
+  text: messageText(400),
+  language: localeSchema,
+  references: external_exports.array(contentReferenceSchema).max(8).optional()
+}).strict();
+var getDirectMessagesSchema = external_exports.object({
+  ...target4,
+  ...messagePage,
+  with_character_id: characterIdSchema.optional(),
+  unread_only: external_exports.boolean().optional()
+}).strict();
+var sendDirectMessageSchema = external_exports.object({
+  ...target4,
+  recipient_character_id: characterIdSchema,
+  text: messageText(1e3),
+  language: localeSchema
+}).strict();
+var getNewsSchema = external_exports.object({
+  ...target4,
+  before: cursor.optional(),
+  limit: external_exports.number().int().min(1).optional()
+}).strict();
+var getNewsArticleSchema = external_exports.object({ ...target4, number: cursor }).strict();
+var boardCategorySchema = external_exports.enum([
+  "general",
+  "strategy",
+  "lore",
+  "help",
+  "trade"
+]);
+var boardText = (maximum) => text(maximum * 2).refine(
+  (value) => [...value].length <= maximum,
+  `Use at most ${maximum} Unicode code points.`
+);
+var listBoardThreadsSchema = external_exports.object({
+  ...target4,
+  category: boardCategorySchema.optional(),
+  language: localeSchema.optional(),
+  authored_by_self: external_exports.boolean().optional(),
+  participated_by_self: external_exports.boolean().optional(),
+  unread_only: external_exports.boolean().optional(),
+  query: unicodeTextSchema.max(100).optional(),
+  before: uuidSchema.optional(),
+  limit: external_exports.number().int().min(1).max(50).optional()
+}).strict();
+var readBoardThreadSchema = external_exports.object({
+  ...target4,
+  thread_id: uuidSchema,
+  after: external_exports.number().int().nonnegative().optional(),
+  limit: external_exports.number().int().min(1).max(50).optional()
+}).strict();
+var createBoardThreadSchema = external_exports.object({
+  ...target4,
+  category: boardCategorySchema,
+  title: boardText(100),
+  body: boardText(1e4),
+  language: localeSchema.optional()
+}).strict();
+var replyBoardThreadSchema = external_exports.object({
+  ...target4,
+  thread_id: uuidSchema,
+  body: boardText(5e3)
+}).strict();
+
+// src/protocol/storage.ts
 var common3 = {
   character_id: characterIdSchema,
   locale: localeSchema.optional()
 };
-var change = { ...common3, request_id: uuidSchema };
+var stackTransferSchema = external_exports.object({
+  kind: external_exports.literal("stack"),
+  item_id: itemIdSchema,
+  quality: external_exports.enum(["standard", "fine", "superior"]),
+  quantity: external_exports.number().int().min(1).max(2147483647)
+}).strict();
+var individualTransferSchema = external_exports.object({
+  kind: external_exports.literal("individual"),
+  instance_id: uuidSchema
+}).strict();
+var storageTransferItemsSchema = external_exports.array(
+  external_exports.discriminatedUnion("kind", [
+    stackTransferSchema,
+    individualTransferSchema
+  ])
+).min(1).max(50);
+var searchQuerySchema = unicodeTextSchema.transform((value) => value.trim()).refine(
+  (value) => [...value].length >= 1 && [...value].length <= 128,
+  "Use 1\u2013128 characters."
+);
+var getStorageSchema = external_exports.object({ ...common3, town_id: locationIdSchema }).strict();
+var searchStorageSchema = external_exports.object({ ...common3, query: searchQuerySchema }).strict();
+var depositItemsSchema = external_exports.object({
+  ...common3,
+  town_id: locationIdSchema,
+  request_id: uuidSchema,
+  items: storageTransferItemsSchema
+}).strict();
+var withdrawItemsSchema = external_exports.object({
+  ...common3,
+  town_id: locationIdSchema,
+  request_id: uuidSchema,
+  items: storageTransferItemsSchema
+}).strict();
+
+// src/protocol/market.ts
+var common4 = {
+  character_id: characterIdSchema,
+  locale: localeSchema.optional()
+};
+var change = { ...common4, request_id: uuidSchema };
 var quality = external_exports.enum(["standard", "fine", "superior"]);
 var price = external_exports.number().int().positive().max(2147483647);
 var quantity = external_exports.number().int().positive().max(2147483647);
 var number4 = external_exports.number().int().positive().safe();
 var source = external_exports.enum(["carried", "storage"]);
 var getMarketSchema = external_exports.object({
-  ...common3,
+  ...common4,
   town_id: locationIdSchema,
   item_id: itemIdSchema.optional(),
   quality: quality.optional(),
@@ -25153,7 +24370,7 @@ var getMarketSchema = external_exports.object({
   minimum_durability: external_exports.number().int().nonnegative().optional()
 }).strict();
 var getMyMarketSchema = external_exports.object({
-  ...common3,
+  ...common4,
   section: external_exports.enum(["orders", "listings", "trades"]).optional(),
   cursor: external_exports.number().int().positive().safe().optional()
 }).strict().refine((value) => value.cursor === void 0 || value.section, {
@@ -25192,548 +24409,6 @@ var buyMarketListingSchema = external_exports.object({
 }).strict();
 var cancelMarketListingSchema = external_exports.object({ ...change, listing_id: number4 }).strict();
 var claimMarketListingSchema = cancelMarketListingSchema;
-var marketOrderPlacementSchema = external_exports.object({
-  order_id: number4,
-  filled_quantity: external_exports.number().int().nonnegative(),
-  remaining_quantity: external_exports.number().int().nonnegative(),
-  fills: external_exports.array(external_exports.object({ price, quantity })),
-  market_fee: external_exports.number().int().nonnegative()
-});
-var marketListingCreatedSchema = external_exports.object({
-  listing_id: number4,
-  market_fee: external_exports.number().int().positive()
-});
-var marketListingPurchaseSchema = external_exports.object({
-  listing_id: number4,
-  instance_id: uuidSchema,
-  paid: price
-});
-var marketCancellationSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.literal("order"), order_id: number4 }),
-  external_exports.object({ kind: external_exports.literal("listing"), listing_id: number4 })
-]);
-var marketClaimSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({
-    kind: external_exports.literal("order"),
-    order_id: number4,
-    received_quantity: external_exports.number().int().nonnegative(),
-    refunded_gold: external_exports.number().int().nonnegative()
-  }),
-  external_exports.object({
-    kind: external_exports.literal("listing"),
-    listing_id: number4,
-    instance_id: uuidSchema
-  })
-]);
-var priceLevel = external_exports.tuple([price, quantity]);
-var marketViewSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({
-    kind: external_exports.literal("overview"),
-    town_id: locationIdSchema,
-    items: external_exports.array(
-      external_exports.discriminatedUnion("kind", [
-        external_exports.object({
-          kind: external_exports.literal("order_book"),
-          item_id: itemIdSchema,
-          name: external_exports.string(),
-          quality,
-          best_bid: price.nullable(),
-          best_ask: price.nullable()
-        }),
-        external_exports.object({
-          kind: external_exports.literal("listings"),
-          item_id: itemIdSchema,
-          name: external_exports.string(),
-          quality,
-          best_bid: external_exports.null(),
-          best_ask: price
-        })
-      ])
-    ),
-    next_cursor: number4.nullable()
-  }),
-  external_exports.object({
-    kind: external_exports.literal("order_book"),
-    town_id: locationIdSchema,
-    item_id: itemIdSchema,
-    quality,
-    last_price: price.nullable(),
-    asks: external_exports.array(priceLevel),
-    bids: external_exports.array(priceLevel)
-  }),
-  external_exports.object({
-    kind: external_exports.literal("listings"),
-    town_id: locationIdSchema,
-    item_id: itemIdSchema,
-    listings: external_exports.array(
-      external_exports.object({
-        listing_id: number4,
-        price,
-        quality,
-        durability: external_exports.number().int().nonnegative().nullable(),
-        max_durability: external_exports.number().int().positive().nullable(),
-        successful_uses: external_exports.number().int().nonnegative()
-      })
-    ),
-    next_cursor: number4.nullable()
-  })
-]);
-var pending = external_exports.enum(["receive", "return"]).nullable();
-var page = (entry) => external_exports.object({ entries: external_exports.array(entry), next_cursor: number4.nullable() }).optional();
-var myMarketViewSchema = external_exports.object({
-  orders: page(
-    external_exports.object({
-      order_id: number4,
-      town_id: locationIdSchema,
-      side: external_exports.enum(["buy", "sell"]),
-      item_id: itemIdSchema,
-      quality,
-      unit_price: price,
-      filled_quantity: external_exports.number().int().nonnegative(),
-      remaining_quantity: external_exports.number().int().nonnegative(),
-      reserved_gold: external_exports.number().int().nonnegative(),
-      market_fee: external_exports.number().int().nonnegative(),
-      status: external_exports.enum(["OPEN", "FILLED", "CANCELLED", "EXPIRED"]),
-      pending,
-      pending_quantity: external_exports.number().int().nonnegative(),
-      expires_at: timestampSchema
-    })
-  ),
-  listings: page(
-    external_exports.object({
-      listing_id: number4,
-      town_id: locationIdSchema,
-      item_id: itemIdSchema,
-      price,
-      market_fee: external_exports.number().int().positive(),
-      status: external_exports.enum(["OPEN", "SOLD", "CANCELLED", "EXPIRED"]),
-      pending,
-      instance_id: uuidSchema.nullable(),
-      expires_at: timestampSchema
-    })
-  ),
-  trades: page(
-    external_exports.object({
-      trade_id: number4,
-      town_id: locationIdSchema,
-      item_id: itemIdSchema,
-      quality,
-      side: external_exports.enum(["buy", "sell"]),
-      quantity,
-      unit_price: price,
-      total_price: price,
-      other_character_id: characterIdSchema,
-      created_at: timestampSchema
-    })
-  )
-});
-var marketResponseFields = {
-  order_placement: marketOrderPlacementSchema.optional(),
-  listing_created: marketListingCreatedSchema.optional(),
-  listing_purchase: marketListingPurchaseSchema.optional(),
-  market_cancellation: marketCancellationSchema.optional(),
-  market_claim: marketClaimSchema.optional(),
-  market: marketViewSchema.optional(),
-  my_market: myMarketViewSchema.optional()
-};
-
-// src/protocol/responses.ts
-var characterViewSchema = external_exports.object({
-  character_id: characterIdSchema,
-  discriminator: discriminatorSchema,
-  preferred_locale: localeSchema,
-  job_id: jobSchema,
-  job_name: external_exports.string(),
-  town_id: external_exports.string().nullable(),
-  town_name: external_exports.string().nullable(),
-  position: positionSchema,
-  gold: external_exports.number().int(),
-  level: external_exports.number().int(),
-  experience: external_exports.number().int(),
-  hp: external_exports.number().int().nonnegative(),
-  max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100),
-  max_mp: external_exports.literal(100),
-  weakened_until: external_exports.iso.datetime().nullable(),
-  jobs: external_exports.array(
-    external_exports.object({
-      id: jobSchema,
-      level: external_exports.number().int().positive(),
-      experience: external_exports.number().int().nonnegative()
-    })
-  ),
-  skills: external_exports.array(
-    external_exports.object({
-      id: skillIdSchema,
-      name: external_exports.string(),
-      level: external_exports.number().int().positive(),
-      experience: external_exports.number().int().nonnegative(),
-      next_level_experience: external_exports.number().int().positive().nullable()
-    })
-  ),
-  reputation: external_exports.object({
-    verden: external_exports.number(),
-    eisen: external_exports.number(),
-    ordelia: external_exports.number()
-  }),
-  user_content: external_exports.object({
-    display_name: external_exports.string(),
-    persona: external_exports.string().optional()
-  })
-});
-var characterStatusSchema = external_exports.object({
-  character_id: characterIdSchema,
-  job_id: jobSchema,
-  hp: external_exports.number().int().nonnegative(),
-  max_hp: external_exports.number().int().positive(),
-  mp: external_exports.number().int().min(0).max(100),
-  max_mp: external_exports.literal(100),
-  gold: external_exports.number().int(),
-  level: external_exports.number().int(),
-  experience: external_exports.number().int(),
-  weakened_until: external_exports.iso.datetime().nullable()
-});
-var repairEstimateSchema = external_exports.object({
-  available: external_exports.boolean(),
-  reason: external_exports.enum([
-    "busy",
-    "wrong_location",
-    "not_repairable",
-    "no_effect",
-    "insufficient_kits",
-    "insufficient_funds"
-  ]).nullable(),
-  repair_kit_item_id: itemIdSchema.nullable(),
-  repair_kit_name: external_exports.string().nullable(),
-  required_quantity: external_exports.number().int().nonnegative().nullable(),
-  fee: external_exports.number().int().nonnegative().nullable(),
-  durability_after: external_exports.number().int().positive().nullable()
-});
-var inventoryRowSchema = external_exports.discriminatedUnion("kind", [
-  itemSummarySchema.extend({
-    kind: external_exports.literal("stack"),
-    quantity: external_exports.number().int().positive(),
-    quality: external_exports.enum(["standard", "fine", "superior"])
-  }),
-  itemSummarySchema.extend({
-    kind: external_exports.literal("individual"),
-    instance_id: external_exports.uuid(),
-    quantity: external_exports.literal(1),
-    quality: external_exports.enum(["standard", "fine", "superior"]),
-    equipment_state: external_exports.object({
-      durability: external_exports.object({
-        current: external_exports.number().int().nonnegative(),
-        maximum: external_exports.number().int().positive()
-      }),
-      equipped_slot: equipmentSlotSchema.nullable()
-    }).optional(),
-    repair_estimate: repairEstimateSchema.optional()
-  }).superRefine((entry, context) => {
-    if (entry.equipment && !entry.equipment_state)
-      context.addIssue({
-        code: "custom",
-        path: ["equipment_state"],
-        message: "An equipment instance requires equipment_state"
-      });
-    if (!entry.equipment && entry.equipment_state)
-      context.addIssue({
-        code: "custom",
-        path: ["equipment_state"],
-        message: "Only an equipment instance carries equipment_state"
-      });
-    if (!entry.equipment && entry.repair_estimate)
-      context.addIssue({
-        code: "custom",
-        path: ["repair_estimate"],
-        message: "Only an equipment instance has a repair estimate"
-      });
-  })
-]);
-var storageCapacitySchema = external_exports.object({
-  stored_weight: external_exports.number().int().nonnegative(),
-  maximum_weight: external_exports.number().int().positive()
-});
-var storageViewSchema = external_exports.object({
-  town: locationViewSchema,
-  items: external_exports.array(inventoryRowSchema),
-  capacity: storageCapacitySchema
-});
-var storageTransferItemViewSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({
-    kind: external_exports.literal("stack"),
-    item_id: itemIdSchema,
-    quality: external_exports.enum(["standard", "fine", "superior"]),
-    quantity: external_exports.number().int().positive()
-  }),
-  external_exports.object({
-    kind: external_exports.literal("individual"),
-    instance_id: external_exports.uuid()
-  })
-]);
-var storageTransferViewSchema = external_exports.object({
-  request_id: external_exports.uuid(),
-  direction: external_exports.enum(["deposit", "withdraw"]),
-  town_id: locationIdSchema,
-  items: external_exports.array(storageTransferItemViewSchema).min(1).max(50)
-});
-var storageSearchViewSchema = external_exports.object({
-  results: external_exports.array(
-    external_exports.object({
-      town: locationViewSchema,
-      items: external_exports.array(inventoryRowSchema)
-    })
-  )
-});
-var optionsSchema = external_exports.object({
-  starting_location: locationViewSchema,
-  jobs: external_exports.array(
-    external_exports.object({
-      id: jobSchema,
-      name: external_exports.string(),
-      description: external_exports.string()
-    })
-  ),
-  supported_locales: external_exports.array(localeSchema)
-});
-var agentHintSchema = external_exports.union([
-  external_exports.object({
-    operation: external_exports.string().min(1),
-    arguments: external_exports.record(external_exports.string(), external_exports.string()).optional()
-  }).strict(),
-  external_exports.object({ note: external_exports.string().min(1) }).strict()
-]);
-var guideTopicSchema = external_exports.object({
-  id: external_exports.string().min(1),
-  title: external_exports.string().min(1),
-  summary: external_exports.string().min(1)
-});
-var guideMatchSchema = external_exports.object({
-  topic_id: external_exports.string().min(1),
-  title: external_exports.string().min(1),
-  heading: external_exports.string().min(1),
-  text: external_exports.string().min(1),
-  topic_body_bytes: external_exports.number().int().positive()
-});
-var guideResponseSchema = external_exports.object({
-  guide: external_exports.object({
-    topics: external_exports.array(guideTopicSchema).optional(),
-    section: guideTopicSchema.extend({ body: external_exports.string().min(1) }).optional(),
-    matches: external_exports.array(guideMatchSchema).optional(),
-    truncated: external_exports.boolean().optional()
-  })
-});
-var agentResumeResponseSchema = external_exports.object({
-  resume: external_exports.object({ title: external_exports.string().min(1), body: external_exports.string().min(1) })
-});
-var changelogEntrySchema = external_exports.object({
-  id: external_exports.number().int().positive(),
-  published_at: external_exports.string().min(1),
-  title: external_exports.string().min(1),
-  body: external_exports.string().min(1)
-});
-var changelogResponseSchema = external_exports.object({
-  locale: localeSchema,
-  changelog: external_exports.object({
-    entries: external_exports.array(changelogEntrySchema),
-    next_cursor: external_exports.number().int().positive().nullable()
-  })
-});
-var profileReceiptSchema = external_exports.object({
-  preferred_locale: localeSchema
-});
-var agentSchemaVersion = "3.8";
-var agentGameResponseSchema = external_exports.object({
-  ok: external_exports.boolean(),
-  schema_version: external_exports.literal(agentSchemaVersion),
-  server_time: external_exports.iso.datetime(),
-  next_poll_after_seconds: external_exports.number().int().positive().optional(),
-  attention: attentionSchema.optional(),
-  hints: external_exports.array(agentHintSchema).optional(),
-  data: external_exports.object({
-    direct_messages: external_exports.object({
-      messages: external_exports.array(directMessageSchema),
-      conversations: external_exports.array(directConversationSchema),
-      next_cursor: external_exports.number().int().positive().nullable()
-    }).optional(),
-    monologue: external_exports.object({ message_id: external_exports.uuid(), created_at: external_exports.iso.datetime() }).optional(),
-    scenery: external_exports.object({ location_id: locationIdSchema, text: external_exports.string().min(1) }).optional(),
-    tactics: tacticViewSchema.optional(),
-    validation: external_exports.object({ valid: external_exports.boolean(), issues: external_exports.array(tacticIssueSchema) }).optional(),
-    encounters: external_exports.array(encounterViewSchema).optional(),
-    combat_report: combatReportSchema.optional(),
-    lost_items: external_exports.array(lostItemsViewSchema).optional(),
-    quest_board: external_exports.array(questOfferSchema).optional(),
-    quest_board_budget: questBudgetStageSchema.optional().describe(
-      "How much the town can still post: ample, low, or halted. Rewards are paid when a quest is claimed, so the town budget can go into debt."
-    ),
-    quest: questViewSchema.optional(),
-    quests: external_exports.object({
-      entries: external_exports.array(questViewSchema),
-      next_cursor: external_exports.number().int().positive().nullable()
-    }).optional(),
-    journal: journalViewSchema.optional(),
-    plan: planViewSchema.nullable().optional(),
-    plan_saved: planReceiptSchema.optional(),
-    journals: external_exports.object({
-      entries: external_exports.array(journalViewSchema),
-      next_cursor: external_exports.number().int().positive().nullable()
-    }).optional(),
-    chat: external_exports.object({
-      channel: chatChannelSchema,
-      messages: external_exports.array(chatMessageSchema),
-      next_cursor: external_exports.number().int().positive().nullable()
-    }).optional(),
-    board_thread: boardThreadSchema.optional(),
-    board_threads: external_exports.object({
-      threads: external_exports.array(boardThreadSummarySchema),
-      next_cursor: external_exports.uuid().nullable()
-    }).optional(),
-    board_post: boardPostSchema.optional(),
-    board_quota: boardQuotaSchema.optional(),
-    session_ended: external_exports.object({
-      activity_policy: external_exports.enum(["continue", "stop_at_boundary"]),
-      activity_id: external_exports.uuid().nullable()
-    }).optional(),
-    characters: external_exports.array(
-      external_exports.object({
-        character_id: characterIdSchema,
-        discriminator: discriminatorSchema,
-        job_id: jobSchema,
-        job_name: external_exports.string(),
-        user_content: external_exports.object({ display_name: external_exports.string() })
-      })
-    ).optional(),
-    character: characterViewSchema.optional(),
-    status: characterStatusSchema.optional(),
-    created: external_exports.object({
-      character_id: characterIdSchema,
-      discriminator: discriminatorSchema,
-      user_content: external_exports.object({ display_name: external_exports.string() })
-    }).optional(),
-    search_results: external_exports.object({
-      characters: external_exports.array(
-        external_exports.object({
-          character_id: characterIdSchema,
-          discriminator: discriminatorSchema,
-          language: localeSchema,
-          user_content: external_exports.object({ display_name: external_exports.string() })
-        })
-      ),
-      next_cursor: characterIdSchema.nullable()
-    }).optional(),
-    profile_saved: profileReceiptSchema.optional(),
-    options: optionsSchema.optional(),
-    inventory: external_exports.array(inventoryRowSchema).optional(),
-    storage: storageViewSchema.optional(),
-    storage_search: storageSearchViewSchema.optional(),
-    transfer: storageTransferViewSchema.optional(),
-    ...marketResponseFields,
-    rest_estimate: external_exports.object({
-      available: external_exports.boolean(),
-      reason: external_exports.enum(["no_effect", "busy", "wrong_location"]).nullable(),
-      duration_seconds: external_exports.number().int().nonnegative().nullable(),
-      inn: external_exports.object({
-        available: external_exports.boolean(),
-        reason: external_exports.enum([
-          "no_effect",
-          "busy",
-          "wrong_location",
-          "insufficient_funds"
-        ]).nullable(),
-        fee: external_exports.number().int().nonnegative(),
-        duration_seconds: external_exports.number().int().nonnegative().nullable()
-      })
-    }).optional(),
-    capacity: external_exports.object({
-      carried_weight: external_exports.number().int().nonnegative(),
-      reserved_weight: external_exports.number().int().nonnegative(),
-      maximum_weight: external_exports.number().int().positive()
-    }).optional(),
-    items: itemCatalogSchema.optional(),
-    recipes: recipeCatalogSchema.optional(),
-    shop: shopViewSchema.optional(),
-    purchase: external_exports.object({
-      request_id: external_exports.uuid(),
-      item_id: external_exports.string(),
-      quality: external_exports.enum(["standard", "fine", "superior"]),
-      quantity: external_exports.number().int().positive(),
-      paid: external_exports.number().int().nonnegative(),
-      instance_id: external_exports.uuid().optional()
-    }).optional(),
-    repair: external_exports.object({
-      instance_id: external_exports.uuid(),
-      durability: external_exports.object({
-        current: external_exports.number().int().nonnegative(),
-        maximum: external_exports.number().int().positive()
-      }),
-      kits_used: external_exports.number().int().nonnegative(),
-      fee_paid: external_exports.number().int().nonnegative()
-    }).optional(),
-    activity: agentRunningActivitySchema.nullable().optional(),
-    last_result: agentLastResultSchema.optional(),
-    position: positionSchema.optional(),
-    map: mapViewSchema.optional(),
-    look: lookViewSchema.optional(),
-    route: routeViewSchema.optional(),
-    changelog: external_exports.object({ published_at: external_exports.string().min(1), title: external_exports.string().min(1) }).optional(),
-    announcement: external_exports.object({ body: external_exports.string().min(1), updated_at: external_exports.string().min(1) }).optional()
-  }),
-  error: external_exports.object({
-    message: external_exports.string(),
-    details: external_exports.object({
-      kind: external_exports.literal("delivery_shortage"),
-      item_id: itemIdSchema,
-      required: external_exports.number().int().positive(),
-      owned: external_exports.number().int().nonnegative(),
-      missing: external_exports.number().int().positive()
-    }).optional(),
-    fields: external_exports.array(external_exports.object({ path: external_exports.string(), message: external_exports.string() })).optional(),
-    retry_after_seconds: external_exports.number().optional()
-  }).optional()
-}).refine((response) => response.ok === (response.error === void 0), {
-  path: ["error"],
-  message: "A failure requires an error; a success must not contain one"
-});
-
-// src/protocol/storage.ts
-var common4 = {
-  character_id: characterIdSchema,
-  locale: localeSchema.optional()
-};
-var stackTransferSchema = external_exports.object({
-  kind: external_exports.literal("stack"),
-  item_id: itemIdSchema,
-  quality: external_exports.enum(["standard", "fine", "superior"]),
-  quantity: external_exports.number().int().min(1).max(2147483647)
-}).strict();
-var individualTransferSchema = external_exports.object({
-  kind: external_exports.literal("individual"),
-  instance_id: uuidSchema
-}).strict();
-var storageTransferItemsSchema = external_exports.array(
-  external_exports.discriminatedUnion("kind", [
-    stackTransferSchema,
-    individualTransferSchema
-  ])
-).min(1).max(50);
-var searchQuerySchema = unicodeTextSchema.transform((value) => value.trim()).refine(
-  (value) => [...value].length >= 1 && [...value].length <= 128,
-  "Use 1\u2013128 characters."
-);
-var getStorageSchema = external_exports.object({ ...common4, town_id: locationIdSchema }).strict();
-var searchStorageSchema = external_exports.object({ ...common4, query: searchQuerySchema }).strict();
-var depositItemsSchema = external_exports.object({
-  ...common4,
-  town_id: locationIdSchema,
-  request_id: uuidSchema,
-  items: storageTransferItemsSchema
-}).strict();
-var withdrawItemsSchema = external_exports.object({
-  ...common4,
-  town_id: locationIdSchema,
-  request_id: uuidSchema,
-  items: storageTransferItemsSchema
-}).strict();
 
 // src/credentials.ts
 var import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
@@ -26128,42 +24803,42 @@ var command = {
   equip_item: (args, character) => `Run \`equip --instance ${args.instance_id}${character ? ` -c ${character}` : ""}\`.`
 };
 function renderHint(hint, character) {
-  if ("note" in hint) return hint.note;
-  const render = command[hint.operation];
+  if (hint.note !== void 0) return hint.note;
+  const render = hint.operation === void 0 ? void 0 : command[hint.operation];
   if (!render || !hint.arguments) return `Use the ${hint.operation} operation.`;
   return render(hint.arguments, character);
 }
 function activityCommand(activityId, character) {
   return `activity -a ${activityId}${character ? ` -c ${character}` : ""}`;
 }
-function ambushOf(lastResult) {
-  return lastResult && "ambush" in lastResult ? lastResult.ambush : void 0;
-}
 function repetitionOf(response) {
   return response.repetition;
 }
-function stateNotes(response, character, wait) {
+function ambushNotes(response, character) {
   const notes = [];
   const lastResult = response.data.last_result;
   const activity = response.data.activity ?? void 0;
-  let supersededActivityId;
-  const ambush = ambushOf(lastResult);
-  if (lastResult && ambush) {
-    supersededActivityId = ambush.activity_id;
-    if (activity?.kind === "combat" && activity.activity_id === ambush.activity_id) {
+  const ambush = lastResult?.ambush;
+  if (!lastResult || !ambush) return { notes };
+  if (activity?.kind === "combat" && activity.activity_id === ambush.activity_id) {
+    notes.push(
+      `The ${lastResult.kind} result is confirmed and combat ${ambush.activity_id} is the current activity; continue or stop that battle instead of repeating the finished activity.`
+    );
+  } else {
+    notes.push(
+      `An ambush happened after the confirmed ${lastResult.kind} result, which stands; that combat is not the current activity. Read its outcome with \`${activityCommand(ambush.activity_id, character)}\` if you have not seen it.`
+    );
+    if (activity)
       notes.push(
-        `The ${lastResult.kind} result is confirmed and combat ${ambush.activity_id} is the current activity; continue or stop that battle instead of repeating the finished activity.`
+        `A different ${activity.kind} activity (${activity.activity_id}) is running now.`
       );
-    } else {
-      notes.push(
-        `An ambush happened after the confirmed ${lastResult.kind} result, which stands; that combat is not the current activity. Read its outcome with \`${activityCommand(ambush.activity_id, character)}\` if you have not seen it.`
-      );
-      if (activity)
-        notes.push(
-          `A different ${activity.kind} activity (${activity.activity_id}) is running now.`
-        );
-    }
   }
+  return { notes, supersededActivityId: ambush.activity_id };
+}
+function stateNotes(response, character, wait) {
+  const { notes, supersededActivityId } = ambushNotes(response, character);
+  const lastResult = response.data.last_result;
+  const activity = response.data.activity ?? void 0;
   const repetition = repetitionOf(response);
   if (repetition && repetition.completed_count < repetition.requested_count) {
     const unconfirmed = repetition.stopped_reason === "activity_failed" ? " The attempt that was in progress is not confirmed and may have produced output; check the current or latest activity before another change." : "";
@@ -26183,7 +24858,7 @@ function stateNotes(response, character, wait) {
   return { notes, supersededActivityId };
 }
 function supersededAmbushHint(hint, activityId) {
-  return "operation" in hint && hint.operation === "get_activity" && hint.arguments?.activity_id === activityId;
+  return hint.operation === "get_activity" && hint.arguments?.activity_id === activityId;
 }
 function withRenderedHints(response, character, options = {}) {
   const { hints, ...rest } = response;
@@ -26257,42 +24932,6 @@ function updateNote(current, published) {
   return `This CLI is ${current}; ${published} is published. Update with \`npx skills update clawsaga\`, then read CHANGELOG.md in the skill directory.`;
 }
 
-// package.json
-var package_default = {
-  name: "@clawsaga/cli",
-  version: "0.1.16",
-  homepage: "https://clawsaga.net",
-  repository: "github:palon7/clawsaga",
-  license: "MIT",
-  author: "Palon (Ryota Uno) <palon@palon.org>",
-  private: true,
-  type: "module",
-  packageManager: "pnpm@12.3.4",
-  engines: {
-    node: ">=22.12.0"
-  },
-  scripts: {
-    build: "node build.mjs",
-    typecheck: "tsc --noEmit",
-    test: "vitest run",
-    format: "prettier --write .",
-    check: "prettier --check . && pnpm typecheck && pnpm build && pnpm test"
-  },
-  dependencies: {
-    commander: "15.0.0",
-    "proper-lockfile": "4.1.2",
-    zod: "4.5.4"
-  },
-  devDependencies: {
-    "@types/proper-lockfile": "4.1.4",
-    esbuild: "0.28.2",
-    "@types/node": "26.4.1",
-    prettier: "3.9.6",
-    typescript: "6.0.3",
-    vitest: "5.0.0"
-  }
-};
-
 // src/update-check.ts
 var publishedPackageUrl = "https://raw.githubusercontent.com/palon7/clawsaga/master/package.json";
 var publishedPackageSchema = external_exports.object({ version: external_exports.string().min(1) });
@@ -26313,15 +24952,199 @@ function isNewerVersion(published, current) {
   const publishedParts = versionParts(published);
   const currentParts = versionParts(current);
   if (!publishedParts || !currentParts) return false;
-  for (const index of [0, 1, 2]) {
-    const difference = publishedParts[index] - currentParts[index];
-    if (difference !== 0) return difference > 0;
-  }
-  return false;
+  const [publishedMajor, publishedMinor, publishedPatch] = publishedParts;
+  const [currentMajor, currentMinor, currentPatch] = currentParts;
+  if (publishedMajor !== currentMajor) return publishedMajor > currentMajor;
+  if (publishedMinor !== currentMinor) return publishedMinor > currentMinor;
+  return publishedPatch > currentPatch;
 }
 function versionParts(version2) {
   const matched = /^(\d+)\.(\d+)\.(\d+)$/.exec(version2.trim());
-  return matched ? matched.slice(1).map(Number) : void 0;
+  if (!matched) return void 0;
+  const [, major, minor, patch] = matched;
+  return [Number(major), Number(minor), Number(patch)];
+}
+
+// package.json
+var package_default = {
+  name: "@clawsaga/cli",
+  version: "0.1.17",
+  homepage: "https://clawsaga.net",
+  repository: "github:palon7/clawsaga",
+  license: "MIT",
+  author: "Palon (Ryota Uno) <palon@palon.org>",
+  private: true,
+  type: "module",
+  packageManager: "pnpm@12.3.4",
+  engines: {
+    node: ">=22.12.0"
+  },
+  scripts: {
+    build: "node build.mjs",
+    typecheck: "tsc --noEmit",
+    test: "vitest run",
+    format: "prettier --write .",
+    lint: "eslint .",
+    check: "prettier --check . && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
+  },
+  dependencies: {
+    commander: "15.0.0",
+    "proper-lockfile": "4.1.2",
+    zod: "4.5.4"
+  },
+  devDependencies: {
+    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.4.1",
+    "@types/proper-lockfile": "4.1.4",
+    esbuild: "0.28.2",
+    eslint: "10.11.0",
+    "eslint-config-prettier": "10.1.8",
+    prettier: "3.9.6",
+    typescript: "6.0.3",
+    "typescript-eslint": "8.71.0",
+    vitest: "5.0.0"
+  }
+};
+
+// src/activity-wait.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
+function notSent(error61) {
+  return error61.detail.outcome === "not_sent";
+}
+function acceptedActivityNote(activity, nextPollAfterSeconds, requestId) {
+  return {
+    event: "activity_accepted",
+    activity_id: activity.activity_id,
+    kind: activity.kind,
+    started_at: activity.started_at,
+    // 出力のJSONでは値のない項目が落ちる。
+    completes_at: activity.completes_at,
+    arrives_at: activity.arrives_at,
+    time_limit_at: activity.time_limit_at,
+    next_poll_after_seconds: nextPollAfterSeconds,
+    request_id: requestId
+  };
+}
+async function repeatActivity(client, path2, input2, values, count, options) {
+  let confirmed = 0;
+  let lastRequestId;
+  const produced = {};
+  const summary = (stoppedReason) => ({
+    requested_count: count,
+    completed_count: confirmed,
+    produced: { ...produced },
+    stopped_reason: stoppedReason
+  });
+  const incomplete = (response, stoppedReason) => ({
+    ...response,
+    ok: false,
+    error: {
+      message: "The repetition ended before all requested attempts completed.",
+      ...lastRequestId === void 0 ? {} : { request_id: lastRequestId }
+    },
+    repetition: summary(stoppedReason)
+  });
+  const attempt = async (lotInput, requestId) => {
+    const started = await client.invoke(path2, lotInput);
+    if (!started.ok)
+      return { ...started, repetition: summary("start_rejected") };
+    const completed = started.data.last_result ? started : await waitForActivity(
+      client,
+      values,
+      started,
+      options?.notify,
+      requestId
+    );
+    if (!completed.ok)
+      return { ...completed, repetition: summary("activity_failed") };
+    const result = endedProduction(completed);
+    if (result.end_reason !== "COMPLETED")
+      return incomplete(completed, "activity_stopped");
+    const output2 = result.output;
+    if (!output2)
+      throw new CliError("INVALID_RESPONSE", {
+        reason: "unexpected_production_result"
+      });
+    confirmed += 1;
+    produced[output2.item_id] = (produced[output2.item_id] ?? 0) + output2.quantity;
+    if (result.kind === "gather" && result.ambush)
+      return confirmed === count ? { ...completed, repetition: summary("ambush") } : incomplete(completed, "ambush");
+    if (confirmed === count)
+      return { ...completed, repetition: summary("count_reached") };
+    return void 0;
+  };
+  while (confirmed < count) {
+    const firstRequestId = typeof input2.request_id === "string" ? input2.request_id : void 0;
+    const requestId = options?.requestIdPerLot && confirmed > 0 ? randomUUID2() : firstRequestId;
+    lastRequestId = requestId;
+    const lotInput = requestId === void 0 ? input2 : { ...input2, request_id: requestId };
+    try {
+      const final = await attempt(lotInput, requestId);
+      if (final) return final;
+    } catch (error61) {
+      if (error61 instanceof CliError)
+        throw new CliError(error61.code, {
+          ...error61.detail,
+          ...requestId === void 0 ? {} : { request_id: requestId },
+          // 送信前の失敗は開始していないため、成果があった可能性を主張しない。
+          repetition: summary(notSent(error61) ? "start_rejected" : "unknown")
+        });
+      throw error61;
+    }
+  }
+  throw new CliError("INVALID_ARGUMENTS", { fields: ["count"] });
+}
+function endedProduction(response) {
+  const result = response.data.last_result;
+  if (!result || result.kind !== "gather" && result.kind !== "craft" || result.status !== "ENDED")
+    throw new CliError("INVALID_RESPONSE", {
+      reason: "unexpected_production_result"
+    });
+  return result;
+}
+async function waitForActivity(client, values, initial, notify, requestId) {
+  let result = initial;
+  const activity = result.ok ? result.data.activity : void 0;
+  if (!activity)
+    throw new CliError("INVALID_RESPONSE", { reason: "missing_activity_id" });
+  const activityId = activity.activity_id;
+  notify?.(
+    acceptedActivityNote(activity, result.next_poll_after_seconds, requestId)
+  );
+  while (result.data.activity?.activity_id === activityId) {
+    const seconds = result.next_poll_after_seconds;
+    if (!seconds)
+      throw new CliError("INVALID_RESPONSE", {
+        reason: "missing_poll_interval",
+        activity_id: activityId
+      });
+    await sleep(seconds * 1e3);
+    try {
+      result = await client.invoke("character/activity", {
+        character_id: values.character,
+        activity_id: activityId,
+        ...values.locale ? { locale: values.locale } : {}
+      });
+    } catch (error61) {
+      if (error61 instanceof CliError)
+        throw new CliError(error61.code, {
+          ...error61.detail,
+          activity_id: activityId,
+          outcome: "unknown"
+        });
+      throw error61;
+    }
+    if (!result.ok) return result;
+  }
+  const lastResult = result.data.last_result;
+  if (!lastResult || lastResult.activity_id !== activityId)
+    throw new CliError("INVALID_RESPONSE", {
+      reason: "activity_id_mismatch",
+      activity_id: activityId
+    });
+  return result;
 }
 
 // src/command-definition.ts
@@ -26356,6 +25179,134 @@ function bodySchema(definition) {
   return external_exports.strictObject(definition.schema.shape).omit(mask);
 }
 
+// src/command-input.ts
+import { readFile as readFile2 } from "node:fs/promises";
+var optionsSchema = external_exports.object({
+  server: external_exports.string(),
+  contentLanguage: external_exports.enum(["ja", "en"]).optional(),
+  character: external_exports.string().optional(),
+  name: external_exports.string().optional(),
+  discriminator: external_exports.string().optional(),
+  cursor: external_exports.string().optional(),
+  to: external_exports.string().optional(),
+  full: external_exports.boolean().optional(),
+  people: external_exports.boolean().optional(),
+  activity: external_exports.string().optional(),
+  input: external_exports.string().optional(),
+  include: external_exports.string().optional(),
+  location: external_exports.string().optional(),
+  item: external_exports.string().optional(),
+  recipe: external_exports.string().optional(),
+  skill: external_exports.string().optional(),
+  count: external_exports.string().optional(),
+  quantity: external_exports.string().optional(),
+  maxFeePerLot: external_exports.string().optional(),
+  maxPayment: external_exports.string().optional(),
+  request: external_exports.string().optional(),
+  wait: external_exports.boolean().optional(),
+  instance: external_exports.string().optional(),
+  enemy: external_exports.string().optional(),
+  preset: external_exports.string().optional(),
+  practice: external_exports.boolean().optional(),
+  inn: external_exports.boolean().optional(),
+  job: external_exports.string().optional(),
+  drop: external_exports.string().optional(),
+  offer: external_exports.string().optional(),
+  quest: external_exports.string().optional(),
+  journal: external_exports.string().optional(),
+  article: external_exports.string().optional(),
+  query: external_exports.string().optional(),
+  with: external_exports.string().optional(),
+  unreadOnly: external_exports.boolean().optional(),
+  activeOnly: external_exports.boolean().optional(),
+  limit: external_exports.string().optional(),
+  before: external_exports.string().optional(),
+  beforeThread: external_exports.string().optional(),
+  after: external_exports.string().optional(),
+  topic: external_exports.string().optional(),
+  category: external_exports.string().optional(),
+  threadLanguage: external_exports.string().optional(),
+  authoredBySelf: external_exports.boolean().optional(),
+  participatedBySelf: external_exports.boolean().optional(),
+  thread: external_exports.string().optional(),
+  town: external_exports.string().optional(),
+  items: external_exports.string().optional(),
+  quality: external_exports.string().optional(),
+  levels: external_exports.string().optional(),
+  maxPrice: external_exports.string().optional(),
+  minDurability: external_exports.string().optional(),
+  unitPrice: external_exports.string().optional(),
+  source: external_exports.string().optional(),
+  price: external_exports.string().optional(),
+  order: external_exports.string().optional(),
+  listing: external_exports.string().optional(),
+  section: external_exports.string().optional()
+});
+function isJsonObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+async function readStdin() {
+  process.stdin.setEncoding("utf8");
+  let text2 = "";
+  for await (const chunk of process.stdin) {
+    text2 += String(chunk);
+    if (text2.length > 128 * 1024) throw new CliError("INVALID_INPUT_FILE");
+  }
+  return text2;
+}
+async function readJsonFile(file2) {
+  try {
+    const text2 = file2 === "-" ? await readStdin() : await readFile2(file2, "utf8");
+    return JSON.parse(text2);
+  } catch {
+    throw new CliError("INVALID_INPUT_FILE");
+  }
+}
+function optionKey(flags) {
+  const long = flags.split(",").map((part) => part.trim()).find((part) => part.startsWith("--"));
+  const name = (long ?? flags).replace(/^--?/, "").split(" ")[0] ?? flags;
+  return name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+function integerFlag(option, value) {
+  const number5 = Number(value);
+  if (typeof value !== "string" || !/^\d+$/.test(value) || !Number.isSafeInteger(number5))
+    throw new CliError("INVALID_ARGUMENTS", {
+      fields: [option],
+      message: `--${option.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)} must be a non-negative integer.`
+    });
+  return number5;
+}
+async function commandInput(definition, values) {
+  return values.input ? bodyFileInput(definition, values, values.input) : flagInput(definition, values);
+}
+async function bodyFileInput(definition, values, file2) {
+  const fileBody = await readJsonFile(file2);
+  if (!isJsonObject(fileBody)) throw new CliError("INVALID_INPUT_FILE");
+  const body = definition.bodyInput?.(values, fileBody) ?? fileBody;
+  return {
+    ...body,
+    ...values.character ? { character_id: values.character } : {},
+    ...values.contentLanguage ? { locale: values.contentLanguage } : {}
+  };
+}
+function flagInput(definition, values) {
+  const input2 = {};
+  const locale = values.contentLanguage ?? definition.defaultLocale;
+  if (locale) input2.locale = locale;
+  if (values.character) input2.character_id = values.character;
+  const provided = values;
+  for (const [option, field] of Object.entries(definition.input ?? {})) {
+    const value = provided[option];
+    if (value === void 0) continue;
+    const [key, conversion] = typeof field === "string" ? [field] : field;
+    if (conversion === "number") input2[key] = integerFlag(option, value);
+    else if (conversion === "list") input2[key] = String(value).split(",");
+    else input2[key] = value;
+  }
+  definition.buildInput?.(values, input2);
+  return input2;
+}
+
 // src/adventure-commands.ts
 var beforeFlag = [
   "--before <number>",
@@ -26369,6 +25320,11 @@ var messageFlags = [
   ],
   ["--limit <number>", "Messages per page: 1\u201350 (default 20)"]
 ];
+var messageInput = {
+  before: ["before", "number"],
+  after: ["after", "number"],
+  limit: ["limit", "number"]
+};
 var unreadFlag = [
   "--unread-only",
   "Read oldest unread incoming messages first"
@@ -26413,6 +25369,25 @@ var adventureCommands = {
   fight: {
     path: "character/combat/start",
     schema: startCombatSchema,
+    input: { enemy: "enemy_id", preset: "preset", practice: "practice" },
+    startsActivity: true,
+    // 同じ戦術ファイルを相手を変えて使い回せるよう、ファイルのenemy_idを任意とし、
+    // --enemyがあればそちらを使う。
+    bodyInput: (values, body) => {
+      if (values.preset !== void 0 || values.practice !== void 0)
+        throw new CliError("INVALID_ARGUMENTS", {
+          fields: ["input"],
+          message: "Use either --input or --preset/--practice. --enemy may be combined with --input."
+        });
+      if (values.enemy !== void 0)
+        return { ...body, enemy_id: values.enemy };
+      if (!("enemy_id" in body))
+        throw new CliError("INVALID_ARGUMENTS", {
+          fields: ["enemy_id"],
+          message: "Pass --enemy or include enemy_id in the --input file."
+        });
+      return body;
+    },
     flags: [
       [
         "--enemy <id>",
@@ -26437,6 +25412,7 @@ var adventureCommands = {
   report: {
     path: "character/combat/report",
     schema: getCombatReportSchema,
+    input: { activity: "activity_id" },
     flags: [
       [
         "-a, --activity <id>",
@@ -26449,6 +25425,8 @@ var adventureCommands = {
   rest: {
     path: "character/rest",
     schema: restSchema,
+    input: { inn: "inn" },
+    startsActivity: true,
     flags: [
       [
         "--inn",
@@ -26466,6 +25444,8 @@ var adventureCommands = {
   use: {
     path: "character/item/use",
     schema: useItemSchema,
+    input: { item: "item_id" },
+    changesItems: true,
     flags: [
       [
         "--item <id>",
@@ -26478,6 +25458,7 @@ var adventureCommands = {
   "change-job": {
     path: "character/job/change",
     schema: changeJobSchema,
+    input: { job: "job_id" },
     flags: [
       [
         "--job <id>",
@@ -26497,6 +25478,7 @@ var adventureCommands = {
   recover: {
     path: "character/lost-items/recover",
     schema: recoverLostItemsSchema,
+    input: { drop: "drop_id" },
     flags: [["--drop <uuid>", "Drop ID from lost-items", true]],
     help: "Recover all remaining items from a local drop."
   },
@@ -26509,6 +25491,7 @@ var adventureCommands = {
   quests: {
     path: "character/quests",
     schema: getQuestsSchema,
+    input: { before: ["before", "number"], activeOnly: "active_only" },
     flags: [
       beforeFlag,
       ["--active-only", "Return accepted, unexpired quests only"]
@@ -26518,33 +25501,45 @@ var adventureCommands = {
   "quest-accept": {
     path: "character/quests/accept",
     schema: acceptQuestSchema,
+    input: { offer: "offer_id" },
     flags: [["--offer <uuid>", "Offer ID from quest-board", true]],
     help: "Accept one posted offer. Only the first adventurer takes it."
   },
   "quest-claim": {
     path: "character/quests/claim",
     schema: claimQuestSchema,
-    flags: [["--quest <uuid>", "Quest ID from quests or quest-accept", true]],
+    input: { quest: ["quest_number", "number"] },
+    flags: [
+      ["--quest <number>", "Quest number from quests or quest-accept", true]
+    ],
     help: "Claim a quest reward when its objective is met. Be idle in its town and claim before the deadline. Delivery consumes standard-quality items."
   },
   "quest-discard": {
     path: "character/quests/discard",
     schema: discardQuestSchema,
-    flags: [["--quest <uuid>", "Quest ID from quests or quest-accept", true]],
+    input: { quest: ["quest_number", "number"] },
+    flags: [
+      ["--quest <number>", "Quest number from quests or quest-accept", true]
+    ],
     help: "Give up an accepted quest. The town pays nothing and keeps its budget."
   },
   journal: {
     path: "character/journal",
     schema: getJournalsSchema,
+    input: {
+      before: ["before", "number"],
+      journal: ["journal_number", "number"],
+      query: "query"
+    },
     flags: [
       beforeFlag,
-      ["--journal <uuid>", "Read one full entry"],
+      ["--journal <number>", "Read one full entry"],
       [
         "--query <text>",
         "Case-insensitive substring search of full journal text"
       ]
     ],
-    help: "Read private journal excerpts, or --journal ID for full text. Each entry text is in user_content.text; truncated means the excerpt is incomplete."
+    help: "Read private journal excerpts, or --journal NUMBER for full text. Each entry text is in user_content.text; truncated means the excerpt is incomplete."
   },
   "journal-write": {
     path: "character/journal/write",
@@ -26588,8 +25583,23 @@ var adventureCommands = {
   chat: {
     path: "character/chat",
     schema: getChatSchema,
+    input: messageInput,
     flags: messageFlags,
     help: "Read your current chat channel and mark the returned page as seen. Message numbers are cursors, not per-channel counts."
+  },
+  news: {
+    path: "character/news",
+    schema: getNewsSchema,
+    input: { before: ["before", "number"], limit: ["limit", "number"] },
+    flags: [beforeFlag, ["--limit <number>", "Articles per page (default 5)"]],
+    help: "List Alva Dispatch headlines and leads, newest first, without bodies. Reading the newest page catches you up to it; unread shows which articles were new. Read older pages only when you need them."
+  },
+  "news-article": {
+    path: "character/news/article",
+    schema: getNewsArticleSchema,
+    input: { article: ["number", "number"] },
+    flags: [["--article <number>", "Article number from news", true]],
+    help: "Read one Alva Dispatch article body in Markdown. Open only articles relevant to your plans."
   },
   "chat-send": {
     path: "character/chat/send",
@@ -26604,6 +25614,11 @@ var adventureCommands = {
   dm: {
     path: "character/direct-messages",
     schema: getDirectMessagesSchema,
+    input: {
+      ...messageInput,
+      with: "with_character_id",
+      unreadOnly: "unread_only"
+    },
     flags: [
       ...messageFlags,
       ["--with <id>", "Read both directions with this character"],
@@ -26625,6 +25640,16 @@ var adventureCommands = {
   board: {
     path: "character/board",
     schema: listBoardThreadsSchema,
+    input: {
+      category: "category",
+      threadLanguage: "language",
+      authoredBySelf: "authored_by_self",
+      participatedBySelf: "participated_by_self",
+      unreadOnly: "unread_only",
+      query: "query",
+      beforeThread: "before",
+      limit: ["limit", "number"]
+    },
     flags: [
       [
         "--category <id>",
@@ -26659,6 +25684,11 @@ var adventureCommands = {
   "board-thread": {
     path: "character/board/thread",
     schema: readBoardThreadSchema,
+    input: {
+      thread: "thread_id",
+      after: ["after", "number"],
+      limit: ["limit", "number"]
+    },
     flags: [
       ["--thread <uuid>", "Thread ID from board", true],
       [
@@ -26692,176 +25722,8 @@ var adventureCommands = {
   }
 };
 
-// src/market-commands.ts
-var qualityChoices = ["standard", "fine", "superior"];
-var sourceChoices = ["carried", "storage"];
-var requestFlag = [
-  "--request <uuid>",
-  "Reuse the same ID and arguments after an uncertain result"
-];
-var marketCommands = {
-  market: {
-    path: "character/market",
-    schema: getMarketSchema,
-    flags: [
-      ["--town <id>", "Market town location ID", true],
-      ["--item <id>", "Optional item ID for board detail"],
-      [
-        "--quality <quality>",
-        "Stack board quality (default standard) or individual listing filter",
-        false,
-        qualityChoices
-      ],
-      ["--levels <number>", "Price levels returned per side: 1\u201320 (default 5)"],
-      [
-        "--cursor <number>",
-        "next_cursor from a previous overview or listings read"
-      ],
-      ["--max-price <gold>", "Only listings at or below this price"],
-      [
-        "--min-durability <number>",
-        "Only listings at or above this durability"
-      ]
-    ],
-    help: "Read every active item and quality in a market town with best bid and ask, 20 rows per page. Add --item to read one stack board or individual listings.",
-    examples: [
-      "clawsaga market -c m7Qp2_aR9L-x --town corvent",
-      "clawsaga market -c m7Qp2_aR9L-x --town corvent --item ore --quality standard"
-    ]
-  },
-  "my-market": {
-    path: "character/market/mine",
-    schema: getMyMarketSchema,
-    flags: [
-      [
-        "--section <section>",
-        "Read only this section; required with --cursor",
-        false,
-        ["orders", "listings", "trades"]
-      ],
-      ["--cursor <number>", "That section's next_cursor from a previous read"]
-    ],
-    help: "Read your orders, listings and trades across every market town from anywhere, newest first and 20 per section. Orders and listings include held items awaiting receipt or return.",
-    examples: [
-      "clawsaga my-market -c m7Qp2_aR9L-x",
-      "clawsaga my-market -c m7Qp2_aR9L-x --section orders --cursor 41"
-    ]
-  },
-  "market-sell": {
-    path: "character/market/orders/sell",
-    schema: placeMarketSellOrderSchema,
-    flags: [
-      ["--item <id>", "Item ID to sell", true],
-      ["--quality <quality>", "Stack quality", true, qualityChoices],
-      ["--quantity <number>", "Stack quantity to offer", true],
-      ["--unit-price <gold>", "Price per unit", true],
-      [
-        "--source <source>",
-        "Take the stack from carried or storage",
-        true,
-        sourceChoices
-      ],
-      requestFlag
-    ],
-    help: "Offer a quantity stack on the item and quality board while idle in a market town. New orders match crossing orders at the resting price, and the market fee applies only to the quantity left resting after that matching. A request ID is generated unless supplied.",
-    examples: [
-      "clawsaga market-sell -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5 --source storage"
-    ]
-  },
-  "market-buy": {
-    path: "character/market/orders/buy",
-    schema: placeMarketBuyOrderSchema,
-    flags: [
-      ["--item <id>", "Item ID to bid for", true],
-      ["--quality <quality>", "Stack quality", true, qualityChoices],
-      ["--quantity <number>", "Stack quantity to bid for", true],
-      ["--unit-price <gold>", "Bid price per unit", true],
-      requestFlag
-    ],
-    help: "Bid for a quantity stack on the item and quality board while idle in a market town. The bid reserves gold for the resting quantity, and the market fee applies only to the quantity left resting after immediate matching. A request ID is generated unless supplied.",
-    examples: [
-      "clawsaga market-buy -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5"
-    ]
-  },
-  "market-order-cancel": {
-    path: "character/market/orders/cancel",
-    schema: cancelMarketOrderSchema,
-    flags: [
-      ["--order <number>", "Numeric order ID from my-market", true],
-      requestFlag
-    ],
-    help: "Cancel one of your own orders from anywhere. Unused buy gold returns to your balance up to its limit; any excess remains claimable later. Resting sell goods move into your storage in the order town as far as they fit; the rest stays in market custody to claim. A request ID is generated unless supplied.",
-    examples: ["clawsaga market-order-cancel -c m7Qp2_aR9L-x --order 12"]
-  },
-  "market-order-claim": {
-    path: "character/market/orders/claim",
-    schema: claimMarketOrderSchema,
-    flags: [
-      ["--order <number>", "Numeric order ID from my-market", true],
-      requestFlag
-    ],
-    help: "Collect held items or leftover gold from one of your orders from anywhere. Items bought by a buy order can be collected while it stays open; leftover gold only after the order ends. Items move into your storage in the order town only as far as they fit, and gold only up to the balance limit; any remainder stays claimable. A request ID is generated unless supplied.",
-    examples: ["clawsaga market-order-claim -c m7Qp2_aR9L-x --order 12"]
-  },
-  "market-list": {
-    path: "character/market/listings/create",
-    schema: createMarketListingSchema,
-    flags: [
-      ["--instance <uuid>", "Item instance ID from inventory", true],
-      ["--price <gold>", "Fixed price for the individual", true],
-      [
-        "--source <source>",
-        "Take the individual from carried or storage",
-        true,
-        sourceChoices
-      ],
-      requestFlag
-    ],
-    help: "List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells. A request ID is generated unless supplied.",
-    examples: [
-      "clawsaga market-list -c m7Qp2_aR9L-x --instance 22222222-2222-4222-8222-222222222222 --price 100 --source carried"
-    ]
-  },
-  "market-purchase": {
-    path: "character/market/listings/buy",
-    schema: buyMarketListingSchema,
-    flags: [
-      ["--listing <number>", "Numeric listing ID from market", true],
-      ["--max-price <gold>", "Highest price you accept", true],
-      ["--min-durability <number>", "Reject an individual in worse condition"],
-      requestFlag
-    ],
-    help: "Buy a fixed-price listing while idle in a market town. The individual moves straight to your bag, which needs room for it. A request ID is generated unless supplied.",
-    examples: [
-      "clawsaga market-purchase -c m7Qp2_aR9L-x --listing 34 --max-price 120"
-    ]
-  },
-  "market-listing-cancel": {
-    path: "character/market/listings/cancel",
-    schema: cancelMarketListingSchema,
-    flags: [
-      ["--listing <number>", "Numeric listing ID from my-market", true],
-      requestFlag
-    ],
-    help: "Withdraw one of your own listings from anywhere. The individual moves into your storage in the listing town if it fits; otherwise it stays in market custody to claim. A request ID is generated unless supplied.",
-    examples: ["clawsaga market-listing-cancel -c m7Qp2_aR9L-x --listing 34"]
-  },
-  "market-listing-claim": {
-    path: "character/market/listings/claim",
-    schema: claimMarketListingSchema,
-    flags: [
-      ["--listing <number>", "Numeric listing ID from my-market", true],
-      requestFlag
-    ],
-    help: "Collect the individual held for one of your finished listings from anywhere. It moves into your storage in the listing town only if it fits; otherwise it stays claimable. A request ID is generated unless supplied.",
-    examples: ["clawsaga market-listing-claim -c m7Qp2_aR9L-x --listing 34"]
-  }
-};
-
-// src/commands.ts
-var commands = {
-  ...adventureCommands,
-  ...marketCommands,
+// src/character-commands.ts
+var characterCommands = {
   hello: {
     path: "character/hello",
     schema: helloSchema,
@@ -26872,6 +25734,7 @@ var commands = {
   characters: {
     path: "characters",
     schema: listCharactersSchema,
+    defaultLocale: "en",
     flags: [],
     requiresCharacter: false,
     help: "List your characters."
@@ -26879,6 +25742,12 @@ var commands = {
   "search-characters": {
     path: "characters/search",
     schema: searchCharactersSchema,
+    input: {
+      name: "name",
+      discriminator: "discriminator",
+      cursor: "cursor",
+      limit: ["limit", "number"]
+    },
     flags: [
       ["--name <name>", "Literal, case-sensitive name substring", true],
       [
@@ -26898,6 +25767,8 @@ var commands = {
   "resolve-character": {
     path: "characters/resolve",
     schema: resolveCharacterSchema,
+    input: { name: "name", discriminator: "discriminator" },
+    defaultLocale: "en",
     flags: [
       ["--name <name>", "Exact character name", true],
       [
@@ -26915,6 +25786,7 @@ var commands = {
   options: {
     path: "onboarding-options",
     schema: getOnboardingOptionsSchema,
+    defaultLocale: "en",
     flags: [],
     requiresCharacter: false,
     help: "Read the starting location, jobs and supported languages.",
@@ -26923,6 +25795,7 @@ var commands = {
   character: {
     path: "character",
     schema: getCharacterSchema,
+    input: { include: ["include", "list"] },
     flags: [
       [
         "--include <sections>",
@@ -26957,12 +25830,14 @@ var commands = {
   map: {
     path: "world/map",
     schema: getMapSchema,
+    input: { full: "full" },
     flags: [["--full", "Return the whole known map"]],
     help: "Read locations and connections near your current location. Use --full for the whole known map."
   },
   look: {
     path: "character/look",
     schema: lookSchema,
+    input: { people: "people", cursor: "cursor" },
     flags: [
       ["--people", "Count nearby characters and list the first 20"],
       [
@@ -26975,18 +25850,257 @@ var commands = {
   route: {
     path: "character/route",
     schema: getRouteSchema,
+    input: { to: "to" },
     flags: [["--to <id>", "Destination location ID", true]],
     help: "Read the shortest-duration path to a destination while stationary. Pass each steps[].to to travel one step at a time."
   },
   activity: {
     path: "character/activity",
     schema: getActivitySchema,
+    input: { activity: "activity_id" },
     flags: [["-a, --activity <id>", "Accepted activity ID"]],
     help: "Read a running or completed activity when its outcome is unknown. Omit -a for the current or latest activity. If a CLI process is still running, collect its result instead of polling here."
+  }
+};
+
+// src/market-commands.ts
+var qualityChoices = ["standard", "fine", "superior"];
+var sourceChoices = ["carried", "storage"];
+var requestFlag = [
+  "--request <uuid>",
+  "Reuse the same ID and arguments after an uncertain result"
+];
+var requestInput = { request: "request_id" };
+function marketWriteContext(values) {
+  return {
+    request_id: values.request,
+    ...values.order === void 0 ? {} : { order_id: Number(values.order) },
+    ...values.listing === void 0 ? {} : { listing_id: Number(values.listing) }
+  };
+}
+var marketCommands = {
+  market: {
+    path: "character/market",
+    schema: getMarketSchema,
+    input: {
+      town: "town_id",
+      item: "item_id",
+      quality: "quality",
+      levels: ["levels", "number"],
+      cursor: ["cursor", "number"],
+      maxPrice: ["max_price", "number"],
+      minDurability: ["minimum_durability", "number"]
+    },
+    flags: [
+      ["--town <id>", "Market town location ID", true],
+      ["--item <id>", "Optional item ID for board detail"],
+      [
+        "--quality <quality>",
+        "Stack board quality (default standard) or individual listing filter",
+        false,
+        qualityChoices
+      ],
+      ["--levels <number>", "Price levels returned per side: 1\u201320 (default 5)"],
+      [
+        "--cursor <number>",
+        "next_cursor from a previous overview or listings read"
+      ],
+      ["--max-price <gold>", "Only listings at or below this price"],
+      [
+        "--min-durability <number>",
+        "Only listings at or above this durability"
+      ]
+    ],
+    help: "Read every active item and quality in a market town with best bid and ask, 20 rows per page. Add --item to read one stack board or individual listings.",
+    examples: [
+      "clawsaga market -c m7Qp2_aR9L-x --town corvent",
+      "clawsaga market -c m7Qp2_aR9L-x --town corvent --item ore --quality standard"
+    ]
   },
+  "my-market": {
+    path: "character/market/mine",
+    schema: getMyMarketSchema,
+    input: { section: "section", cursor: ["cursor", "number"] },
+    flags: [
+      [
+        "--section <section>",
+        "Read only this section; required with --cursor",
+        false,
+        ["orders", "listings", "trades"]
+      ],
+      ["--cursor <number>", "That section's next_cursor from a previous read"]
+    ],
+    help: "Read your orders, listings and trades across every market town from anywhere, newest first and 20 per section. Orders and listings include held items awaiting receipt or return.",
+    examples: [
+      "clawsaga my-market -c m7Qp2_aR9L-x",
+      "clawsaga my-market -c m7Qp2_aR9L-x --section orders --cursor 41"
+    ]
+  },
+  "market-sell": {
+    path: "character/market/orders/sell",
+    schema: placeMarketSellOrderSchema,
+    input: {
+      item: "item_id",
+      quality: "quality",
+      quantity: ["quantity", "number"],
+      unitPrice: ["unit_price", "number"],
+      source: "source",
+      ...requestInput
+    },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
+    flags: [
+      ["--item <id>", "Item ID to sell", true],
+      ["--quality <quality>", "Stack quality", true, qualityChoices],
+      ["--quantity <number>", "Stack quantity to offer", true],
+      ["--unit-price <gold>", "Price per unit", true],
+      [
+        "--source <source>",
+        "Take the stack from carried or storage",
+        true,
+        sourceChoices
+      ],
+      requestFlag
+    ],
+    help: "Offer a quantity stack on the item and quality board while idle in a market town. New orders match crossing orders at the resting price, and the market fee applies only to the quantity left resting after that matching. A request ID is generated unless supplied.",
+    examples: [
+      "clawsaga market-sell -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5 --source storage"
+    ]
+  },
+  "market-buy": {
+    path: "character/market/orders/buy",
+    schema: placeMarketBuyOrderSchema,
+    input: {
+      item: "item_id",
+      quality: "quality",
+      quantity: ["quantity", "number"],
+      unitPrice: ["unit_price", "number"],
+      ...requestInput
+    },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
+    flags: [
+      ["--item <id>", "Item ID to bid for", true],
+      ["--quality <quality>", "Stack quality", true, qualityChoices],
+      ["--quantity <number>", "Stack quantity to bid for", true],
+      ["--unit-price <gold>", "Bid price per unit", true],
+      requestFlag
+    ],
+    help: "Bid for a quantity stack on the item and quality board while idle in a market town. The bid reserves gold for the resting quantity, and the market fee applies only to the quantity left resting after immediate matching. A request ID is generated unless supplied.",
+    examples: [
+      "clawsaga market-buy -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5"
+    ]
+  },
+  "market-order-cancel": {
+    path: "character/market/orders/cancel",
+    schema: cancelMarketOrderSchema,
+    input: { order: ["order_id", "number"], ...requestInput },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
+    flags: [
+      ["--order <number>", "Numeric order ID from my-market", true],
+      requestFlag
+    ],
+    help: "Cancel one of your own orders from anywhere. Unused buy gold returns to your balance up to its limit; any excess remains claimable later. Resting sell goods move into your storage in the order town as far as they fit; the rest stays in market custody to claim. A request ID is generated unless supplied.",
+    examples: ["clawsaga market-order-cancel -c m7Qp2_aR9L-x --order 12"]
+  },
+  "market-order-claim": {
+    path: "character/market/orders/claim",
+    schema: claimMarketOrderSchema,
+    input: { order: ["order_id", "number"], ...requestInput },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
+    flags: [
+      ["--order <number>", "Numeric order ID from my-market", true],
+      requestFlag
+    ],
+    help: "Collect held items or leftover gold from one of your orders from anywhere. Items bought by a buy order can be collected while it stays open; leftover gold only after the order ends. Items move into your storage in the order town only as far as they fit, and gold only up to the balance limit; any remainder stays claimable. A request ID is generated unless supplied.",
+    examples: ["clawsaga market-order-claim -c m7Qp2_aR9L-x --order 12"]
+  },
+  "market-list": {
+    path: "character/market/listings/create",
+    schema: createMarketListingSchema,
+    input: {
+      instance: "instance_id",
+      price: ["price", "number"],
+      source: "source",
+      ...requestInput
+    },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
+    flags: [
+      ["--instance <uuid>", "Item instance ID from inventory", true],
+      ["--price <gold>", "Fixed price for the individual", true],
+      [
+        "--source <source>",
+        "Take the individual from carried or storage",
+        true,
+        sourceChoices
+      ],
+      requestFlag
+    ],
+    help: "List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells. A request ID is generated unless supplied.",
+    examples: [
+      "clawsaga market-list -c m7Qp2_aR9L-x --instance 22222222-2222-4222-8222-222222222222 --price 100 --source carried"
+    ]
+  },
+  "market-purchase": {
+    path: "character/market/listings/buy",
+    schema: buyMarketListingSchema,
+    input: {
+      listing: ["listing_id", "number"],
+      maxPrice: ["max_price", "number"],
+      minDurability: ["minimum_durability", "number"],
+      ...requestInput
+    },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
+    flags: [
+      ["--listing <number>", "Numeric listing ID from market", true],
+      ["--max-price <gold>", "Highest price you accept", true],
+      ["--min-durability <number>", "Reject an individual in worse condition"],
+      requestFlag
+    ],
+    help: "Buy a fixed-price listing while idle in a market town. The individual moves straight to your bag, which needs room for it. A request ID is generated unless supplied.",
+    examples: [
+      "clawsaga market-purchase -c m7Qp2_aR9L-x --listing 34 --max-price 120"
+    ]
+  },
+  "market-listing-cancel": {
+    path: "character/market/listings/cancel",
+    schema: cancelMarketListingSchema,
+    input: { listing: ["listing_id", "number"], ...requestInput },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
+    flags: [
+      ["--listing <number>", "Numeric listing ID from my-market", true],
+      requestFlag
+    ],
+    help: "Withdraw one of your own listings from anywhere. The individual moves into your storage in the listing town if it fits; otherwise it stays in market custody to claim. A request ID is generated unless supplied.",
+    examples: ["clawsaga market-listing-cancel -c m7Qp2_aR9L-x --listing 34"]
+  },
+  "market-listing-claim": {
+    path: "character/market/listings/claim",
+    schema: claimMarketListingSchema,
+    input: { listing: ["listing_id", "number"], ...requestInput },
+    autoRequestId: true,
+    errorContext: marketWriteContext,
+    flags: [
+      ["--listing <number>", "Numeric listing ID from my-market", true],
+      requestFlag
+    ],
+    help: "Collect the individual held for one of your finished listings from anywhere. It moves into your storage in the listing town only if it fits; otherwise it stays claimable. A request ID is generated unless supplied.",
+    examples: ["clawsaga market-listing-claim -c m7Qp2_aR9L-x --listing 34"]
+  }
+};
+
+// src/production-commands.ts
+var productionCommands = {
   travel: {
     path: "character/travel",
     schema: travelSchema,
+    input: { to: "to" },
+    startsActivity: true,
     flags: [
       ["--to <id>", "Adjacent destination location ID", true],
       noWaitFlag
@@ -27000,6 +26114,9 @@ var commands = {
   gather: {
     path: "character/gather",
     schema: gatherSchema,
+    input: { item: "item_id" },
+    startsActivity: true,
+    repeat: { requestIdPerLot: false },
     flags: [
       ["--item <id>", "Resource item ID from look", true],
       ["--count <number>", "Attempts, one at a time (default 1)"],
@@ -27014,6 +26131,7 @@ var commands = {
   recipes: {
     path: "character/recipes",
     schema: getRecipesSchema,
+    input: { location: "location_id", skill: "skill_id", recipe: "recipe_id" },
     flags: [
       ["--location <id>", "Location used for a recipe detail estimate"],
       [
@@ -27037,6 +26155,7 @@ var commands = {
   items: {
     path: "character/items",
     schema: getItemsSchema,
+    input: { query: "query", item: "item_id" },
     flags: [
       ["--query <text>", "Search IDs, names, descriptions, effects and stats"],
       ["--item <id>", "Read one public item definition"]
@@ -27046,6 +26165,15 @@ var commands = {
   craft: {
     path: "character/craft",
     schema: craftSchema,
+    input: {
+      recipe: "recipe_id",
+      maxFeePerLot: ["max_fee_per_lot", "number"],
+      request: "request_id"
+    },
+    startsActivity: true,
+    repeat: { requestIdPerLot: true },
+    autoRequestId: true,
+    errorContext: (values) => ({ request_id: values.request }),
     flags: [
       ["--recipe <id>", "Recipe ID from recipes", true],
       [
@@ -27068,6 +26196,7 @@ var commands = {
   stop: {
     path: "character/activity/stop",
     schema: stopActivitySchema,
+    input: { activity: "activity_id" },
     flags: [
       [
         "-a, --activity <id>",
@@ -27086,6 +26215,17 @@ var commands = {
   buy: {
     path: "character/shop-purchases",
     schema: buySchema,
+    input: {
+      item: "item_id",
+      maxPayment: ["max_payment", "number"],
+      request: "request_id"
+    },
+    autoRequestId: true,
+    errorContext: (values) => ({
+      request_id: values.request,
+      item_id: values.item,
+      max_payment: Number(values.maxPayment)
+    }),
     flags: [
       ["--item <id>", "Item ID from shop", true],
       ["--max-payment <gold>", "Maximum payment", true],
@@ -27099,6 +26239,7 @@ var commands = {
   equip: {
     path: "character/equipment/equip",
     schema: equipSchema,
+    input: { instance: "instance_id" },
     flags: [
       [
         "--instance <uuid>",
@@ -27111,6 +26252,7 @@ var commands = {
   unequip: {
     path: "character/equipment/unequip",
     schema: equipSchema,
+    input: { instance: "instance_id" },
     flags: [
       [
         "--instance <uuid>",
@@ -27123,6 +26265,7 @@ var commands = {
   repair: {
     path: "character/equipment/repair",
     schema: repairSchema,
+    input: { instance: "instance_id" },
     flags: [
       [
         "--instance <uuid>",
@@ -27135,6 +26278,17 @@ var commands = {
   discard: {
     path: "character/item/discard",
     schema: discardItemSchema,
+    changesItems: true,
+    buildInput: (values, input2) => {
+      const stack = values.item !== void 0 || values.quantity !== void 0;
+      const individual = values.instance !== void 0;
+      if (stack === individual) return;
+      input2.target = stack ? {
+        kind: "stack",
+        item_id: values.item,
+        quantity: values.quantity === void 0 ? void 0 : integerFlag("quantity", values.quantity)
+      } : { kind: "individual", instance_id: values.instance };
+    },
     flags: [
       ["--item <id>", "Stack item ID from inventory"],
       ["--quantity <number>", "Stack quantity to discard"],
@@ -27145,10 +26299,26 @@ var commands = {
       "clawsaga discard -c m7Qp2_aR9L-x --item wolf_meat --quantity 10",
       "clawsaga discard -c m7Qp2_aR9L-x --instance 00000000-0000-4000-8000-000000000001"
     ]
-  },
+  }
+};
+
+// src/storage-commands.ts
+function addItemTargets(values, input2) {
+  if (values.items === void 0) return;
+  try {
+    input2.items = JSON.parse(values.items);
+  } catch {
+    throw new CliError("INVALID_ARGUMENTS", { fields: ["items"] });
+  }
+}
+function storageContext(values) {
+  return { request_id: values.request, town_id: values.town };
+}
+var storageCommands = {
   storage: {
     path: "character/storage",
     schema: getStorageSchema,
+    input: { town: "town_id" },
     flags: [["--town <id>", "Town location ID", true]],
     help: "Read your storage in one town from anywhere: items, weight and capacity. Unused storage is empty.",
     examples: ["clawsaga storage -c m7Qp2_aR9L-x --town selene"]
@@ -27156,6 +26326,7 @@ var commands = {
   "search-storage": {
     path: "character/storage/search",
     schema: searchStorageSchema,
+    input: { query: "query" },
     flags: [
       [
         "--query <text>",
@@ -27169,6 +26340,10 @@ var commands = {
   deposit: {
     path: "character/storage/deposit",
     schema: depositItemsSchema,
+    input: { town: "town_id", request: "request_id" },
+    autoRequestId: true,
+    errorContext: storageContext,
+    buildInput: addItemTargets,
     flags: [
       ["--town <id>", "Town location ID where you stand", true],
       ["--items <json>", "JSON array of stack and individual targets", true],
@@ -27185,6 +26360,10 @@ var commands = {
   withdraw: {
     path: "character/storage/withdraw",
     schema: withdrawItemsSchema,
+    input: { town: "town_id", request: "request_id" },
+    autoRequestId: true,
+    errorContext: storageContext,
+    buildInput: addItemTargets,
     flags: [
       ["--town <id>", "Town location ID where you stand", true],
       ["--items <json>", "JSON array of stack and individual targets", true],
@@ -27199,227 +26378,17 @@ var commands = {
     ]
   }
 };
-var activityCommands = /* @__PURE__ */ new Set([
-  "travel",
-  "gather",
-  "craft",
-  "fight",
-  "rest"
-]);
-var marketCommandNames = new Set(Object.keys(marketCommands));
-var marketWriteCommands = /* @__PURE__ */ new Set([
-  "market-sell",
-  "market-buy",
-  "market-order-cancel",
-  "market-order-claim",
-  "market-list",
-  "market-purchase",
-  "market-listing-cancel",
-  "market-listing-claim"
-]);
-var optionsSchema2 = external_exports.object({
-  server: external_exports.string(),
-  contentLanguage: external_exports.enum(["ja", "en"]).optional(),
-  character: external_exports.string().optional(),
-  name: external_exports.string().optional(),
-  discriminator: external_exports.string().optional(),
-  cursor: external_exports.string().optional(),
-  to: external_exports.string().optional(),
-  full: external_exports.boolean().optional(),
-  people: external_exports.boolean().optional(),
-  activity: external_exports.string().optional(),
-  input: external_exports.string().optional(),
-  include: external_exports.string().optional(),
-  location: external_exports.string().optional(),
-  item: external_exports.string().optional(),
-  recipe: external_exports.string().optional(),
-  skill: external_exports.string().optional(),
-  count: external_exports.string().optional(),
-  quantity: external_exports.string().optional(),
-  maxFeePerLot: external_exports.string().optional(),
-  maxPayment: external_exports.string().optional(),
-  request: external_exports.string().optional(),
-  wait: external_exports.boolean().optional(),
-  instance: external_exports.string().optional(),
-  enemy: external_exports.string().optional(),
-  preset: external_exports.string().optional(),
-  practice: external_exports.boolean().optional(),
-  inn: external_exports.boolean().optional(),
-  job: external_exports.string().optional(),
-  drop: external_exports.string().optional(),
-  offer: external_exports.string().optional(),
-  quest: external_exports.string().optional(),
-  journal: external_exports.string().optional(),
-  query: external_exports.string().optional(),
-  with: external_exports.string().optional(),
-  unreadOnly: external_exports.boolean().optional(),
-  activeOnly: external_exports.boolean().optional(),
-  limit: external_exports.string().optional(),
-  before: external_exports.string().optional(),
-  beforeThread: external_exports.string().optional(),
-  after: external_exports.string().optional(),
-  topic: external_exports.string().optional(),
-  category: external_exports.string().optional(),
-  threadLanguage: external_exports.string().optional(),
-  authoredBySelf: external_exports.boolean().optional(),
-  participatedBySelf: external_exports.boolean().optional(),
-  thread: external_exports.string().optional(),
-  town: external_exports.string().optional(),
-  items: external_exports.string().optional(),
-  quality: external_exports.string().optional(),
-  levels: external_exports.string().optional(),
-  maxPrice: external_exports.string().optional(),
-  minDurability: external_exports.string().optional(),
-  unitPrice: external_exports.string().optional(),
-  source: external_exports.string().optional(),
-  price: external_exports.string().optional(),
-  order: external_exports.string().optional(),
-  listing: external_exports.string().optional(),
-  section: external_exports.string().optional()
-});
-async function readStdin() {
-  process.stdin.setEncoding("utf8");
-  let text2 = "";
-  for await (const chunk of process.stdin) {
-    text2 += String(chunk);
-    if (text2.length > 128 * 1024) throw new CliError("INVALID_INPUT_FILE");
-  }
-  return text2;
-}
-async function commandInput(values, definition, commandName) {
-  if (values.input) {
-    if (commandName === "fight" && (values.preset !== void 0 || values.practice !== void 0))
-      throw new CliError("INVALID_ARGUMENTS", {
-        fields: ["input"],
-        message: "Use either --input or --preset/--practice. --enemy may be combined with --input."
-      });
-    let input3;
-    try {
-      const text2 = values.input === "-" ? await readStdin() : await readFile2(values.input, "utf8");
-      input3 = JSON.parse(text2);
-    } catch {
-      throw new CliError("INVALID_INPUT_FILE");
-    }
-    if (commandName === "fight" && typeof input3 === "object" && input3 !== null && !Array.isArray(input3)) {
-      if (values.enemy !== void 0)
-        input3 = { ...input3, enemy_id: values.enemy };
-      else if (!("enemy_id" in input3))
-        throw new CliError("INVALID_ARGUMENTS", {
-          fields: ["enemy_id"],
-          message: "Pass --enemy or include enemy_id in the --input file."
-        });
-    }
-    const body = validateInput(bodySchema(definition), input3);
-    return {
-      ...body,
-      ...values.character ? { character_id: values.character } : {},
-      ...values.contentLanguage ? { locale: values.contentLanguage } : {}
-    };
-  }
-  const input2 = {};
-  if (values.contentLanguage) input2.locale = values.contentLanguage;
-  if (values.character) input2.character_id = values.character;
-  if (marketCommandNames.has(commandName)) {
-    if (values.town) input2.town_id = values.town;
-    if (values.item) input2.item_id = values.item;
-    if (values.instance) input2.instance_id = values.instance;
-    if (values.quality !== void 0) input2.quality = values.quality;
-    if (values.section !== void 0) input2.section = values.section;
-    if (values.source !== void 0) input2.source = values.source;
-    if (values.levels !== void 0) input2.levels = Number(values.levels);
-    if (values.cursor !== void 0) input2.cursor = Number(values.cursor);
-    if (values.maxPrice !== void 0)
-      input2.max_price = Number(values.maxPrice);
-    if (values.minDurability !== void 0)
-      input2.minimum_durability = Number(values.minDurability);
-    if (values.quantity !== void 0) input2.quantity = Number(values.quantity);
-    if (values.unitPrice !== void 0)
-      input2.unit_price = Number(values.unitPrice);
-    if (values.price !== void 0) input2.price = Number(values.price);
-    if (values.order !== void 0) input2.order_id = Number(values.order);
-    if (values.listing !== void 0) input2.listing_id = Number(values.listing);
-    if (values.request) input2.request_id = values.request;
-    return input2;
-  }
-  if (values.name !== void 0) input2.name = values.name;
-  if (values.discriminator !== void 0)
-    input2.discriminator = values.discriminator;
-  if (values.cursor !== void 0) input2.cursor = values.cursor;
-  if (values.to) input2.to = values.to;
-  if (values.full) input2.full = true;
-  if (values.people) input2.people = true;
-  if (values.activity) input2.activity_id = values.activity;
-  if (values.include) input2.include = values.include.split(",");
-  if (values.location) input2.location_id = values.location;
-  if (commandName === "discard") {
-    const stack = values.item !== void 0 || values.quantity !== void 0;
-    const individual = values.instance !== void 0;
-    if (stack !== individual)
-      input2.target = stack ? {
-        kind: "stack",
-        item_id: values.item,
-        quantity: Number(values.quantity)
-      } : {
-        kind: "individual",
-        instance_id: values.instance
-      };
-    return input2;
-  }
-  if (values.item) input2.item_id = values.item;
-  if (values.recipe) input2.recipe_id = values.recipe;
-  if (values.skill) input2.skill_id = values.skill;
-  if (values.maxFeePerLot !== void 0)
-    input2.max_fee_per_lot = Number(values.maxFeePerLot);
-  if (values.maxPayment !== void 0)
-    input2.max_payment = Number(values.maxPayment);
-  if (values.request) input2.request_id = values.request;
-  if (values.instance) input2.instance_id = values.instance;
-  if (values.enemy) input2.enemy_id = values.enemy;
-  if (values.preset) input2.preset = values.preset;
-  if (values.practice) input2.practice = values.practice;
-  if (values.inn) input2.inn = true;
-  if (values.job) input2.job_id = values.job;
-  if (values.drop) input2.drop_id = values.drop;
-  if (values.offer) input2.offer_id = values.offer;
-  if (values.quest) input2.quest_id = values.quest;
-  if (values.journal) input2.journal_id = values.journal;
-  if (values.query) input2.query = values.query;
-  if (values.with) input2.with_character_id = values.with;
-  if (values.unreadOnly) input2.unread_only = true;
-  if (values.activeOnly) input2.active_only = true;
-  if (values.limit !== void 0) input2.limit = Number(values.limit);
-  if (values.before) input2.before = Number(values.before);
-  if (values.beforeThread) input2.before = values.beforeThread;
-  if (values.after) input2.after = Number(values.after);
-  if (values.category) input2.category = values.category;
-  if (values.threadLanguage) input2.language = values.threadLanguage;
-  if (values.authoredBySelf) input2.authored_by_self = true;
-  if (values.participatedBySelf) input2.participated_by_self = true;
-  if (values.thread) input2.thread_id = values.thread;
-  if (values.town) input2.town_id = values.town;
-  if (commandName === "deposit" || commandName === "withdraw") {
-    input2.items = parseItemTargets(values.items);
-  }
-  return input2;
-}
-function parseItemTargets(value) {
-  if (value === void 0) return void 0;
-  try {
-    return JSON.parse(value);
-  } catch {
-    throw new CliError("INVALID_ARGUMENTS", { fields: ["items"] });
-  }
-}
-function validateInput(schema, input2) {
-  const parsed = schema.safeParse(input2);
-  if (!parsed.success)
-    throw new CliError("INVALID_ARGUMENTS", {
-      fields: parsed.error.issues.flatMap(
-        (issue2) => issue2.code === "unrecognized_keys" ? issue2.keys : [issue2.path.join(".")]
-      )
-    });
-  return parsed.data;
-}
+
+// src/command-registry.ts
+var commands = {
+  ...adventureCommands,
+  ...marketCommands,
+  ...characterCommands,
+  ...productionCommands,
+  ...storageCommands
+};
+
+// src/help.ts
 var guideTopicOption = {
   flags: "--topic <topic>",
   description: "Return one topic body at guide.section.body"
@@ -27441,11 +26410,6 @@ function requiredUsage(flags) {
   const short = (flags.split(",")[0] ?? flags).trim();
   if (value && short.includes(value)) return short;
   return [short, value].filter(Boolean).join(" ");
-}
-function optionKey(flags) {
-  const long = flags.split(",").map((part) => part.trim()).find((part) => part.startsWith("--"));
-  const name = (long ?? flags).replace(/^--?/, "").split(" ")[0] ?? flags;
-  return name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 function commandUsage(name, definition) {
   const parts = [`clawsaga ${name}`];
@@ -27547,17 +26511,90 @@ function schemaHelp() {
     examples: ["clawsaga schema create", "clawsaga schema gather"]
   };
 }
+function structuredHelp(target5) {
+  if (target5 === "clawsaga") return programHelp();
+  if (target5 === "clawsaga guide") return guideHelp();
+  if (target5 === "auth login") return authLoginHelp();
+  if (target5 === "schema") return schemaHelp();
+  const name = target5.startsWith("clawsaga ") ? target5.slice("clawsaga ".length) : target5;
+  const definition = commands[name];
+  return definition ? commandHelp(name, definition) : programHelp();
+}
+
+// src/commands.ts
+function clientFor(values) {
+  return new GameClient(serverOrigin(values.server));
+}
 async function execute(args, notify, options = {}) {
-  const request = options.request ?? fetch;
-  let helpTarget = "clawsaga";
-  let helpCommand = "clawsaga --help";
-  let executedCommand;
-  let publishedVersion;
-  let executedCharacter;
-  let executedWait = true;
-  let executedActivity = false;
-  let schemaHelpResult;
-  let result;
+  const run = { helpTarget: "clawsaga", helpCommand: "clawsaga --help" };
+  const program2 = createProgram(run, notify, options.request ?? fetch);
+  try {
+    await program2.parseAsync(args, { from: "user" });
+  } catch (error61) {
+    return helpOrFailure(error61, run);
+  }
+  return commandOutput(run);
+}
+function helpOrFailure(error61, run) {
+  if (error61 instanceof CliError) throw withRecoveryGuidance(error61, run);
+  if (!(error61 instanceof CommanderError)) throw error61;
+  if (error61.code === "commander.version")
+    return { ok: true, version: package_default.version };
+  if (error61.code === "commander.helpDisplayed" || error61.code === "commander.help" && error61.exitCode === 0)
+    return { ok: true, help: structuredHelp(run.helpTarget) };
+  throw new CliError("INVALID_ARGUMENTS", {
+    message: error61.message,
+    help_command: run.helpCommand
+  });
+}
+async function commandOutput(run) {
+  if (run.schemaHelpResult) return { ok: true, ...run.schemaHelpResult };
+  const { result, executed } = run;
+  if (!result) throw new CliError("INVALID_COMMAND");
+  if (!isGameResponse(result)) return result;
+  const rendered = withRenderedHints(result, executed?.character, {
+    wait: executed?.wait ?? true
+  });
+  if (executed?.name !== "hello" || !rendered.ok) return rendered;
+  return withNotes(rendered, await helloNotes(rendered, run.publishedVersion));
+}
+function isGameResponse(result) {
+  return "schema_version" in result;
+}
+function withRecoveryGuidance(error61, run) {
+  const definition = run.executed?.definition;
+  const help = ["INVALID_ARGUMENTS", "INVALID_INPUT_FILE"].includes(error61.code) ? { help_command: run.helpCommand } : {};
+  const activity = definition?.startsActivity === true;
+  const itemChange = definition?.changesItems === true;
+  const detail = (activity || itemChange) && isLostResponse(error61) ? { ...error61.detail, outcome: "unknown" } : error61.detail;
+  const hint = recoveryHint(detail, {
+    character: run.executed?.character,
+    activity,
+    craft: definition?.repeat?.requestIdPerLot === true,
+    itemChange
+  });
+  if (Object.keys(help).length === 0 && !hint) return error61;
+  return new CliError(error61.code, {
+    ...detail,
+    ...help,
+    ...hint ? { hint } : {}
+  });
+}
+function isLostResponse(error61) {
+  return !notSent(error61) && (error61.code === "INVALID_RESPONSE" || error61.code === "UPDATE_REQUIRED" || error61.code === "SERVICE_UNAVAILABLE");
+}
+async function helloNotes(response, published) {
+  const notes = [];
+  if (response.data.announcement)
+    notes.push(announcementNote(response.data.announcement));
+  if (response.data.changelog)
+    notes.push(changelogNote(response.data.changelog));
+  const latest = await published;
+  if (latest && isNewerVersion(latest, package_default.version))
+    notes.push(updateNote(package_default.version, latest));
+  return notes;
+}
+function createProgram(run, notify, request) {
   const program2 = new Command("clawsaga").description("Play ClawSaga. Requires Node.js 22.12.0 or later.").version(package_default.version).addOption(
     new Option("-s, --server <origin>", "ClawSaga origin").env("CLAWSAGA_SERVER").default(package_default.homepage)
   ).addOption(
@@ -27575,8 +26612,15 @@ async function execute(args, notify, options = {}) {
   });
   program2.action(() => program2.help());
   program2.on("--help", () => {
-    helpTarget = "clawsaga";
+    run.helpTarget = "clawsaga";
   });
+  addSchemaCommand(program2, run);
+  addDocumentCommands(program2, run);
+  for (const [name, definition] of Object.entries(commands))
+    addGameCommand(program2, run, notify, request, name, definition);
+  return program2;
+}
+function addSchemaCommand(program2, run) {
   const schemaCommand = program2.command("schema").description(
     "Read the JSON body schema for an input-file command, or the API request schema for a flag command."
   ).argument("<command>", "Game command name").action((name) => {
@@ -27584,7 +26628,7 @@ async function execute(args, notify, options = {}) {
     if (!definition)
       throw new CliError("INVALID_ARGUMENTS", { fields: ["command"] });
     const hasBody = definition.flags.some(([flags]) => flags === jsonFlag[0]);
-    schemaHelpResult = {
+    run.schemaHelpResult = {
       input_kind: hasBody ? "json_body" : "api_request",
       input_schema: external_exports.toJSONSchema(
         hasBody ? bodySchema(definition) : definition.schema,
@@ -27593,393 +26637,192 @@ async function execute(args, notify, options = {}) {
     };
   });
   schemaCommand.on("--help", () => {
-    helpTarget = "schema";
+    run.helpTarget = "schema";
   });
-  const guideCommand = program2.command("guide").description(
-    "Read the game guide served by the game server. Without --topic or --query, list the topics and what each covers."
-  ).option(guideTopicOption.flags, guideTopicOption.description).option(guideQueryOption.flags, guideQueryOption.description);
-  guideCommand.on("--help", () => {
-    helpTarget = "clawsaga guide";
-    helpCommand = "clawsaga guide --help";
-  });
-  guideCommand.action(async () => {
-    helpCommand = "clawsaga guide --help";
-    const values = optionsSchema2.parse(guideCommand.optsWithGlobals());
-    const search = new URLSearchParams();
-    if (values.topic !== void 0) search.set("topic", values.topic);
-    if (values.query !== void 0) search.set("query", values.query);
-    const suffix = search.size === 0 ? "" : `?${search}`;
-    result = await clientFor(values).readDocument(
-      `guide${suffix}`,
-      guideResponseSchema
-    );
-  });
-  const resumeCommand = program2.command("resume").description(
-    "Read the operating guide to follow when starting or resuming play."
-  );
-  resumeCommand.on("--help", () => {
-    helpTarget = "clawsaga resume";
-    helpCommand = "clawsaga resume --help";
-  });
-  resumeCommand.action(async () => {
-    helpCommand = "clawsaga resume --help";
-    const values = optionsSchema2.parse(resumeCommand.optsWithGlobals());
-    result = await clientFor(values).readDocument(
-      "guide/resume",
-      agentResumeResponseSchema
-    );
-  });
-  const changelogCommand = program2.command("changelog").description("Read the server changelog, newest first.");
-  changelogCommand.on("--help", () => {
-    helpTarget = "clawsaga changelog";
-    helpCommand = "clawsaga changelog --help";
-  });
-  changelogCommand.action(async () => {
-    helpCommand = "clawsaga changelog --help";
-    const values = optionsSchema2.parse(changelogCommand.optsWithGlobals());
-    result = await clientFor(values).readDocument(
-      `changelog?locale=${values.contentLanguage ?? "en"}`,
-      changelogResponseSchema
-    );
-  });
+}
+var documentCommands = [
+  {
+    name: "guide",
+    description: "Read the game guide served by the game server. Without --topic or --query, list the topics and what each covers.",
+    options: [guideTopicOption, guideQueryOption],
+    path: (values) => {
+      const search = new URLSearchParams();
+      if (values.topic !== void 0) search.set("topic", values.topic);
+      if (values.query !== void 0) search.set("query", values.query);
+      return search.size === 0 ? "guide" : `guide?${search.toString()}`;
+    },
+    schema: guideResponseSchema
+  },
+  {
+    name: "resume",
+    description: "Read the operating guide to follow when starting or resuming play.",
+    options: [],
+    path: () => "guide/resume",
+    schema: agentResumeResponseSchema
+  },
+  {
+    name: "changelog",
+    description: "Read the server changelog, newest first.",
+    options: [],
+    path: (values) => `changelog?locale=${values.contentLanguage ?? "en"}`,
+    schema: changelogResponseSchema
+  }
+];
+function addDocumentCommands(program2, run) {
+  for (const document of documentCommands) {
+    const command2 = program2.command(document.name).description(document.description);
+    for (const option of document.options)
+      command2.option(option.flags, option.description);
+    command2.on("--help", () => {
+      run.helpTarget = `clawsaga ${document.name}`;
+      run.helpCommand = `clawsaga ${document.name} --help`;
+    });
+    command2.action(async () => {
+      run.helpCommand = `clawsaga ${document.name} --help`;
+      const values = optionsSchema.parse(command2.optsWithGlobals());
+      run.result = await clientFor(values).readDocument(
+        document.path(values),
+        document.schema
+      );
+    });
+  }
   const login = program2.command("auth").description("Manage authorization").command("login").description("Return a device verification URL without waiting").configureOutput({
     outputError: () => {
-      helpCommand = "clawsaga auth login --help";
+      run.helpCommand = "clawsaga auth login --help";
     }
   });
   login.on("--help", () => {
-    helpTarget = "auth login";
+    run.helpTarget = "auth login";
   });
   login.action(async () => {
-    result = await clientFor(
-      optionsSchema2.parse(login.optsWithGlobals())
+    run.result = await clientFor(
+      optionsSchema.parse(login.optsWithGlobals())
     ).login();
   });
-  for (const [name, definition] of Object.entries(commands)) {
-    const command2 = program2.command(name).description(definition.help).configureOutput({
-      outputError: () => {
-        helpCommand = `clawsaga ${name} --help`;
-      }
-    });
-    for (const [flags, description] of definition.flags) {
-      command2.option(flags, description);
+}
+function addGameCommand(program2, run, notify, request, name, definition) {
+  const command2 = program2.command(name).description(definition.help).configureOutput({
+    outputError: () => {
+      run.helpCommand = `clawsaga ${name} --help`;
     }
-    if (definition.inputExample)
-      command2.addHelpText(
-        "after",
-        `
+  });
+  for (const [flags, description] of definition.flags) {
+    command2.option(flags, description);
+  }
+  if (definition.inputExample)
+    command2.addHelpText(
+      "after",
+      `
 JSON body: use input_example below with your own content. Full schema: clawsaga schema ${name}.`
-      );
-    command2.on("--help", () => {
-      helpTarget = `clawsaga ${name}`;
-    });
-    command2.action(async () => {
-      helpCommand = `clawsaga ${name} --help`;
-      executedCommand = name;
-      if (name === "hello") publishedVersion = fetchPublishedVersion(request);
-      const values = optionsSchema2.parse(command2.optsWithGlobals());
-      executedCharacter = values.character;
-      executedWait = values.wait !== false;
-      executedActivity = activityCommands.has(name);
-      if (definition.requiresCharacter !== false && !values.character)
-        throw new CliError("INVALID_ARGUMENTS", {
-          fields: ["character"],
-          message: "Required option '-c, --character <id>' was not provided."
-        });
-      const provided = command2.opts();
-      for (const [flags, , required2] of definition.flags) {
-        if (!required2 || provided[optionKey(flags)] !== void 0) continue;
-        throw new CliError("INVALID_ARGUMENTS", {
-          fields: [optionKey(flags)],
-          message: `Required option '${flags}' was not provided.`
-        });
-      }
-      const requestedId = values.request;
-      if ((name === "buy" || name === "craft" || name === "deposit" || name === "withdraw" || marketWriteCommands.has(name)) && !values.request)
-        values.request = randomUUID2();
-      const inputValues = name === "characters" || name === "resolve-character" || name === "options" ? {
-        ...values,
-        contentLanguage: values.contentLanguage ?? "en"
-      } : values;
-      const input2 = validateInput(
-        definition.schema,
-        await commandInput(inputValues, definition, name)
-      );
-      const client = clientFor(values);
-      if (name === "gather" || name === "craft") {
-        const count = values.count === void 0 ? 1 : Number(values.count);
-        if (!Number.isSafeInteger(count) || count < 1)
-          throw new CliError("INVALID_ARGUMENTS", {
-            fields: ["count"],
-            message: "--count must be a positive safe integer."
-          });
-        if (name === "craft" && requestedId !== void 0 && count !== 1)
-          throw new CliError("INVALID_ARGUMENTS", {
-            fields: ["request"],
-            message: "--request retries a single lot; use --count 1 or omit --request."
-          });
-        if (!executedWait && count !== 1)
-          throw new CliError("INVALID_ARGUMENTS", {
-            fields: ["count"],
-            message: "--no-wait starts one activity; use --count 1 or omit --count."
-          });
-        if (!executedWait) {
-          try {
-            result = await client.invoke(definition.path, input2);
-          } catch (error61) {
-            if (name === "craft" && error61 instanceof CliError)
-              throw new CliError(error61.code, {
-                ...error61.detail,
-                request_id: values.request
-              });
-            throw error61;
-          }
-          return;
-        }
-        result = await repeatActivity(
-          client,
-          definition.path,
-          input2,
-          { character: values.character, locale: values.contentLanguage },
-          count,
-          name === "craft" ? { requestIdPerLot: true, notify } : { notify }
-        );
-        return;
-      }
-      let response;
-      try {
-        response = await client.invoke(definition.path, input2);
-      } catch (error61) {
-        if (name === "buy" && error61 instanceof CliError)
-          throw new CliError(error61.code, {
-            ...error61.detail,
-            request_id: values.request,
-            item_id: values.item,
-            max_payment: Number(values.maxPayment)
-          });
-        if ((name === "deposit" || name === "withdraw") && error61 instanceof CliError)
-          throw new CliError(error61.code, {
-            ...error61.detail,
-            request_id: values.request,
-            town_id: values.town
-          });
-        if (marketWriteCommands.has(name) && error61 instanceof CliError)
-          throw new CliError(error61.code, {
-            ...error61.detail,
-            request_id: values.request,
-            ...values.order === void 0 ? {} : { order_id: Number(values.order) },
-            ...values.listing === void 0 ? {} : { listing_id: Number(values.listing) }
-          });
-        throw error61;
-      }
-      result = activityCommands.has(name) && response.ok && executedWait ? await waitForActivity(
+    );
+  command2.on("--help", () => {
+    run.helpTarget = `clawsaga ${name}`;
+  });
+  command2.action(async () => {
+    run.helpCommand = `clawsaga ${name} --help`;
+    const executed = {
+      name,
+      definition,
+      character: void 0,
+      wait: true
+    };
+    run.executed = executed;
+    if (name === "hello") run.publishedVersion = fetchPublishedVersion(request);
+    const values = optionsSchema.parse(command2.optsWithGlobals());
+    executed.character = values.character;
+    executed.wait = values.wait !== false;
+    assertRequiredOptions(definition, values, command2.opts());
+    const requestedId = values.request;
+    if (definition.autoRequestId && !values.request)
+      values.request = randomUUID3();
+    const input2 = await commandInput(definition, values);
+    const client = clientFor(values);
+    if (definition.repeat) {
+      const { requestIdPerLot } = definition.repeat;
+      const count = repeatCount(requestIdPerLot, values, requestedId);
+      run.result = executed.wait ? await repeatActivity(
         client,
-        { character: values.character, locale: values.contentLanguage },
-        response,
-        notify
-      ) : response;
-    });
-  }
-  try {
-    await program2.parseAsync(args, { from: "user" });
-  } catch (error61) {
-    if (error61 instanceof CliError) {
-      const help = ["INVALID_ARGUMENTS", "INVALID_INPUT_FILE"].includes(
-        error61.code
-      ) ? { help_command: helpCommand } : {};
-      const itemChange = executedCommand === "use" || executedCommand === "discard";
-      const detail = (executedActivity || itemChange) && !notSent(error61) && (error61.code === "INVALID_RESPONSE" || error61.code === "UPDATE_REQUIRED" || error61.code === "SERVICE_UNAVAILABLE") ? { ...error61.detail, outcome: "unknown" } : error61.detail;
-      const hint = recoveryHint(detail, {
-        character: executedCharacter,
-        activity: executedActivity,
-        craft: executedCommand === "craft",
-        itemChange
-      });
-      if (Object.keys(help).length === 0 && !hint) throw error61;
-      throw new CliError(error61.code, {
-        ...detail,
-        ...help,
-        ...hint ? { hint } : {}
-      });
+        definition.path,
+        input2,
+        activityValues(values),
+        count,
+        { requestIdPerLot, notify }
+      ) : await invokeGame(client, definition, input2, values);
+      return;
     }
-    if (!(error61 instanceof CommanderError)) throw error61;
-    if (error61.code === "commander.version")
-      return { ok: true, version: package_default.version };
-    if (error61.code === "commander.helpDisplayed" || error61.code === "commander.help" && error61.exitCode === 0)
-      return { ok: true, help: structuredHelp(helpTarget) };
+    const response = await invokeGame(client, definition, input2, values);
+    run.result = definition.startsActivity && response.ok && executed.wait ? await waitForActivity(
+      client,
+      activityValues(values),
+      response,
+      notify
+    ) : response;
+  });
+}
+function activityValues(values) {
+  return { character: values.character, locale: values.contentLanguage };
+}
+function assertRequiredOptions(definition, values, provided) {
+  if (definition.requiresCharacter !== false && !values.character)
     throw new CliError("INVALID_ARGUMENTS", {
-      message: error61.message,
-      help_command: helpCommand
+      fields: ["character"],
+      message: "Required option '-c, --character <id>' was not provided."
+    });
+  for (const [flags, , required2] of definition.flags) {
+    if (!required2 || provided[optionKey(flags)] !== void 0) continue;
+    throw new CliError("INVALID_ARGUMENTS", {
+      fields: [optionKey(flags)],
+      message: `Required option '${flags}' was not provided.`
     });
   }
-  if (schemaHelpResult) return { ok: true, ...schemaHelpResult };
-  if (!result) throw new CliError("INVALID_COMMAND");
-  if (!("schema_version" in result)) return result;
-  const rendered = withRenderedHints(result, executedCharacter, {
-    wait: executedWait
-  });
-  if (executedCommand !== "hello" || !rendered.ok) return rendered;
-  return withNotes(rendered, await helloNotes(rendered, publishedVersion));
 }
-async function helloNotes(response, published) {
-  const notes = [];
-  if (response.data.announcement)
-    notes.push(announcementNote(response.data.announcement));
-  if (response.data.changelog)
-    notes.push(changelogNote(response.data.changelog));
-  const latest = await published;
-  if (latest && isNewerVersion(latest, package_default.version))
-    notes.push(updateNote(package_default.version, latest));
-  return notes;
-}
-function structuredHelp(target5) {
-  if (target5 === "clawsaga") return programHelp();
-  if (target5 === "clawsaga guide") return guideHelp();
-  if (target5 === "auth login") return authLoginHelp();
-  if (target5 === "schema") return schemaHelp();
-  const name = target5.startsWith("clawsaga ") ? target5.slice("clawsaga ".length) : target5;
-  const definition = commands[name];
-  return definition ? commandHelp(name, definition) : programHelp();
-}
-function requestIdOf(input2) {
-  return input2 !== null && typeof input2 === "object" ? input2.request_id : void 0;
-}
-function notSent(error61) {
-  return error61.detail.outcome === "not_sent";
-}
-function acceptedActivityNote(activity, nextPollAfterSeconds, requestId) {
-  return {
-    event: "activity_accepted",
-    activity_id: activity.activity_id,
-    kind: activity.kind,
-    started_at: activity.started_at,
-    ..."completes_at" in activity ? { completes_at: activity.completes_at } : {},
-    ..."arrives_at" in activity ? { arrives_at: activity.arrives_at } : {},
-    ..."time_limit_at" in activity ? { time_limit_at: activity.time_limit_at } : {},
-    ...nextPollAfterSeconds === void 0 ? {} : { next_poll_after_seconds: nextPollAfterSeconds },
-    ...requestId === void 0 ? {} : { request_id: requestId }
-  };
-}
-async function repeatActivity(client, path2, input2, values, count, options) {
-  let confirmed = 0;
-  let lastRequestId;
-  const produced = {};
-  const summary = (stoppedReason) => ({
-    requested_count: count,
-    completed_count: confirmed,
-    produced: { ...produced },
-    stopped_reason: stoppedReason
-  });
-  const incomplete = (response, stoppedReason) => ({
-    ...response,
-    ok: false,
-    error: {
-      message: "The repetition ended before all requested attempts completed.",
-      ...lastRequestId === void 0 ? {} : { request_id: lastRequestId }
-    },
-    repetition: summary(stoppedReason)
-  });
-  while (confirmed < count) {
-    const requestId = options?.requestIdPerLot && confirmed > 0 ? randomUUID2() : requestIdOf(input2);
-    lastRequestId = requestId;
-    const lotInput = requestId === void 0 || input2 === null || typeof input2 !== "object" ? input2 : { ...input2, request_id: requestId };
-    try {
-      const started = await client.invoke(path2, lotInput);
-      if (!started.ok)
-        return { ...started, repetition: summary("start_rejected") };
-      const completed = started.data.last_result ? started : await waitForActivity(
-        client,
-        values,
-        started,
-        options?.notify,
-        requestId
-      );
-      if (!completed.ok)
-        return { ...completed, repetition: summary("activity_failed") };
-      const result = completed.data.last_result;
-      if (!result || result.kind !== "gather" && result.kind !== "craft" || result.status !== "ENDED")
-        throw new CliError("INVALID_RESPONSE", {
-          reason: "unexpected_production_result"
-        });
-      if (result.end_reason !== "COMPLETED")
-        return incomplete(completed, "activity_stopped");
-      confirmed += 1;
-      produced[result.output.item_id] = (produced[result.output.item_id] ?? 0) + result.output.quantity;
-      if (result.kind === "gather" && result.ambush)
-        return confirmed === count ? { ...completed, repetition: summary("ambush") } : incomplete(completed, "ambush");
-      if (confirmed === count)
-        return { ...completed, repetition: summary("count_reached") };
-    } catch (error61) {
-      if (error61 instanceof CliError)
-        throw new CliError(error61.code, {
-          ...error61.detail,
-          ...requestId === void 0 ? {} : { request_id: requestId },
-          // 送信前の失敗は開始していないため、成果があった可能性を主張しない。
-          repetition: summary(notSent(error61) ? "start_rejected" : "unknown")
-        });
-      throw error61;
-    }
-  }
-  throw new CliError("INVALID_ARGUMENTS", { fields: ["count"] });
-}
-function clientFor(values) {
-  return new GameClient(serverOrigin(values.server));
-}
-async function waitForActivity(client, values, initial, notify, requestId) {
-  let result = initial;
-  const activity = result.ok ? result.data.activity : void 0;
-  if (!activity)
-    throw new CliError("INVALID_RESPONSE", { reason: "missing_activity_id" });
-  const activityId = activity.activity_id;
-  notify?.(
-    acceptedActivityNote(activity, result.next_poll_after_seconds, requestId)
-  );
-  while (result.data.activity?.activity_id === activityId) {
-    const seconds = result.next_poll_after_seconds;
-    if (!seconds)
-      throw new CliError("INVALID_RESPONSE", {
-        reason: "missing_poll_interval",
-        activity_id: activityId
+async function invokeGame(client, definition, input2, values) {
+  try {
+    return await client.invoke(definition.path, input2);
+  } catch (error61) {
+    if (definition.errorContext && error61 instanceof CliError)
+      throw new CliError(error61.code, {
+        ...error61.detail,
+        ...definition.errorContext(values)
       });
-    await sleep(seconds * 1e3);
-    try {
-      result = await client.invoke("character/activity", {
-        character_id: values.character,
-        activity_id: activityId,
-        ...values.locale ? { locale: values.locale } : {}
-      });
-    } catch (error61) {
-      if (error61 instanceof CliError)
-        throw new CliError(error61.code, {
-          ...error61.detail,
-          activity_id: activityId,
-          outcome: "unknown"
-        });
-      throw error61;
-    }
-    if (!result.ok) return result;
+    throw error61;
   }
-  const lastResult = result.data.last_result;
-  if (!lastResult || lastResult.activity_id !== activityId)
-    throw new CliError("INVALID_RESPONSE", {
-      reason: "activity_id_mismatch",
-      activity_id: activityId
+}
+function repeatCount(requestIdPerLot, values, requestedId) {
+  const count = values.count === void 0 ? 1 : Number(values.count);
+  if (!Number.isSafeInteger(count) || count < 1)
+    throw new CliError("INVALID_ARGUMENTS", {
+      fields: ["count"],
+      message: "--count must be a positive safe integer."
     });
-  return result;
+  if (requestIdPerLot && requestedId !== void 0 && count !== 1)
+    throw new CliError("INVALID_ARGUMENTS", {
+      fields: ["request"],
+      message: "--request retries a single lot; use --count 1 or omit --request."
+    });
+  if (values.wait === false && count !== 1)
+    throw new CliError("INVALID_ARGUMENTS", {
+      fields: ["count"],
+      message: "--no-wait starts one activity; use --count 1 or omit --count."
+    });
+  return count;
 }
 
 // src/main.ts
+function print(stream, value) {
+  const output2 = { ...value };
+  delete output2.schema_version;
+  stream.write(`${JSON.stringify(output2)}
+`);
+}
 try {
   const result = await execute(
     process.argv.slice(2),
-    (value) => process.stderr.write(`${JSON.stringify(value)}
-`)
+    (value) => print(process.stderr, value)
   );
-  process.stdout.write(`${JSON.stringify(result)}
-`);
+  print(process.stdout, result);
   process.exitCode = "ok" in result && !result.ok ? 1 : 0;
 } catch (error61) {
-  process.stdout.write(`${JSON.stringify(cliFailure(error61))}
-`);
+  print(process.stdout, cliFailure(error61));
   process.exitCode = 1;
 }

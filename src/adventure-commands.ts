@@ -19,6 +19,8 @@ import {
   writeJournalSchema,
   endSessionSchema,
   getChatSchema,
+  getNewsArticleSchema,
+  getNewsSchema,
   sendChatSchema,
   getDirectMessagesSchema,
   sendDirectMessageSchema,
@@ -30,6 +32,7 @@ import {
   createBoardThreadSchema,
   replyBoardThreadSchema,
 } from './protocol.js';
+import { CliError } from './errors.js';
 import {
   jsonFlag,
   noWaitFlag,
@@ -47,6 +50,11 @@ const messageFlags = [
   ],
   ['--limit <number>', 'Messages per page: 1–50 (default 20)'],
 ] as const;
+const messageInput = {
+  before: ['before', 'number'],
+  after: ['after', 'number'],
+  limit: ['limit', 'number'],
+} as const;
 const unreadFlag = [
   '--unread-only',
   'Read oldest unread incoming messages first',
@@ -92,6 +100,26 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   fight: {
     path: 'character/combat/start',
     schema: startCombatSchema,
+    input: { enemy: 'enemy_id', preset: 'preset', practice: 'practice' },
+    startsActivity: true,
+    // 同じ戦術ファイルを相手を変えて使い回せるよう、ファイルのenemy_idを任意とし、
+    // --enemyがあればそちらを使う。
+    bodyInput: (values, body) => {
+      if (values.preset !== undefined || values.practice !== undefined)
+        throw new CliError('INVALID_ARGUMENTS', {
+          fields: ['input'],
+          message:
+            'Use either --input or --preset/--practice. --enemy may be combined with --input.',
+        });
+      if (values.enemy !== undefined)
+        return { ...body, enemy_id: values.enemy };
+      if (!('enemy_id' in body))
+        throw new CliError('INVALID_ARGUMENTS', {
+          fields: ['enemy_id'],
+          message: 'Pass --enemy or include enemy_id in the --input file.',
+        });
+      return body;
+    },
     flags: [
       [
         '--enemy <id>',
@@ -116,6 +144,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   report: {
     path: 'character/combat/report',
     schema: getCombatReportSchema,
+    input: { activity: 'activity_id' },
     flags: [
       [
         '-a, --activity <id>',
@@ -128,6 +157,8 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   rest: {
     path: 'character/rest',
     schema: restSchema,
+    input: { inn: 'inn' },
+    startsActivity: true,
     flags: [
       [
         '--inn',
@@ -145,6 +176,8 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   use: {
     path: 'character/item/use',
     schema: useItemSchema,
+    input: { item: 'item_id' },
+    changesItems: true,
     flags: [
       [
         '--item <id>',
@@ -157,6 +190,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   'change-job': {
     path: 'character/job/change',
     schema: changeJobSchema,
+    input: { job: 'job_id' },
     flags: [
       [
         '--job <id>',
@@ -176,6 +210,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   recover: {
     path: 'character/lost-items/recover',
     schema: recoverLostItemsSchema,
+    input: { drop: 'drop_id' },
     flags: [['--drop <uuid>', 'Drop ID from lost-items', true]],
     help: 'Recover all remaining items from a local drop.',
   },
@@ -188,6 +223,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   quests: {
     path: 'character/quests',
     schema: getQuestsSchema,
+    input: { before: ['before', 'number'], activeOnly: 'active_only' },
     flags: [
       beforeFlag,
       ['--active-only', 'Return accepted, unexpired quests only'],
@@ -197,33 +233,45 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   'quest-accept': {
     path: 'character/quests/accept',
     schema: acceptQuestSchema,
+    input: { offer: 'offer_id' },
     flags: [['--offer <uuid>', 'Offer ID from quest-board', true]],
     help: 'Accept one posted offer. Only the first adventurer takes it.',
   },
   'quest-claim': {
     path: 'character/quests/claim',
     schema: claimQuestSchema,
-    flags: [['--quest <uuid>', 'Quest ID from quests or quest-accept', true]],
+    input: { quest: ['quest_number', 'number'] },
+    flags: [
+      ['--quest <number>', 'Quest number from quests or quest-accept', true],
+    ],
     help: 'Claim a quest reward when its objective is met. Be idle in its town and claim before the deadline. Delivery consumes standard-quality items.',
   },
   'quest-discard': {
     path: 'character/quests/discard',
     schema: discardQuestSchema,
-    flags: [['--quest <uuid>', 'Quest ID from quests or quest-accept', true]],
+    input: { quest: ['quest_number', 'number'] },
+    flags: [
+      ['--quest <number>', 'Quest number from quests or quest-accept', true],
+    ],
     help: 'Give up an accepted quest. The town pays nothing and keeps its budget.',
   },
   journal: {
     path: 'character/journal',
     schema: getJournalsSchema,
+    input: {
+      before: ['before', 'number'],
+      journal: ['journal_number', 'number'],
+      query: 'query',
+    },
     flags: [
       beforeFlag,
-      ['--journal <uuid>', 'Read one full entry'],
+      ['--journal <number>', 'Read one full entry'],
       [
         '--query <text>',
         'Case-insensitive substring search of full journal text',
       ],
     ],
-    help: 'Read private journal excerpts, or --journal ID for full text. Each entry text is in user_content.text; truncated means the excerpt is incomplete.',
+    help: 'Read private journal excerpts, or --journal NUMBER for full text. Each entry text is in user_content.text; truncated means the excerpt is incomplete.',
   },
   'journal-write': {
     path: 'character/journal/write',
@@ -267,8 +315,23 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   chat: {
     path: 'character/chat',
     schema: getChatSchema,
+    input: messageInput,
     flags: messageFlags,
     help: 'Read your current chat channel and mark the returned page as seen. Message numbers are cursors, not per-channel counts.',
+  },
+  news: {
+    path: 'character/news',
+    schema: getNewsSchema,
+    input: { before: ['before', 'number'], limit: ['limit', 'number'] },
+    flags: [beforeFlag, ['--limit <number>', 'Articles per page (default 5)']],
+    help: 'List Alva Dispatch headlines and leads, newest first, without bodies. Reading the newest page catches you up to it; unread shows which articles were new. Read older pages only when you need them.',
+  },
+  'news-article': {
+    path: 'character/news/article',
+    schema: getNewsArticleSchema,
+    input: { article: ['number', 'number'] },
+    flags: [['--article <number>', 'Article number from news', true]],
+    help: 'Read one Alva Dispatch article body in Markdown. Open only articles relevant to your plans.',
   },
   'chat-send': {
     path: 'character/chat/send',
@@ -283,6 +346,11 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   dm: {
     path: 'character/direct-messages',
     schema: getDirectMessagesSchema,
+    input: {
+      ...messageInput,
+      with: 'with_character_id',
+      unreadOnly: 'unread_only',
+    },
     flags: [
       ...messageFlags,
       ['--with <id>', 'Read both directions with this character'],
@@ -304,6 +372,16 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   board: {
     path: 'character/board',
     schema: listBoardThreadsSchema,
+    input: {
+      category: 'category',
+      threadLanguage: 'language',
+      authoredBySelf: 'authored_by_self',
+      participatedBySelf: 'participated_by_self',
+      unreadOnly: 'unread_only',
+      query: 'query',
+      beforeThread: 'before',
+      limit: ['limit', 'number'],
+    },
     flags: [
       [
         '--category <id>',
@@ -338,6 +416,11 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   'board-thread': {
     path: 'character/board/thread',
     schema: readBoardThreadSchema,
+    input: {
+      thread: 'thread_id',
+      after: ['after', 'number'],
+      limit: ['limit', 'number'],
+    },
     flags: [
       ['--thread <uuid>', 'Thread ID from board', true],
       [

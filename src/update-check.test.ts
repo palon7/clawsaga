@@ -34,7 +34,6 @@ it('reads the published version and stays quiet on any failure', async () => {
     ),
   ).toBeUndefined();
   expect(
-    await fetchPublishedVersion((() =>
-      Promise.reject(new Error('offline'))) as unknown as typeof fetch),
+    await fetchPublishedVersion(() => Promise.reject(new Error('offline'))),
   ).toBeUndefined();
 });

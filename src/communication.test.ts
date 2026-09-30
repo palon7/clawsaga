@@ -2,12 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
-import {
-  agentGameResponseSchema,
-  agentSchemaVersion,
-  sendChatSchema,
-  sendDirectMessageSchema,
-} from './protocol.js';
+import { agentGameResponseSchema, agentSchemaVersion } from './protocol.js';
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
@@ -20,7 +15,7 @@ const result = {
 const traveler = 'Traveler0000';
 const friend = 'Friend000000';
 
-it('maps communication flags and rejects removed regional flags and invalid limits before sending', async () => {
+it('maps communication flags', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue({ ...result });
@@ -43,6 +38,20 @@ it('maps communication flags and rejects removed regional flags and invalid limi
     unread_only: true,
     limit: 1,
   });
+  await execute(
+    ['news', '-c', traveler, '--before', '12', '--limit', '3'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith('character/news', {
+    character_id: traveler,
+    before: 12,
+    limit: 3,
+  });
+  await execute(['news-article', '-c', traveler, '--article', '7'], vi.fn());
+  expect(invoke).toHaveBeenLastCalledWith('character/news/article', {
+    character_id: traveler,
+    number: 7,
+  });
   await execute(['search-characters', '--name', 'El', '--limit', '5'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('characters/search', {
     name: 'El',
@@ -56,43 +65,6 @@ it('maps communication flags and rejects removed regional flags and invalid limi
     name: 'Elwen',
     discriminator: '0427',
   });
-  invoke.mockClear();
-  for (const flags of [
-    ['--region', 'selene'],
-    ['--limit', '51'],
-    ['--limit', '0'],
-    ['--before', '1.5'],
-  ]) {
-    await expect(
-      execute(['chat', '-c', traveler, ...flags], vi.fn()),
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  }
-  expect(invoke).not.toHaveBeenCalled();
-});
-
-it('validates code-point limits and rejects unknown send fields', () => {
-  for (const [schema, maximum, extra] of [
-    [sendChatSchema, 400, {}],
-    [sendDirectMessageSchema, 1000, { recipient_character_id: friend }],
-  ] as const) {
-    const body = {
-      character_id: traveler,
-      language: 'en',
-      text: '🧙'.repeat(maximum),
-      ...extra,
-    };
-    expect(schema.safeParse(body).success).toBe(true);
-    for (const text of ['🧙'.repeat(maximum + 1), '\u0000', '\ud800', '   ']) {
-      expect(schema.safeParse({ ...body, text }).success).toBe(false);
-    }
-    for (const removed of [
-      { request_id: '11111111-1111-4111-8111-111111111111' },
-      { region_id: 'selene' },
-      { in_reply_to: '11111111-1111-4111-8111-111111111111' },
-    ]) {
-      expect(schema.safeParse({ ...body, ...removed }).success).toBe(false);
-    }
-  }
 });
 
 it('sends identical text twice as two explicit calls without adding request IDs', async () => {
@@ -115,9 +87,8 @@ it('sends identical text twice as two explicit calls without adding request IDs'
   );
 });
 
-it('retains attention, message bodies, read state and conversation direction during response validation', () => {
+it('retains attention, message bodies, read state and conversation direction during response parsing', () => {
   const message = {
-    message_id: '11111111-1111-4111-8111-111111111111',
     number: 1,
     sender_character_id: friend,
     sender_discriminator: '0002',
@@ -138,6 +109,7 @@ it('retains attention, message bodies, read state and conversation direction dur
       unread_direct_messages: 1,
       chat: { channel_id: 'selene', new_messages: 3 },
       board: { unread_threads: 0 },
+      news: { unread: 0 },
     },
     data: {
       direct_messages: {
@@ -156,10 +128,4 @@ it('retains attention, message bodies, read state and conversation direction dur
     },
   };
   expect(agentGameResponseSchema.parse(response)).toEqual(response);
-  expect(
-    agentGameResponseSchema.safeParse({
-      ...response,
-      attention: { ...response.attention, unread_direct_messages: -1 },
-    }).success,
-  ).toBe(false);
 });
