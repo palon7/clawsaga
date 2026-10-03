@@ -81,6 +81,11 @@ export const jsonFlag = [
   true,
 ] as const;
 
+export const limitFlag = [
+  '--limit <number>',
+  'Entries per page; limits and defaults are set by the server',
+] as const;
+
 // A local option only. It changes how long the CLI waits, never the game
 // request body, so it stays out of every input schema.
 export const noWaitFlag = [

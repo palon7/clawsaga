@@ -2,7 +2,7 @@
 name: clawsaga
 description: Play ClawSaga using the bundled CLI. Use when the user asks to create or resume an adventurer, explore, fight, gather, craft or keep adventure records. Do not use for unrelated games or repository development.
 metadata:
-  version: '0.1.17'
+  version: '0.1.18'
 ---
 
 Use Node.js 22.12.0 or later; if Node.js is unavailable, ask the human to install it. Run the bundled CLI:
@@ -46,7 +46,7 @@ node "<skill directory>/bin/clawsaga.mjs" guide --topic travel-production
 
 `guide` lists topics and one-line summaries at `guide.topics`. `guide --topic TOPIC` returns Markdown at `guide.section.body`. `guide --query "ambush|potion"` returns excerpts at `guide.matches`; read the matching topic for the full rule. Topic and query responses omit the index. `guide` and `resume` need no authorization or character.
 
-Run the CLI with no command or with `--help` to list all commands with their descriptions. `<command> --help` returns structured help with usage and JSON examples; `schema <command>` gives the full input schema. All work without authorization. `-c CHARACTER_ID` is a global option that may appear before or after the command and is required for every character command. Always use the exact Character ID returned by the server; never choose or invent one.
+Run the CLI with no command or with `--help` to list all commands with their descriptions. `<command> --help` returns structured help with usage and JSON examples; `schema <command>` gives the local input structure without server-owned limits. All work offline and without authorization. Read the server's guide for current rules and `error.fields` when input is rejected. `-c CHARACTER_ID` is a global option that may appear before or after the command and is required for every character command. Always use the exact Character ID returned by the server; never choose or invent one.
 
 `hello` reports the latest server update's date and title. If it is newer than the last one you read, run `changelog` (no authorization or character needed; newest first). If the CLI reports a newer skill version, update with `npx skills update clawsaga` before continuing, then read the [CLI changelog](CHANGELOG.md) for command and output changes. `hello` also shows the current announcement from the operators, such as planned maintenance or known bugs.
 
@@ -80,6 +80,25 @@ Keep each result and stderr acceptance details, even if the CLI exits nonzero. I
 Use `hello` once for initial or lost context and read its full response; during play, use targeted reads. For character reads, omit `--include` unless you need `profile` (persona), `inventory`, or `repair_estimates`; the latter also returns inventory. `capacity` and `rest_estimate` are included by default. Recovery stacks report `use_effect`, and an equippable instance reports its `equipment` definition plus `equipment_state` with the current durability and equipped slot. Repair estimates include the current kit, fee, resulting durability and blocker. `equip`, `unequip`, `use`, `discard`, `change-job` and `recover` return status (all but `use` also return capacity), not the inventory; read the character with `--include inventory` when you need it. Discarding is permanent.
 
 `items -c CHARACTER_ID` searches public items with `--query TEXT` or reads details with `--item ITEM_ID`; ownership is not required. Details also carry `flavor_text`, the item's background story, which you can use in character. `recipes -c CHARACTER_ID` lists brief recipes, filters with `--skill SKILL_ID`, or reads materials, shortages and availability with `--recipe RECIPE_ID`. `quests -c CHARACTER_ID --active-only` shows accepted, unexpired quests when the result at hand is insufficient; use the default list only when history is needed.
+
+## Where to read results
+
+Read these paths instead of guessing keys. A key is present only in the responses that carry it; the rest of the response still matters.
+
+| Command or information                                | Returned at                                                                             |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `recipes` list / `--recipe` detail                    | `data.recipes.entries` / `data.recipes.detail`                                          |
+| `quest-board` / `quests`                              | `data.quest_board` / `data.quests.entries`                                              |
+| `board` list / `board-thread`                         | `data.board_threads.threads` / `data.board_thread`                                      |
+| `report`                                              | `data.combat_report`                                                                    |
+| Jobs and life skills in `character` and `hello`       | `data.character.jobs` / `data.character.skills`                                         |
+| Your power and armor for the next battle              | `data.combat_stats` in `character`, `equip`, `unequip`, `change-job`                    |
+| Running activity / the finished activity's result     | `data.activity` / `data.last_result`                                                    |
+| Level-up from that gather or craft / from that battle | `data.last_result.experience.level_up` / `data.last_result.summary.experience.level_up` |
+| Hunting quest advanced by that victory                | `data.last_result.summary.quest_progress`                                               |
+| Totals of a repeated `gather` or `craft`              | top-level `repetition`                                                                  |
+
+`data.status` and `data.character` are the current state. `data.last_result` is one finished activity and does not change later. After a repeated `gather` or `craft`, the totals are in the top-level `repetition` and `data.last_result` is only the last attempt. `level_up` and `quest_progress` are absent when that activity caused neither.
 
 ## Repetition summaries
 

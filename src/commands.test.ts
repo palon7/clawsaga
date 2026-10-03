@@ -4,6 +4,7 @@ import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
 import { initial } from './test-responses.js';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
+import { commands } from './command-registry.js';
 
 vi.mock('node:timers/promises', () => ({
   setTimeout: (delay: number) =>
@@ -277,6 +278,16 @@ it('generates structured help examples from the command definitions without auth
   );
 });
 
+it('emits no upper limit in any command schema', async () => {
+  for (const name of Object.keys(commands)) {
+    const result = await execute(['schema', name], vi.fn());
+    const schema = JSON.stringify(result);
+    expect(schema, name).not.toMatch(/"maxLength"|"maxItems"/);
+    for (const match of schema.matchAll(/"maximum":(\d+)/g))
+      expect(Number(match[1]), name).toBe(Number.MAX_SAFE_INTEGER);
+  }
+});
+
 it('parses every structured help command example with a fake client', async () => {
   const failure: AgentGameResponse = {
     ok: false,
@@ -441,6 +452,9 @@ it('returns the parser reason and command-specific help without sending a reques
       'clawsaga equip',
     ],
     [['characters', 'unexpected'], 'too many arguments', 'clawsaga characters'],
+    [['schema'], 'missing required argument', 'clawsaga schema'],
+    [['guide', '--topic'], 'argument missing', 'clawsaga guide'],
+    [['resume', '--unknown'], 'unknown option', 'clawsaga resume'],
     [
       ['auth', 'login', '--input', 'settings.json'],
       "unknown option '--input'",
@@ -641,6 +655,22 @@ it('passes item IDs to the server, including definitions unknown to this CLI', a
   expect(invoke).toHaveBeenLastCalledWith('character/item/use', {
     character_id: 'Traveler0000',
     item_id: 'future_tonic',
+  });
+});
+
+it('sends use --count as one request and does not repeat it', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  await execute(
+    ['use', '-c', 'Traveler0000', '--item', 'wolf_jerky', '--count', '5'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenCalledTimes(1);
+  expect(invoke).toHaveBeenLastCalledWith('character/item/use', {
+    character_id: 'Traveler0000',
+    item_id: 'wolf_jerky',
+    count: 5,
   });
 });
 

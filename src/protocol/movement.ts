@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { localeSchema, characterIdSchema } from './ids.js';
 
 export const locationIdSchema = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
-export type LocationId = z.infer<typeof locationIdSchema>;
 
 const common = {
   character_id: characterIdSchema.describe('The immutable Character ID.'),
@@ -30,5 +29,3 @@ export const getActivitySchema = z
     activity_id: z.uuid().optional(),
   })
   .strict();
-export type TravelInput = z.infer<typeof travelSchema>;
-export type GetActivityInput = z.infer<typeof getActivitySchema>;

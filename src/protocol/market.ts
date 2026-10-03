@@ -13,9 +13,9 @@ const common = {
 };
 const change = { ...common, request_id: uuidSchema };
 const quality = z.enum(['standard', 'fine', 'superior']);
-const price = z.number().int().positive().max(2_147_483_647);
-const quantity = z.number().int().positive().max(2_147_483_647);
-const number = z.number().int().positive().safe();
+const price = z.number().int().positive();
+const quantity = z.number().int().positive();
+const number = z.number().int().positive();
 const source = z.enum(['carried', 'storage']);
 
 export const getMarketSchema = z
@@ -24,8 +24,8 @@ export const getMarketSchema = z
     town_id: locationIdSchema,
     item_id: itemId.optional(),
     quality: quality.optional(),
-    levels: z.number().int().min(1).max(20).optional(),
-    cursor: z.number().int().positive().safe().optional(),
+    levels: z.number().int().min(1).optional(),
+    cursor: z.number().int().positive().optional(),
     max_price: price.optional(),
     minimum_durability: z.number().int().nonnegative().optional(),
   })
@@ -34,13 +34,9 @@ export const getMyMarketSchema = z
   .object({
     ...common,
     section: z.enum(['orders', 'listings', 'trades']).optional(),
-    cursor: z.number().int().positive().safe().optional(),
+    cursor: z.number().int().positive().optional(),
   })
-  .strict()
-  .refine((value) => value.cursor === undefined || value.section, {
-    message: 'Give section with cursor.',
-    path: ['section'],
-  });
+  .strict();
 export const placeMarketSellOrderSchema = z
   .object({
     ...change,
@@ -50,11 +46,7 @@ export const placeMarketSellOrderSchema = z
     unit_price: price,
     source,
   })
-  .strict()
-  .refine((value) => value.quantity * value.unit_price <= 2_147_483_647, {
-    message: 'Order total exceeds the supported maximum.',
-    path: ['quantity'],
-  });
+  .strict();
 export const placeMarketBuyOrderSchema = z
   .object({
     ...change,
@@ -63,11 +55,7 @@ export const placeMarketBuyOrderSchema = z
     quantity,
     unit_price: price,
   })
-  .strict()
-  .refine((value) => value.quantity * value.unit_price <= 2_147_483_647, {
-    message: 'Order total exceeds the supported maximum.',
-    path: ['quantity'],
-  });
+  .strict();
 export const cancelMarketOrderSchema = z
   .object({ ...change, order_id: number })
   .strict();

@@ -12,7 +12,11 @@ import {
   resolveCharacterSchema,
   updateProfileSchema,
 } from './protocol.js';
-import { jsonFlag, type CommandDefinition } from './command-definition.js';
+import {
+  jsonFlag,
+  limitFlag,
+  type CommandDefinition,
+} from './command-definition.js';
 
 export const characterCommands: Record<string, CommandDefinition> = {
   hello: {
@@ -46,7 +50,7 @@ export const characterCommands: Record<string, CommandDefinition> = {
         'Exact four-digit discriminator for an exact name match',
       ],
       ['--cursor <character id>', 'Last Character ID from next_cursor'],
-      ['--limit <number>', 'Results per page: 1–50 (default 20)'],
+      limitFlag,
     ],
     requiresCharacter: false,
     help: 'Find characters by name, or exact name plus discriminator. Returns public IDs and names; use the Character ID for DMs.',

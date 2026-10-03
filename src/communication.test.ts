@@ -39,6 +39,14 @@ it('maps communication flags', async () => {
     limit: 1,
   });
   await execute(
+    ['dm-conversations', '-c', traveler, '--before', '40', '--limit', '5'],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith(
+    'character/direct-messages/conversations',
+    { character_id: traveler, before: 40, limit: 5 },
+  );
+  await execute(
     ['news', '-c', traveler, '--before', '12', '--limit', '3'],
     vi.fn(),
   );
@@ -120,6 +128,7 @@ it('retains attention, message bodies, read state and conversation direction dur
             discriminator: '0002',
             last_direction: 'received',
             last_message_at: result.server_time,
+            unread_count: 1,
             user_content: { name: 'Friend' },
           },
         ],

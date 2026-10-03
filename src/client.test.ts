@@ -239,12 +239,14 @@ it('reports 5xx and unreadable responses without exposing response contents', as
         data: {},
       }),
       code: 'INVALID_RESPONSE',
-      message: "The server response did not match this CLI's expected format.",
+      message:
+        "The server response did not match this CLI's expected format. The action may still have been applied; check its outcome before another change.",
     },
     {
       response: new Response('private upstream details', { status: 200 }),
       code: 'INVALID_RESPONSE',
-      message: 'The server returned a response that was not valid JSON.',
+      message:
+        'The server returned a response that was not valid JSON. The action may still have been applied; check its outcome before another change.',
     },
   ];
   for (const { response, code, message } of cases) {
@@ -419,4 +421,39 @@ it('returns device approval immediately and exchanges the pending code on the ne
   expect(JSON.stringify(result)).not.toContain('private-device');
   expect(await client.accessToken()).toBe('new-access');
   expect(request).toHaveBeenCalledTimes(2);
+});
+
+it('forgets a pending authorization once it expires or the server refuses it', async () => {
+  const later = Date.now() + 600_000;
+  const cases = [
+    { expires_at: Date.now() - 1, body: '{}', kept: false },
+    { expires_at: later, body: '{"error":"access_denied"}', kept: false },
+    {
+      expires_at: later,
+      body: '{"error":"authorization_pending"}',
+      kept: true,
+    },
+    { expires_at: later, body: '{"error":"slow_down"}', kept: true },
+    { expires_at: later, body: 'private upstream details', kept: true },
+  ];
+  for (const { expires_at, body, kept } of cases) {
+    const { store, path } = await fixture();
+    await store.update((entries) => {
+      entries[origin] = { device_code: 'private-device', expires_at };
+    });
+    const request = vi
+      .fn<typeof fetch>()
+      .mockImplementation(() =>
+        Promise.resolve(new Response(body, { status: 400 })),
+      );
+    const client = new GameClient(origin, store, request);
+    await expect(client.accessToken()).rejects.toMatchObject({
+      code: 'AUTH_NOT_COMPLETED',
+    });
+    const saved = JSON.parse(await readFile(path, 'utf8')) as object;
+    expect(origin in saved).toBe(kept);
+    await expect(client.accessToken()).rejects.toMatchObject({
+      code: kept ? 'AUTH_NOT_COMPLETED' : 'AUTH_REQUIRED',
+    });
+  }
 });

@@ -13,8 +13,7 @@ export const getQuestsSchema = z
   })
   .strict();
 export const getQuestBoardSchema = z.object(target).strict();
-// quest.number は int4 の列なので、範囲外の値をDBへ渡さない。
-const questNumber = z.number().int().min(1).max(2_147_483_647);
+const questNumber = z.number().int().min(1);
 export const acceptQuestSchema = z
   .object({ ...target, offer_id: uuidSchema })
   .strict();
@@ -24,6 +23,3 @@ export const claimQuestSchema = z
 export const discardQuestSchema = z
   .object({ ...target, quest_number: questNumber })
   .strict();
-export type AcceptQuestInput = z.infer<typeof acceptQuestSchema>;
-export type ClaimQuestInput = z.infer<typeof claimQuestSchema>;
-export type DiscardQuestInput = z.infer<typeof discardQuestSchema>;
