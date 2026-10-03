@@ -19,7 +19,6 @@ export const damageTypeSchema = z.enum([
   'lightning',
   'holy',
 ]);
-export type DamageType = z.infer<typeof damageTypeSchema>;
 export const combatStatusSchema = z.enum([
   'poison',
   'guard',
@@ -27,13 +26,12 @@ export const combatStatusSchema = z.enum([
   'battle_song',
   'soothing_song',
 ]);
-export type CombatStatus = z.infer<typeof combatStatusSchema>;
 
 export const tacticConditionSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.enum(['hp_below', 'mp_below', 'enemy_hp_below']),
-      percent: z.number().int().min(1).max(100),
+      percent: z.number().int().min(1),
     })
     .strict()
     .describe(
@@ -62,7 +60,7 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('potions_below'),
-      count: z.number().int().min(1).max(21),
+      count: z.number().int().min(1),
     })
     .strict()
     .describe(
@@ -72,6 +70,16 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
     .object({ kind: z.literal('enemy_weak_to'), damage_type: damageTypeSchema })
     .strict()
     .describe('Matches when the enemy resistance for damage_type is negative.'),
+  z
+    .object({
+      kind: z.enum(['enemy_resistance_at_least', 'enemy_resistance_below']),
+      damage_type: damageTypeSchema,
+      value: z.number().int(),
+    })
+    .strict()
+    .describe(
+      'Matches when enemy resistance for damage_type is greater than or equal to value, or strictly below value, respectively. Negative resistance is weakness, zero is neutral, and positive resistance reduces damage.',
+    ),
   z
     .object({
       kind: z.enum(['self_has_status', 'self_missing_status']),
@@ -111,7 +119,6 @@ export const tacticSchema = z
           .object({
             conditions: z
               .array(tacticConditionSchema)
-              .max(3)
               .describe(
                 'All conditions must match (AND); an empty list always matches.',
               ),
@@ -119,7 +126,6 @@ export const tacticSchema = z
           })
           .strict(),
       )
-      .max(8)
       .describe(
         'Evaluated from top to bottom each tick. The first matching, usable action runs; otherwise use a basic attack.',
       ),
@@ -127,7 +133,6 @@ export const tacticSchema = z
       .number()
       .int()
       .min(0)
-      .max(20)
       .describe(
         'Maximum healing potions the tactic may use in one battle, limited by the bag quantity at start. Each potion is consumed when used; zero disables potion use.',
       ),
@@ -135,9 +140,7 @@ export const tacticSchema = z
   .strict()
   .meta({ id: 'Tactic' });
 export type Tactic = z.infer<typeof tacticSchema>;
-export type TacticAction = z.infer<typeof tacticActionSchema>;
 export const presetIdSchema = z.enum(['safe', 'aggressive']);
-export type PresetId = z.infer<typeof presetIdSchema>;
 export const getTacticsSchema = z.object(target).strict();
 export const setTacticsSchema = z
   .object({ ...target, tactic: tacticSchema })
@@ -151,11 +154,7 @@ export const startCombatSchema = z
     tactic: tacticSchema.optional(),
     practice: z.boolean().optional(),
   })
-  .strict()
-  .refine((input) => !(input.preset && input.tactic), {
-    path: ['tactic'],
-    message: 'Choose either tactic or preset, not both.',
-  });
+  .strict();
 export const restSchema = z
   .object({
     ...target,
@@ -169,6 +168,10 @@ export const useItemSchema = z
   .object({
     ...target,
     item_id: itemIdSchema,
+    count: z.number().int().positive().optional().meta({
+      description:
+        'Maximum number of this item to use in this one call (default 1). The server uses only as many as still recover HP or MP, limited by the quantity you carry across qualities, and reports the number in used_item.',
+    }),
   })
   .strict();
 export const changeJobSchema = z
@@ -182,7 +185,3 @@ export const getLostItemsSchema = z.object(target).strict();
 export const recoverLostItemsSchema = z
   .object({ ...target, drop_id: uuidSchema })
   .strict();
-export type StartCombatInput = z.infer<typeof startCombatSchema>;
-export type SetTacticsInput = z.infer<typeof setTacticsSchema>;
-export type UseItemInput = z.infer<typeof useItemSchema>;
-export type ChangeJobInput = z.infer<typeof changeJobSchema>;

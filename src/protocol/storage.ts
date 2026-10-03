@@ -20,7 +20,7 @@ const stackTransferSchema = z
     kind: z.literal('stack'),
     item_id: itemId,
     quality: z.enum(['standard', 'fine', 'superior']),
-    quantity: z.number().int().min(1).max(2_147_483_647),
+    quantity: z.number().int().min(1),
   })
   .strict();
 const individualTransferSchema = z
@@ -39,21 +39,13 @@ export const storageTransferItemsSchema = z
       individualTransferSchema,
     ]),
   )
-  .min(1)
-  .max(50);
-
-const searchQuerySchema = unicodeTextSchema
-  .transform((value) => value.trim())
-  .refine(
-    (value) => [...value].length >= 1 && [...value].length <= 128,
-    'Use 1–128 characters.',
-  );
+  .min(1);
 
 export const getStorageSchema = z
   .object({ ...common, town_id: locationIdSchema })
   .strict();
 export const searchStorageSchema = z
-  .object({ ...common, query: searchQuerySchema })
+  .object({ ...common, query: unicodeTextSchema })
   .strict();
 export const depositItemsSchema = z
   .object({

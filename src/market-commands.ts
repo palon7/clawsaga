@@ -56,7 +56,10 @@ export const marketCommands: Record<string, CommandDefinition> = {
         false,
         qualityChoices,
       ],
-      ['--levels <number>', 'Price levels returned per side: 1–20 (default 5)'],
+      [
+        '--levels <number>',
+        'Price levels returned per side; limits and defaults are set by the server',
+      ],
       [
         '--cursor <number>',
         'next_cursor from a previous overview or listings read',
@@ -67,7 +70,7 @@ export const marketCommands: Record<string, CommandDefinition> = {
         'Only listings at or above this durability',
       ],
     ],
-    help: 'Read every active item and quality in a market town with best bid and ask, 20 rows per page. Add --item to read one stack board or individual listings.',
+    help: 'Read every active item and quality in a market town with best bid and ask, one page at a time. Add --item to read one stack board or individual listings.',
     examples: [
       'clawsaga market -c m7Qp2_aR9L-x --town corvent',
       'clawsaga market -c m7Qp2_aR9L-x --town corvent --item ore --quality standard',
@@ -86,7 +89,7 @@ export const marketCommands: Record<string, CommandDefinition> = {
       ],
       ['--cursor <number>', "That section's next_cursor from a previous read"],
     ],
-    help: 'Read your orders, listings and trades across every market town from anywhere, newest first and 20 per section. Orders and listings include held items awaiting receipt or return.',
+    help: 'Read your orders, listings and trades across every market town from anywhere, newest first, one page per section. Orders and listings include held items awaiting receipt or return.',
     examples: [
       'clawsaga my-market -c m7Qp2_aR9L-x',
       'clawsaga my-market -c m7Qp2_aR9L-x --section orders --cursor 41',

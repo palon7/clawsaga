@@ -217,13 +217,23 @@ function addSchemaCommand(program: Command, run: Run) {
   const schemaCommand = program
     .command('schema')
     .description(
-      'Read the JSON body schema for an input-file command, or the API request schema for a flag command.',
+      'Read the local input structure for a command. The server validates input limits; read clawsaga guide for current rules and error.fields when input is rejected.',
     )
     .argument('<command>', 'Game command name')
+    .configureOutput({
+      outputError: () => {
+        run.helpCommand = 'clawsaga schema --help';
+      },
+    })
     .action((name: string) => {
+      run.helpCommand = 'clawsaga schema --help';
       const definition = commands[name];
       if (!definition)
-        throw new CliError('INVALID_ARGUMENTS', { fields: ['command'] });
+        throw new CliError('INVALID_ARGUMENTS', {
+          fields: ['command'],
+          message:
+            'Choose a game command from clawsaga --help, then run clawsaga schema <command>.',
+        });
       const hasBody = definition.flags.some(([flags]) => flags === jsonFlag[0]);
       run.schemaHelpResult = {
         input_kind: hasBody ? 'json_body' : 'api_request',
@@ -283,7 +293,12 @@ function addDocumentCommands(program: Command, run: Run) {
   for (const document of documentCommands) {
     const command = program
       .command(document.name)
-      .description(document.description);
+      .description(document.description)
+      .configureOutput({
+        outputError: () => {
+          run.helpCommand = `clawsaga ${document.name} --help`;
+        },
+      });
     for (const option of document.options)
       command.option(option.flags, option.description);
     command.on('--help', () => {

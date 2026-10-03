@@ -160,7 +160,7 @@ function schemaHelp(): StructuredHelp {
   return {
     command: 'clawsaga schema <command>',
     description:
-      'Read the JSON body schema for an input-file command, or the API request schema for a flag command.',
+      'Read the local input structure for a command. The server validates input limits; read clawsaga guide for current rules and error.fields when input is rejected.',
     usage: 'clawsaga schema <command>',
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: ['clawsaga schema create', 'clawsaga schema gather'],

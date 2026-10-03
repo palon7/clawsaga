@@ -14,7 +14,7 @@ const result = {
   data: {},
 } as const;
 const traveler = 'Traveler0000';
-const thread = '11111111-1111-4111-8111-111111111111';
+const thread = '123';
 
 it('maps Community Board flags and cursors to the board requests', async () => {
   const invoke = vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue({
@@ -49,7 +49,7 @@ it('maps Community Board flags and cursors to the board requests', async () => {
     participated_by_self: true,
     unread_only: true,
     query: 'coal',
-    before: thread,
+    before: 123,
     limit: 10,
   });
 
@@ -59,7 +59,7 @@ it('maps Community Board flags and cursors to the board requests', async () => {
   );
   expect(invoke).toHaveBeenLastCalledWith('character/board/thread', {
     character_id: traveler,
-    thread_id: thread,
+    thread_number: 123,
     after: 7,
   });
 });

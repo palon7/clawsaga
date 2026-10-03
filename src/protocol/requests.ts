@@ -7,18 +7,6 @@ import {
   discriminatorSchema,
 } from './ids.js';
 
-export const displayNameSchema = unicodeTextSchema
-  .transform((s) => s.trim().normalize('NFC'))
-  .refine(
-    (s) =>
-      [...s].length >= 3 &&
-      [...s].length <= 32 &&
-      !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(s),
-    'Use 3–32 characters without line breaks or control characters.',
-  );
-
-const personaSchema = unicodeTextSchema.refine((s) => [...s].length <= 4000);
-
 const presentation = {
   locale: localeSchema.optional(),
 };
@@ -34,13 +22,12 @@ export const includeSchema = z.enum([
 ]);
 
 export const helloSchema = z.object({ ...target, ...presentation }).strict();
-export type HelloInput = z.infer<typeof helloSchema>;
 
 export const getCharacterSchema = z
   .object({
     ...target,
     ...presentation,
-    include: z.array(includeSchema).max(3).optional(),
+    include: z.array(includeSchema).optional(),
   })
   .strict();
 
@@ -48,7 +35,7 @@ export const updateProfileSchema = z
   .object({
     ...target,
     ...presentation,
-    persona: personaSchema.optional(),
+    persona: unicodeTextSchema.optional(),
     preferred_locale: localeSchema.optional(),
   })
   .strict();
@@ -56,55 +43,30 @@ export const updateProfileSchema = z
 export const createCharacterSchema = z
   .object({
     ...presentation,
-    persona: personaSchema.optional(),
+    persona: unicodeTextSchema.optional(),
     preferred_locale: localeSchema,
-    display_name: displayNameSchema,
+    display_name: unicodeTextSchema,
     job_id: jobSchema,
   })
   .strict();
 
-const searchNameSchema = unicodeTextSchema
-  .transform((s) => s.trim().normalize('NFC'))
-  .refine(
-    (s) =>
-      [...s].length >= 1 &&
-      [...s].length <= 32 &&
-      !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(s),
-    'Use 1–32 characters without line breaks or control characters.',
-  );
-
 export const searchCharactersSchema = z
   .object({
     ...presentation,
-    name: searchNameSchema,
+    name: unicodeTextSchema,
     discriminator: discriminatorSchema.optional(),
     cursor: characterIdSchema.optional(),
-    limit: z.number().int().min(1).max(50).optional(),
+    limit: z.number().int().min(1).optional(),
   })
-  .strict()
-  .superRefine((value, context) => {
-    if (value.discriminator && [...value.name].length < 3)
-      context.addIssue({
-        code: 'custom',
-        path: ['name'],
-        message: 'Use 3–32 characters for an exact name search.',
-      });
-  });
+  .strict();
 
 export const resolveCharacterSchema = z
   .object({
     ...presentation,
-    name: displayNameSchema,
+    name: unicodeTextSchema,
     discriminator: discriminatorSchema.optional(),
   })
   .strict();
 
 export const listCharactersSchema = z.object(presentation).strict();
 export const getOnboardingOptionsSchema = z.object(presentation).strict();
-
-export type GetCharacterInput = z.infer<typeof getCharacterSchema>;
-
-export type CreateCharacterInput = z.infer<typeof createCharacterSchema>;
-export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
-export type SearchCharactersInput = z.infer<typeof searchCharactersSchema>;
-export type ResolveCharacterInput = z.infer<typeof resolveCharacterSchema>;

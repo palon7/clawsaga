@@ -12,6 +12,8 @@ Read `requested_count`, confirmed `completed_count`, `produced` and `stopped_rea
 - `start_rejected`: the next attempt did not start; its error is preserved.
 - `activity_failed` or `unknown`: the affected attempt is unconfirmed and may have succeeded. Inspect it before doing more.
 
+`data.last_result` is the last attempt only, so its `experience.awarded` and `experience.level_up` describe that one attempt, not the run. A skill level gained on an earlier attempt is not in the final result: read `data.character.skills` with `character` for the current level, or read that attempt with `activity -a ACTIVITY_ID` using the ID from its stderr acceptance line.
+
 Confirmed yields are preserved. If `completed_count < requested_count`, `ok` is false and the CLI exits nonzero. An ambush on the final requested attempt keeps `ok: true`, but combat may still be running. Nothing is retried automatically. An uncertain craft includes its lot's `request_id` for `--request`.
 
 ## Examples

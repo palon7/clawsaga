@@ -11,6 +11,7 @@ export default defineConfig([
     plugins: { '@eslint-community/eslint-comments': eslintComments },
     linterOptions: { reportUnusedDisableDirectives: 'error' },
     rules: {
+      'no-nested-ternary': 'error',
       '@eslint-community/eslint-comments/no-unlimited-disable': 'error',
       '@eslint-community/eslint-comments/require-description': [
         'error',

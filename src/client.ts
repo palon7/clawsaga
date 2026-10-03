@@ -29,6 +29,10 @@ const [supportedSchemaMajor = 0, supportedSchemaMinor = 0] = agentSchemaVersion
   .split('.')
   .map(Number);
 
+// The server may have applied an action whose response could not be read.
+const checkOutcome =
+  'The action may still have been applied; check its outcome before another change.';
+
 function serverMessage(body: unknown): string | undefined {
   const parsed = serverMessageSchema.safeParse(body);
   return parsed.success ? parsed.data.error?.message : undefined;
@@ -145,13 +149,15 @@ export class GameClient {
     if (!isPendingAuthorization(cached) && !expiringSoon(cached))
       return cached.access_token;
 
-    return this.credentials.update(async (entries) => {
+    // update() saves only when its action returns, so the paths that remove a
+    // finished pending authorization return their error instead of throwing it.
+    const result = await this.credentials.update(async (entries) => {
       const current = entries[this.origin];
       if (!current) throw new CliError('AUTH_REQUIRED');
       if (isPendingAuthorization(current)) {
         if (current.expires_at <= Date.now()) {
           delete entries[this.origin];
-          throw new CliError('AUTH_NOT_COMPLETED', {
+          return new CliError('AUTH_NOT_COMPLETED', {
             reason: 'expired_token',
           });
         }
@@ -168,12 +174,17 @@ export class GameClient {
         const failure = errorSchema.safeParse(
           await polled.json().catch(() => null),
         );
-        const reason = failure.success
-          ? failure.data.error
-          : 'invalid_response';
-        if (reason !== 'authorization_pending' && reason !== 'slow_down')
-          delete entries[this.origin];
-        throw new CliError('AUTH_NOT_COMPLETED', { reason });
+        // An unreadable answer does not say the code was refused, so the code
+        // stays and the next command asks again until it expires.
+        if (!failure.success)
+          throw new CliError('AUTH_NOT_COMPLETED', {
+            reason: 'invalid_response',
+          });
+        const reason = failure.data.error;
+        if (reason === 'authorization_pending' || reason === 'slow_down')
+          throw new CliError('AUTH_NOT_COMPLETED', { reason });
+        delete entries[this.origin];
+        return new CliError('AUTH_NOT_COMPLETED', { reason });
       }
       // The token request stays inside the lock: the server revokes the whole
       // connection when a rotated refresh token is replayed.
@@ -189,6 +200,8 @@ export class GameClient {
       entries[this.origin] = refreshed;
       return refreshed.access_token;
     });
+    if (result instanceof CliError) throw result;
+    return result;
   }
   async invoke(path: string, input: unknown) {
     let token: string;
@@ -226,7 +239,7 @@ export class GameClient {
       throw new CliError('SERVICE_UNAVAILABLE', message ? { message } : {});
     if (body === undefined)
       throw new CliError('INVALID_RESPONSE', {
-        message: 'The server returned a response that was not valid JSON.',
+        message: `The server returned a response that was not valid JSON. ${checkOutcome}`,
         operation: path,
         http_status: response.status,
       });
@@ -238,8 +251,7 @@ export class GameClient {
           http_status: response.status,
         });
       throw new CliError('INVALID_RESPONSE', {
-        message:
-          "The server response did not match this CLI's expected format.",
+        message: `The server response did not match this CLI's expected format. ${checkOutcome}`,
         operation: path,
         http_status: response.status,
         fields: [

@@ -75,8 +75,7 @@ async function readStdin() {
   let text = '';
   for await (const chunk of process.stdin) {
     text += String(chunk);
-    // ゲーム経路のJSON本文の境界に合わせる。10,000コードポイントの本文を
-    // 最悪のエスケープで送っても収まる。無制限にはしない。
+    // 標準入力を無制限に読み込まない。本文の上限はサーバーが検査する。
     if (text.length > 128 * 1024) throw new CliError('INVALID_INPUT_FILE');
   }
   return text;

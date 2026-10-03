@@ -17,29 +17,21 @@ export const getRecipesSchema = z
     ...common,
     location_id: locationIdSchema.optional(),
     skill_id: skillIdSchema.optional(),
-    recipe_id: z.string().min(1).max(128).optional(),
+    recipe_id: z.string().min(1).optional(),
   })
-  .strict()
-  .refine((input) => !(input.skill_id && input.recipe_id), {
-    message: 'skill_id and recipe_id cannot be combined',
-    path: ['skill_id'],
-  });
+  .strict();
 export const getItemsSchema = z
   .object({
     ...common,
-    query: z.string().trim().min(1).max(200).optional(),
+    query: z.string().min(1).optional(),
     item_id: itemId.optional(),
   })
-  .strict()
-  .refine((input) => !(input.query && input.item_id), {
-    message: 'query and item_id cannot be combined',
-    path: ['query'],
-  });
+  .strict();
 export const craftSchema = z
   .object({
     ...common,
-    recipe_id: z.string().min(1).max(128),
-    max_fee_per_lot: z.number().int().min(0).max(2_147_483_647).optional(),
+    recipe_id: z.string().min(1),
+    max_fee_per_lot: z.number().int().min(0).optional(),
     request_id: z.uuid(),
   })
   .strict();
@@ -51,7 +43,7 @@ export const buySchema = z
   .object({
     ...common,
     item_id: itemId,
-    max_payment: z.number().int().min(0).max(2_147_483_647),
+    max_payment: z.number().int().min(0),
     request_id: z.uuid(),
   })
   .strict();
@@ -69,7 +61,7 @@ export const discardItemSchema = z
         .object({
           kind: z.literal('stack'),
           item_id: itemId,
-          quantity: z.number().int().positive().max(2_147_483_647),
+          quantity: z.number().int().positive(),
         })
         .strict(),
       z
