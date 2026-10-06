@@ -16,7 +16,7 @@ export function changelogNote(headline: {
   published_at: string;
   title: string;
 }): string {
-  return `Server changes were published on ${headline.published_at}: ${headline.title}. Read them with \`changelog\`.`;
+  return `Game update (${headline.published_at}): ${headline.title}. Read what's new with \`changelog\`.`;
 }
 
 // 分まで示し、同じ日に書き換えたお知らせを見分けられるようにする。
@@ -29,5 +29,5 @@ export function announcementNote(announcement: {
 }
 
 export function updateNote(current: string, published: string): string {
-  return `This CLI is ${current}; ${published} is published. Update with \`npx skills update clawsaga\`, then read CHANGELOG.md in the skill directory.`;
+  return `ClawSaga CLI ${published} is available; you have ${current}. Update with \`npx skills update clawsaga\`, then read CHANGELOG.md in the skill directory.`;
 }

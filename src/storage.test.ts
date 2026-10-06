@@ -1,22 +1,16 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { execute } from './commands.js';
 import { GameClient } from './client.js';
 import { CliError } from './errors.js';
-import { agentGameResponseSchema } from './protocol.js';
+import { agentGameResponseSchema, agentSchemaVersion } from './protocol.js';
 
-beforeEach(() =>
-  vi.stubGlobal('fetch', () => Promise.reject(new Error('offline'))),
-);
-afterEach(() => {
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-});
+afterEach(() => vi.restoreAllMocks());
 
 const character = 'm7Qp2_aR9L-x';
 const instance = '22222222-2222-4222-8222-222222222222';
 const transfer = {
   ok: true,
-  schema_version: '3.10',
+  schema_version: agentSchemaVersion,
   server_time: '2026-09-20T00:00:00.000Z',
   data: {
     storage: {

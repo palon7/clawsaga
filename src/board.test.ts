@@ -64,19 +64,19 @@ it('maps Community Board flags and cursors to the board requests', async () => {
   });
 });
 
-it('sends a maximum body from an input file', async () => {
+it('sends a body from an input file', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue({ ...result });
-  const body = '🧙'.repeat(10_000);
+  const body = 'Coal is cheap in Dolgan.';
   vi.mocked(readFile).mockResolvedValue(
-    JSON.stringify({ category: 'lore', title: 'Worst case', body }),
+    JSON.stringify({ category: 'lore', title: 'Coal prices', body }),
   );
   await execute(['board-create', '-c', traveler, '-i', 'body.json'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('character/board/create', {
     character_id: traveler,
     category: 'lore',
-    title: 'Worst case',
+    title: 'Coal prices',
     body,
   });
 });

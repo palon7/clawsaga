@@ -23953,7 +23953,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.10";
+var agentSchemaVersion = "3.11";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   schema_version: external_exports.literal(agentSchemaVersion),
@@ -23990,7 +23990,7 @@ var lookSchema = external_exports.object({
   cursor: characterIdSchema.optional()
 }).strict();
 var getRouteSchema = external_exports.object({ ...common, to: locationIdSchema }).strict();
-var travelSchema = external_exports.object({ ...common, to: locationIdSchema }).strict();
+var travelSchema = external_exports.object({ ...common, to: locationIdSchema, carriage: external_exports.boolean().optional() }).strict();
 var getActivitySchema = external_exports.object({
   ...common,
   activity_id: external_exports.uuid().optional()
@@ -24028,7 +24028,7 @@ var buySchema = external_exports.object({
   request_id: external_exports.uuid()
 }).strict();
 var equipSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid() }).strict();
-var repairSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid() }).strict();
+var repairSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid(), method: external_exports.enum(["kit", "npc"]) }).strict();
 var discardItemSchema = external_exports.object({
   ...common2,
   target: external_exports.discriminatedUnion("kind", [
@@ -24793,15 +24793,15 @@ function ambushNotes(response, character) {
   if (!lastResult || !ambush) return { notes };
   if (activity?.kind === "combat" && activity.activity_id === ambush.activity_id) {
     notes.push(
-      `The ${lastResult.kind} result is confirmed and combat ${ambush.activity_id} is the current activity; continue or stop that battle instead of repeating the finished activity.`
+      `The ${lastResult.kind} activity is complete. Continue the ambush battle or retreat.`
     );
   } else {
     notes.push(
-      `An ambush happened after the confirmed ${lastResult.kind} result, which stands; that combat is not the current activity. Read its outcome with \`${activityCommand(ambush.activity_id, character)}\` if you have not seen it.`
+      `The ${lastResult.kind} activity is complete. Read the ambush battle report with \`${activityCommand(ambush.activity_id, character)}\` if you have not seen it.`
     );
     if (activity)
       notes.push(
-        `A different ${activity.kind} activity (${activity.activity_id}) is running now.`
+        `Your ${activity.kind} activity (${activity.activity_id}) is now in progress.`
       );
   }
   return { notes, supersededActivityId: ambush.activity_id };
@@ -24812,18 +24812,18 @@ function stateNotes(response, character, wait) {
   const activity = response.data.activity ?? void 0;
   const repetition = repetitionOf(response);
   if (repetition && repetition.completed_count < repetition.requested_count) {
-    const unconfirmed = repetition.stopped_reason === "activity_failed" ? " The attempt that was in progress is not confirmed and may have produced output; check the current or latest activity before another change." : "";
+    const unconfirmed = repetition.stopped_reason === "activity_failed" ? " The last attempt may also have succeeded. Check your current or latest activity before continuing." : "";
     notes.push(
-      `${repetition.completed_count} of ${repetition.requested_count} attempts are confirmed and their output is kept; the repetition stopped before the rest.${unconfirmed}`
+      `Stopped with ${repetition.completed_count} of ${repetition.requested_count} attempts completed. You keep their results.${unconfirmed}`
     );
   } else if (!wait && response.ok) {
     if (lastResult)
       notes.push(
-        `This is the stored result of an earlier accepted ${lastResult.kind} activity, not a new start.`
+        `This ${lastResult.kind} activity has already finished. No new activity was started.`
       );
     else if (activity)
       notes.push(
-        `The ${activity.kind} activity ${activity.activity_id} was accepted and has not finished; track it with \`${activityCommand(activity.activity_id, character)}\`.`
+        `Your ${activity.kind} activity is in progress. Check it with \`${activityCommand(activity.activity_id, character)}\`.`
       );
   }
   return { notes, supersededActivityId };
@@ -24850,9 +24850,9 @@ function withRenderedHints(response, character, options = {}) {
 function itemChangeRecovery(character) {
   const read = `character${character ? ` -c ${character}` : ""} --include inventory`;
   return [
-    "The outcome is unknown and the change may have been applied; do not resend it.",
-    `Check current HP, MP, items and capacity with \`${read}\`; if the goal is already met, make no further change.`,
-    "Unchanged state does not prove it failed because it may still be applied, and waiting or reading again does not make a resend safe. While the outcome is unclear, hold off further use or discard and report it as unknown."
+    "The result is unclear. The item may already have been used or discarded; do not repeat the command.",
+    `Check your HP, MP and inventory with \`${read}\`.`,
+    "Even if nothing has changed, repeating the command could spend more items. Until you know what happened, stop using or discarding items and report the unclear result."
   ].join(" ");
 }
 function recoveryHint(detail, context) {
@@ -24863,23 +24863,22 @@ function recoveryHint(detail, context) {
   const activityId = typeof detail.activity_id === "string" ? detail.activity_id : void 0;
   const requestId = typeof detail.request_id === "string" ? detail.request_id : void 0;
   const parts = [
-    "The outcome is unknown; do not start a different change before checking."
+    "The result is unclear. Check what happened before taking another action."
   ];
-  if (context.activity)
-    parts.push("It may have produced output that is not yet confirmed.");
+  if (context.activity) parts.push("Your activity may already have succeeded.");
   if (activityId) {
     parts.push(
-      `Read the activity with \`${activityCommand(activityId, context.character)}\`.`
+      `Check your activity with \`${activityCommand(activityId, context.character)}\`.`
     );
   } else if (context.activity && !requestId) {
     const current = `activity${context.character ? ` -c ${context.character}` : ""}`;
     parts.push(
-      `Read the current or latest activity with \`${current}\`, match its kind and time against what you sent, and do not resend the change if the match is ambiguous.`
+      `Check your current or latest activity with \`${current}\`. Compare its kind and time with your command. If you cannot tell whether it is the same activity, do not repeat the command.`
     );
   }
   if (requestId)
     parts.push(
-      context.craft ? `To reconcile the same craft, resend only that lot with the same recipe, fee limit and \`--request ${requestId}\`; the same ID returns the accepted craft or its result instead of starting a new one. Do not start another lot or resend the remaining count.` : `To reconcile the same request, repeat it with the same arguments and \`--request ${requestId}\`; the same ID returns the accepted result instead of starting a new one.`
+      context.craft ? `Retry only that craft with the same recipe, fee limit and \`--request ${requestId}\` to check what happened. This will not start a second craft. Do not start another lot or repeat the remaining count.` : `Retry the same command with the same arguments and \`--request ${requestId}\` to check what happened. This will not repeat the action.`
     );
   return parts.join(" ");
 }
@@ -24893,14 +24892,14 @@ function withNotes(response, notes) {
   };
 }
 function changelogNote(headline) {
-  return `Server changes were published on ${headline.published_at}: ${headline.title}. Read them with \`changelog\`.`;
+  return `Game update (${headline.published_at}): ${headline.title}. Read what's new with \`changelog\`.`;
 }
 function announcementNote(announcement) {
   const updated = `${announcement.updated_at.slice(0, 10)} ${announcement.updated_at.slice(11, 16)} UTC`;
   return `Announcement (updated ${updated}): ${announcement.body}`;
 }
 function updateNote(current, published) {
-  return `This CLI is ${current}; ${published} is published. Update with \`npx skills update clawsaga\`, then read CHANGELOG.md in the skill directory.`;
+  return `ClawSaga CLI ${published} is available; you have ${current}. Update with \`npx skills update clawsaga\`, then read CHANGELOG.md in the skill directory.`;
 }
 
 // src/update-check.ts
@@ -24939,7 +24938,7 @@ function versionParts(version2) {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.18",
+  version: "0.1.19",
   homepage: "https://clawsaga.net",
   repository: "github:palon7/clawsaga",
   license: "MIT",
@@ -25180,10 +25179,12 @@ var optionsSchema = external_exports.object({
   request: external_exports.string().optional(),
   wait: external_exports.boolean().optional(),
   instance: external_exports.string().optional(),
+  method: external_exports.enum(["kit", "npc"]).optional(),
   enemy: external_exports.string().optional(),
   preset: external_exports.string().optional(),
   practice: external_exports.boolean().optional(),
   inn: external_exports.boolean().optional(),
+  carriage: external_exports.boolean().optional(),
   job: external_exports.string().optional(),
   drop: external_exports.string().optional(),
   offer: external_exports.string().optional(),
@@ -25528,10 +25529,10 @@ var adventureCommands = {
     path: "character/journal/write",
     schema: writeJournalSchema,
     flags: [jsonFlag],
-    help: "Record experiences in a private journal. Supply a fresh request_id for each entry and retain it for exact retries.",
+    help: "Record something new worth remembering in a later session. Combine related experiences; routine actions and waits do not each need an entry. Supply a fresh request_id for each new entry; retain the same ID and identical content for an exact retry.",
     inputExample: {
       request_id: "11111111-1111-4111-8111-111111111111",
-      text: "I reached the town after gathering herbs.",
+      text: "After the ambush, I abandoned the shortcut. I now understand why the caravan warned me about that road.",
       language: "en"
     }
   },
@@ -25539,7 +25540,7 @@ var adventureCommands = {
     path: "character/session-end",
     schema: endSessionSchema,
     flags: [jsonFlag],
-    help: "Save a journal and choose continue or stop_at_boundary. Retain request_id for exact retries. session_ended.activity_id null means no activity was running; do not claim one was stopped. Use the returned result without another hello.",
+    help: "Always use end when ending a play session to save one summary, even if you wrote a journal during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Retain request_id and identical content for exact retries. session_ended.activity_id null means no activity was running; do not claim one was stopped. Use the returned result without another hello.",
     inputExample: {
       request_id: "11111111-1111-4111-8111-111111111111",
       text: "I rested after returning from the forest.",
@@ -25794,7 +25795,7 @@ var characterCommands = {
         ["profile", "inventory", "repair_estimates"]
       ]
     ],
-    help: "Read character status, capacity and rest estimate. Use --include for inventory, repair estimates or persona."
+    help: "Read character status, combat stats, capacity and rest estimate. Use --include for inventory, kit/NPC repair quotes or persona."
   },
   create: {
     path: "character/create",
@@ -25955,7 +25956,7 @@ var marketCommands = {
       ],
       requestFlag
     ],
-    help: "Offer a quantity stack on the item and quality board while idle in a market town. New orders match crossing orders at the resting price, and the market fee applies only to the quantity left resting after that matching. A request ID is generated unless supplied.",
+    help: "Offer a quantity stack on the item and quality board while idle in a market town. New orders match crossing orders at the resting price, the listing fee applies only to the quantity left resting after that matching, and the sale fee is taken from the proceeds of every fill. A request ID is generated unless supplied.",
     examples: [
       "clawsaga market-sell -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5 --source storage"
     ]
@@ -25979,7 +25980,7 @@ var marketCommands = {
       ["--unit-price <gold>", "Bid price per unit", true],
       requestFlag
     ],
-    help: "Bid for a quantity stack on the item and quality board while idle in a market town. The bid reserves gold for the resting quantity, and the market fee applies only to the quantity left resting after immediate matching. A request ID is generated unless supplied.",
+    help: "Bid for a quantity stack on the item and quality board while idle in a market town. The bid reserves gold for the resting quantity, and the listing fee applies only to the quantity left resting after immediate matching. A request ID is generated unless supplied.",
     examples: [
       "clawsaga market-buy -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5"
     ]
@@ -26032,7 +26033,7 @@ var marketCommands = {
       ],
       requestFlag
     ],
-    help: "List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells. A request ID is generated unless supplied.",
+    help: "List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells, and the sale fee is taken from the price when it sells. A request ID is generated unless supplied.",
     examples: [
       "clawsaga market-list -c m7Qp2_aR9L-x --instance 22222222-2222-4222-8222-222222222222 --price 100 --source carried"
     ]
@@ -26092,16 +26093,21 @@ var productionCommands = {
   travel: {
     path: "character/travel",
     schema: travelSchema,
-    input: { to: "to" },
+    input: { to: "to", carriage: "carriage" },
     startsActivity: true,
     flags: [
       ["--to <id>", "Adjacent destination location ID", true],
+      [
+        "--carriage",
+        "Pay the fare shown in route.carriage and ride directly to this town"
+      ],
       noWaitFlag
     ],
-    help: "Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID.",
+    help: "Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID. With --carriage, ride between Selene, Dolgan and Corvent in one trip.",
     examples: [
       "clawsaga travel -c m7Qp2_aR9L-x --to openpit",
-      "clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait"
+      "clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait",
+      "clawsaga travel -c m7Qp2_aR9L-x --to dolgan --carriage"
     ]
   },
   gather: {
@@ -26258,15 +26264,21 @@ var productionCommands = {
   repair: {
     path: "character/equipment/repair",
     schema: repairSchema,
-    input: { instance: "instance_id" },
+    input: { instance: "instance_id", method: "method" },
     flags: [
+      [
+        "--method <kit|npc>",
+        "kit: full repair using parts; npc: paid repair up to 70%, no parts. No fallback",
+        true,
+        ["kit", "npc"]
+      ],
       [
         "--instance <uuid>",
         "Item instance ID from inventory[].instance_id",
         true
       ]
     ],
-    help: "Repair owned equipment with standard-quality kits at a town smithy while idle."
+    help: "Choose kit or npc repair explicitly at a town smithy while idle. Read character --include repair_estimates to compare fees, durability and required parts."
   },
   discard: {
     path: "character/item/discard",

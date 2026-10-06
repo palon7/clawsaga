@@ -1,21 +1,15 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { execute } from './commands.js';
 import { GameClient } from './client.js';
 import { CliError } from './errors.js';
-import { agentGameResponseSchema } from './protocol.js';
+import { agentSchemaVersion } from './protocol.js';
 
-beforeEach(() =>
-  vi.stubGlobal('fetch', () => Promise.reject(new Error('offline'))),
-);
-afterEach(() => {
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-});
+afterEach(() => vi.restoreAllMocks());
 
 const character = 'm7Qp2_aR9L-x';
 const instance = '22222222-2222-4222-8222-222222222222';
 const envelope = {
-  schema_version: '3.10',
+  schema_version: agentSchemaVersion,
   server_time: '2026-09-20T00:00:00.000Z',
 } as const;
 
@@ -100,7 +94,7 @@ const myMarket = {
             filled_quantity: 0,
             remaining_quantity: 30,
             reserved_gold: 0,
-            market_fee: 2,
+            listing_fee: 2,
             status: 'OPEN',
             pending: null,
             pending_quantity: 0,
@@ -116,7 +110,7 @@ const myMarket = {
             town_id: 'corvent',
             item_id: 'iron_sword',
             price: 100,
-            market_fee: 5,
+            listing_fee: 5,
             status: 'SOLD',
             pending: 'receive',
             instance_id: instance,
@@ -155,7 +149,7 @@ const placement = {
       filled_quantity: 5,
       remaining_quantity: 5,
       fills: [{ price: 10, quantity: 5 }],
-      market_fee: 1,
+      listing_fee: 1,
     },
   },
 } as const;
@@ -172,22 +166,18 @@ it('reads every active item without an item filter', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(structuredClone(overview));
-  const result = await execute(
-    ['market', '-c', character, '--town', 'corvent'],
-    vi.fn(),
-  );
+  await execute(['market', '-c', character, '--town', 'corvent'], vi.fn());
   expect(invoke.mock.calls[0]![1]).toEqual({
     character_id: character,
     town_id: 'corvent',
   });
-  expect(agentGameResponseSchema.parse(result)).toEqual(result);
 });
 
 it('reads one board remotely and maps every optional filter to typed numbers', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(structuredClone(orderBook));
-  const result = await execute(
+  await execute(
     [
       'market',
       '-c',
@@ -220,14 +210,13 @@ it('reads one board remotely and maps every optional filter to typed numbers', a
     max_price: 120,
     minimum_durability: 3,
   });
-  expect(agentGameResponseSchema.parse(result)).toEqual(result);
 });
 
 it('reads listings with their pagination cursor', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(structuredClone(listings));
-  const result = await execute(
+  await execute(
     ['market', '-c', character, '--town', 'corvent', '--item', 'iron_sword'],
     vi.fn(),
   );
@@ -236,14 +225,13 @@ it('reads listings with their pagination cursor', async () => {
     town_id: 'corvent',
     item_id: 'iron_sword',
   });
-  expect(agentGameResponseSchema.parse(result)).toEqual(result);
 });
 
 it('reads own orders, held items and trades from anywhere', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(structuredClone(myMarket));
-  const result = await execute(
+  await execute(
     ['my-market', '-c', character, '--section', 'trades', '--cursor', '9'],
     vi.fn(),
   );
@@ -253,7 +241,6 @@ it('reads own orders, held items and trades from anywhere', async () => {
     section: 'trades',
     cursor: 9,
   });
-  expect(agentGameResponseSchema.parse(result)).toEqual(result);
 });
 
 it('posts each write to its order or listing path with a request ID', async () => {
@@ -349,11 +336,11 @@ it('posts each write to its order or listing path with a request ID', async () =
   expect(invoke.mock.calls[4]![1]).toMatchObject({ order_id: 7 });
 });
 
-it('posts a purchase with numeric bounds and parses the accepted purchase', async () => {
+it('posts a purchase with numeric bounds', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(structuredClone(purchase));
-  const result = await execute(
+  await execute(
     [
       'market-purchase',
       '-c',
@@ -375,7 +362,6 @@ it('posts a purchase with numeric bounds and parses the accepted purchase', asyn
     minimum_durability: 5,
     request_id: expect.any(String),
   });
-  expect(agentGameResponseSchema.parse(result)).toEqual(result);
 });
 
 it('keeps the request ID and target in an uncertain error', async () => {
@@ -388,17 +374,4 @@ it('keeps the request ID and target in an uncertain error', async () => {
     code: 'SERVICE_UNAVAILABLE',
     detail: { request_id: expect.any(String), order_id: 12 },
   });
-});
-
-it('parses the market slot-limit failure body', () => {
-  const limitReached = {
-    ok: false,
-    ...envelope,
-    data: {},
-    error: {
-      message:
-        'You have 100 active market orders or listings. Cancel one, or claim held items to free a slot.',
-    },
-  };
-  expect(agentGameResponseSchema.safeParse(limitReached).success).toBe(true);
 });

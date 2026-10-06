@@ -287,10 +287,10 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/journal/write',
     schema: writeJournalSchema,
     flags: [jsonFlag],
-    help: 'Record experiences in a private journal. Supply a fresh request_id for each entry and retain it for exact retries.',
+    help: 'Record something new worth remembering in a later session. Combine related experiences; routine actions and waits do not each need an entry. Supply a fresh request_id for each new entry; retain the same ID and identical content for an exact retry.',
     inputExample: {
       request_id: '11111111-1111-4111-8111-111111111111',
-      text: 'I reached the town after gathering herbs.',
+      text: 'After the ambush, I abandoned the shortcut. I now understand why the caravan warned me about that road.',
       language: 'en',
     },
   },
@@ -298,7 +298,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/session-end',
     schema: endSessionSchema,
     flags: [jsonFlag],
-    help: 'Save a journal and choose continue or stop_at_boundary. Retain request_id for exact retries. session_ended.activity_id null means no activity was running; do not claim one was stopped. Use the returned result without another hello.',
+    help: 'Always use end when ending a play session to save one summary, even if you wrote a journal during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Retain request_id and identical content for exact retries. session_ended.activity_id null means no activity was running; do not claim one was stopped. Use the returned result without another hello.',
     inputExample: {
       request_id: '11111111-1111-4111-8111-111111111111',
       text: 'I rested after returning from the forest.',

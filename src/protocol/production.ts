@@ -51,7 +51,7 @@ export const equipSchema = z
   .object({ ...common, instance_id: z.uuid() })
   .strict();
 export const repairSchema = z
-  .object({ ...common, instance_id: z.uuid() })
+  .object({ ...common, instance_id: z.uuid(), method: z.enum(['kit', 'npc']) })
   .strict();
 export const discardItemSchema = z
   .object({

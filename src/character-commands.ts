@@ -99,7 +99,7 @@ export const characterCommands: Record<string, CommandDefinition> = {
         ['profile', 'inventory', 'repair_estimates'],
       ],
     ],
-    help: 'Read character status, capacity and rest estimate. Use --include for inventory, repair estimates or persona.',
+    help: 'Read character status, combat stats, capacity and rest estimate. Use --include for inventory, kit/NPC repair quotes or persona.',
   },
   create: {
     path: 'character/create',

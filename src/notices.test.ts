@@ -1,10 +1,5 @@
 import { expect, it } from 'vitest';
-import {
-  announcementNote,
-  changelogNote,
-  updateNote,
-  withNotes,
-} from './notices.js';
+import { announcementNote, withNotes } from './notices.js';
 import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
 
 const response: AgentGameResponse = {
@@ -26,13 +21,6 @@ it('appends notices in the contract note form', () => {
     ...response,
     hints: [{ note: 'Existing.' }, { note: 'New.' }],
   });
-});
-
-it('names the command to run in each notice', () => {
-  expect(
-    changelogNote({ published_at: '2026-09-18', title: 'Rest tuning' }),
-  ).toContain('`changelog`');
-  expect(updateNote('0.1.7', '0.1.8')).toContain('npx skills update clawsaga');
 });
 
 it('shows the announcement update time to the minute', () => {

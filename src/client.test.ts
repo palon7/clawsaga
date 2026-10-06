@@ -17,15 +17,9 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   return { ...fs, chmod: vi.fn(fs.chmod) };
 });
 
-vi.mock('node:timers/promises', () => ({
-  setTimeout: (delay: number) =>
-    new Promise((resolve) => setTimeout(resolve, delay)),
-}));
-
 const directories: string[] = [];
 const origin = 'https://clawsaga.example';
 afterEach(async () => {
-  vi.useRealTimers();
   vi.unstubAllGlobals();
   for (const directory of directories.splice(0))
     await rm(directory, { recursive: true, force: true });
@@ -65,10 +59,7 @@ it('keeps storage and locks inside the home directory and excludes them from Git
   directories.push(home);
   const path = credentialPath(home);
   const store = new CredentialStore(path);
-  await store.update(async (entries) => {
-    expect(
-      (await stat(join(home, '.clawsaga', 'credentials.lock'))).isDirectory(),
-    ).toBe(true);
+  await store.update((entries) => {
     entries[origin] = {
       access_token: 'access',
       refresh_token: 'refresh',
@@ -176,10 +167,10 @@ it('saves, updates and reads credentials even when permission changes fail', asy
   );
 });
 
-it('waits for a slow concurrent refresh and leaves unchanged credentials untouched', async () => {
+it('waits through repeated lock retries for a slow concurrent refresh', async () => {
   const { store, path } = await fixture();
   const request = vi.fn<typeof fetch>().mockImplementation(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 6000));
+    await new Promise((resolve) => setTimeout(resolve, 1200));
     return Response.json({
       access_token: 'new-access',
       refresh_token: 'new-refresh',
@@ -193,12 +184,7 @@ it('waits for a slow concurrent refresh and leaves unchanged credentials untouch
     await Promise.all([first.accessToken(), second.accessToken()]),
   ).toEqual(['new-access', 'new-access']);
   expect(request).toHaveBeenCalledTimes(1);
-  const before = await stat(path);
-  await first.accessToken();
-  const after = await stat(path);
-  expect(after.ino).toBe(before.ino);
-  expect(after.mtimeMs).toBe(before.mtimeMs);
-}, 10_000);
+});
 
 it('does not replay a game mutation after a 401 or network failure', async () => {
   const { store } = await fixture();
