@@ -270,16 +270,21 @@ it('recovers a travel killed during the wait from its acceptance diagnostic', as
   ]);
 }, 20_000);
 
-it('preserves success and failure fixtures through the built CLI', async () => {
+it('preserves a failure and an accepted activity through the built CLI', async () => {
+  // 子プロセスの出力経路はfixtureによらず1本なので、失敗応答と、travel専用の
+  // 分岐を通る受付応答だけを流す。
+  const fixtures = contractFixtures.filter(
+    ({ name }) => name === 'business_failure' || name === 'accepted_activity',
+  );
   let index = 0;
   const { origin, requests } = await harness((_request, response) => {
-    const fixture = contractFixtures[index++];
+    const fixture = fixtures[index++];
     if (!fixture) throw new Error('Unexpected CLI request');
     response.statusCode = fixture.response.ok ? 200 : 404;
     response.end(JSON.stringify(fixture.response));
   });
 
-  for (const fixture of contractFixtures) {
+  for (const fixture of fixtures) {
     const args =
       fixture.name === 'accepted_activity'
         ? ['travel', '-c', characterId, '--to', 'openpit', '--no-wait']
@@ -304,7 +309,7 @@ it('preserves success and failure fixtures through the built CLI', async () => {
     delete expected.schema_version;
     expect(output).toEqual(expected);
   }
-  expect(requests).toHaveLength(contractFixtures.length);
+  expect(requests).toHaveLength(fixtures.length);
   expect(
     requests.filter((request) => request.path === '/api/v1/character/travel'),
   ).toHaveLength(1);

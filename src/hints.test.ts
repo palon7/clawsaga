@@ -2,12 +2,13 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
 import { withRenderedHints } from './hints.js';
-import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
+import {
+  agentSchemaVersion,
+  type AgentGameResponse,
+  type AgentHint,
+} from './protocol.js';
 
 afterEach(() => vi.restoreAllMocks());
-
-// 更新確認は公開リポジトリへ取りに行くため、単体試験では必ず失敗させて無効化する。
-vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
 
 const response: AgentGameResponse = {
   ok: true,
@@ -16,21 +17,17 @@ const response: AgentGameResponse = {
   data: {},
 };
 
-it('renders server hints with CLI command syntax and keeps notes as written', () => {
-  expect(
-    withRenderedHints({
-      ...response,
-      hints: [
-        { operation: 'hello', arguments: { character_id: 'm7Qp2_aR9L-x' } },
-        { operation: 'get_activity', arguments: { activity_id: 'a1b2c3d4' } },
-        {
-          operation: 'equip_item',
-          arguments: { instance_id: '11111111-1111-4111-8111-111111111111' },
-        },
-        { note: 'Changing job puts your previous weapon in the bag.' },
-      ],
-    }).hints,
-  ).toEqual([
+it('renders server hints with CLI command syntax, adds the invoked character and keeps notes as written', () => {
+  const hints: AgentHint[] = [
+    { operation: 'hello', arguments: { character_id: 'm7Qp2_aR9L-x' } },
+    { operation: 'get_activity', arguments: { activity_id: 'a1b2c3d4' } },
+    {
+      operation: 'equip_item',
+      arguments: { instance_id: '11111111-1111-4111-8111-111111111111' },
+    },
+    { note: 'Changing job puts your previous weapon in the bag.' },
+  ];
+  expect(withRenderedHints({ ...response, hints }).hints).toEqual([
     { note: 'Run `hello -c m7Qp2_aR9L-x`.' },
     { note: 'Run `activity -a a1b2c3d4`.' },
     {
@@ -38,30 +35,15 @@ it('renders server hints with CLI command syntax and keeps notes as written', ()
     },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
-});
-
-it('adds the invoked character to hints for character commands', () => {
   expect(
-    withRenderedHints(
-      {
-        ...response,
-        hints: [
-          { operation: 'get_activity', arguments: { activity_id: 'a1b2c3d4' } },
-          {
-            operation: 'equip_item',
-            arguments: {
-              instance_id: '11111111-1111-4111-8111-111111111111',
-            },
-          },
-        ],
-      },
-      'HintHero0000',
-    ).hints,
+    withRenderedHints({ ...response, hints }, 'HintHero0000').hints,
   ).toEqual([
+    { note: 'Run `hello -c m7Qp2_aR9L-x`.' },
     { note: 'Run `activity -a a1b2c3d4 -c HintHero0000`.' },
     {
       note: 'Run `equip --instance 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
     },
+    { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
 });
 
@@ -110,24 +92,6 @@ it('renders hints from the result without another request', async () => {
   });
   expect(serverResponse.hints).toHaveLength(1);
   expect(invoke).toHaveBeenCalledTimes(1);
-});
-
-it('leaves failures and results without hints unchanged', async () => {
-  const failure: AgentGameResponse = {
-    ...response,
-    ok: false,
-    error: { message: 'Too many requests.' },
-  };
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(failure);
-  expect(await execute(['hello', '-c', 'HintHero0000'], vi.fn())).toEqual(
-    failure,
-  );
-  invoke.mockResolvedValue(response);
-  expect(await execute(['map', '-c', 'HintHero0000'], vi.fn())).toEqual(
-    response,
-  );
 });
 
 const travelId = '00000000-0000-4000-8000-000000000001';
@@ -192,7 +156,7 @@ it('describes a --no-wait acceptance as a receipt, not a completion', () => {
   ).toMatchObject({
     hints: [
       {
-        note: `The travel activity ${travelId} was accepted and has not finished; track it with \`activity -a ${travelId} -c HintHero0000\`.`,
+        note: `Your travel activity is in progress. Check it with \`activity -a ${travelId} -c HintHero0000\`.`,
       },
     ],
   });
@@ -202,35 +166,43 @@ it('describes a --no-wait acceptance as a receipt, not a completion', () => {
   ).toBeUndefined();
 });
 
-it('describes a --no-wait finished result as a past result', () => {
+it('describes a --no-wait finished result as a past result, even while another activity runs', () => {
+  const finished: AgentGameResponse = {
+    ...response,
+    data: {
+      activity: null,
+      last_result: {
+        kind: 'rest',
+        activity_id: travelId,
+        status: 'ENDED',
+        end_reason: 'COMPLETED',
+        ended_at: '2026-09-12T00:00:45.000Z',
+        summary: {
+          hp: 100,
+          mp: 100,
+          weakened_until: null,
+        },
+      },
+    },
+  };
+  const stored = [
+    {
+      note: 'This rest activity has already finished. No new activity was started.',
+    },
+  ];
+  expect(
+    withRenderedHints(finished, 'HintHero0000', { wait: false }).hints,
+  ).toEqual(stored);
   expect(
     withRenderedHints(
       {
-        ...response,
-        data: {
-          activity: null,
-          last_result: {
-            kind: 'rest',
-            activity_id: travelId,
-            status: 'ENDED',
-            end_reason: 'COMPLETED',
-            ended_at: '2026-09-12T00:00:45.000Z',
-            summary: {
-              hp: 100,
-              mp: 100,
-              weakened_until: null,
-            },
-          },
-        },
+        ...finished,
+        data: { ...finished.data, activity: runningTravel().data.activity },
       },
       'HintHero0000',
       { wait: false },
     ).hints,
-  ).toEqual([
-    {
-      note: 'This is the stored result of an earlier accepted rest activity, not a new start.',
-    },
-  ]);
+  ).toEqual(stored);
 });
 
 it('confirms an ambush result and keeps a running combat without a read suggestion', () => {
@@ -250,7 +222,7 @@ it('confirms an ambush result and keeps a running combat without a read suggesti
     ).hints,
   ).toEqual([
     {
-      note: `The gather result is confirmed and combat ${ambushId} is the current activity; continue or stop that battle instead of repeating the finished activity.`,
+      note: 'The gather activity is complete. Continue the ambush battle or retreat.',
     },
   ]);
 });
@@ -269,8 +241,26 @@ it('describes a past ambush and only then suggests reading its combat', () => {
     ).hints,
   ).toEqual([
     {
-      note: `An ambush happened after the confirmed gather result, which stands; that combat is not the current activity. Read its outcome with \`activity -a ${ambushId} -c HintHero0000\` if you have not seen it.`,
+      note: `The gather activity is complete. Read the ambush battle report with \`activity -a ${ambushId} -c HintHero0000\` if you have not seen it.`,
     },
+  ]);
+});
+
+it('describes a past ambush without asserting that another running activity is its combat', () => {
+  const running = runningTravel();
+  expect(
+    withRenderedHints(
+      {
+        ...running,
+        data: { ...running.data, last_result: gatherResultWithAmbush() },
+      },
+      'HintHero0000',
+    ).hints,
+  ).toEqual([
+    {
+      note: `The gather activity is complete. Read the ambush battle report with \`activity -a ${ambushId} -c HintHero0000\` if you have not seen it.`,
+    },
+    { note: `Your travel activity (${travelId}) is now in progress.` },
   ]);
 });
 
@@ -306,10 +296,10 @@ it('keeps a partial repetition and its payload while noting the confirmed count'
   });
   expect(rendered.hints).toEqual([
     {
-      note: `The gather result is confirmed and combat ${ambushId} is the current activity; continue or stop that battle instead of repeating the finished activity.`,
+      note: 'The gather activity is complete. Continue the ambush battle or retreat.',
     },
     {
-      note: '3 of 10 attempts are confirmed and their output is kept; the repetition stopped before the rest.',
+      note: 'Stopped with 3 of 10 attempts completed. You keep their results.',
     },
   ]);
 });

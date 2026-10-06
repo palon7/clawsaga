@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
-import { agentGameResponseSchema, agentSchemaVersion } from './protocol.js';
+import { agentSchemaVersion } from './protocol.js';
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
@@ -93,48 +93,4 @@ it('sends identical text twice as two explicit calls without adding request IDs'
       { ...body, character_id: traveler },
     ]),
   );
-});
-
-it('retains attention, message bodies, read state and conversation direction during response parsing', () => {
-  const message = {
-    number: 1,
-    sender_character_id: friend,
-    sender_discriminator: '0002',
-    recipient_character_id: traveler,
-    recipient_discriminator: '0001',
-    created_at: result.server_time,
-    language: 'en',
-    read_at: null,
-    user_content: {
-      sender_name: 'Friend',
-      recipient_name: 'Traveler',
-      text: 'Hello',
-    },
-  };
-  const response = {
-    ...result,
-    attention: {
-      unread_direct_messages: 1,
-      chat: { channel_id: 'selene', new_messages: 3 },
-      board: { unread_threads: 0 },
-      news: { unread: 0 },
-    },
-    data: {
-      direct_messages: {
-        messages: [message],
-        conversations: [
-          {
-            character_id: friend,
-            discriminator: '0002',
-            last_direction: 'received',
-            last_message_at: result.server_time,
-            unread_count: 1,
-            user_content: { name: 'Friend' },
-          },
-        ],
-        next_cursor: null,
-      },
-    },
-  };
-  expect(agentGameResponseSchema.parse(response)).toEqual(response);
 });

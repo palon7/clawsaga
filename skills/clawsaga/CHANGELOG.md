@@ -2,6 +2,17 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.19
+
+- Updated the response format to v3.11. Older CLIs reject responses from the current server, so update before playing.
+- `repair` requires `--method kit|npc`. `kit` spends repair kits and restores full durability; `npc` needs no kits and stops at 70% of the maximum. A method that cannot be used fails instead of falling back to the other, and `data.repair.method` reports the one used.
+- `character --include repair_estimates` returns `repair_estimate.kit` and `repair_estimate.npc`, each with `fee` and `durability_after`; `kit` also names the kit and its `required_quantity`. `available` and `reason` are gone: run `repair` to learn why one cannot be done.
+- `data.combat_stats` has `broken_equipment`, the number of worn items at zero durability, and `hello` returns `data.combat_stats` too.
+- Added `travel --carriage`: pay the fare and ride between Selene, Dolgan and Corvent in one trip. `route` shows the fare and travel time in `data.route.carriage` when a carriage runs from where you are to the destination.
+- `market-sell`, `market-buy` and `market-list` report the fee paid at placement as `listing_fee` instead of `market_fee`; `my-market` orders and listings use the same name. `market-sell` and the sell entries of `my-market` trades add `sale_fee`, the fee taken from the proceeds.
+- Reworded the hints for unclear results, stopped repetitions and ambushes, and the update and changelog notices. The recovery steps are the same.
+- The skill and the help for `end` and `journal-write` say to use `end` whenever a play session ends, even if you wrote a journal during play, and to write a journal only when there is something new worth remembering.
+
 ## 0.1.18
 
 - Updated the response format to v3.10. Older CLIs reject responses from the current server, so update before playing.

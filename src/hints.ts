@@ -65,15 +65,15 @@ function ambushNotes(
     // The response already shows this combat, so do not tell the agent to
     // read it again.
     notes.push(
-      `The ${lastResult.kind} result is confirmed and combat ${ambush.activity_id} is the current activity; continue or stop that battle instead of repeating the finished activity.`,
+      `The ${lastResult.kind} activity is complete. Continue the ambush battle or retreat.`,
     );
   } else {
     notes.push(
-      `An ambush happened after the confirmed ${lastResult.kind} result, which stands; that combat is not the current activity. Read its outcome with \`${activityCommand(ambush.activity_id, character)}\` if you have not seen it.`,
+      `The ${lastResult.kind} activity is complete. Read the ambush battle report with \`${activityCommand(ambush.activity_id, character)}\` if you have not seen it.`,
     );
     if (activity)
       notes.push(
-        `A different ${activity.kind} activity (${activity.activity_id}) is running now.`,
+        `Your ${activity.kind} activity (${activity.activity_id}) is now in progress.`,
       );
   }
   return { notes, supersededActivityId: ambush.activity_id };
@@ -97,19 +97,19 @@ function stateNotes(
     // confirmed count must not read as if the stopped attempt produced nothing.
     const unconfirmed =
       repetition.stopped_reason === 'activity_failed'
-        ? ' The attempt that was in progress is not confirmed and may have produced output; check the current or latest activity before another change.'
+        ? ' The last attempt may also have succeeded. Check your current or latest activity before continuing.'
         : '';
     notes.push(
-      `${repetition.completed_count} of ${repetition.requested_count} attempts are confirmed and their output is kept; the repetition stopped before the rest.${unconfirmed}`,
+      `Stopped with ${repetition.completed_count} of ${repetition.requested_count} attempts completed. You keep their results.${unconfirmed}`,
     );
   } else if (!wait && response.ok) {
     if (lastResult)
       notes.push(
-        `This is the stored result of an earlier accepted ${lastResult.kind} activity, not a new start.`,
+        `This ${lastResult.kind} activity has already finished. No new activity was started.`,
       );
     else if (activity)
       notes.push(
-        `The ${activity.kind} activity ${activity.activity_id} was accepted and has not finished; track it with \`${activityCommand(activity.activity_id, character)}\`.`,
+        `Your ${activity.kind} activity is in progress. Check it with \`${activityCommand(activity.activity_id, character)}\`.`,
       );
   }
   return { notes, supersededActivityId };
@@ -160,9 +160,9 @@ export type RecoveryContext = {
 function itemChangeRecovery(character: string | undefined) {
   const read = `character${character ? ` -c ${character}` : ''} --include inventory`;
   return [
-    'The outcome is unknown and the change may have been applied; do not resend it.',
-    `Check current HP, MP, items and capacity with \`${read}\`; if the goal is already met, make no further change.`,
-    'Unchanged state does not prove it failed because it may still be applied, and waiting or reading again does not make a resend safe. While the outcome is unclear, hold off further use or discard and report it as unknown.',
+    'The result is unclear. The item may already have been used or discarded; do not repeat the command.',
+    `Check your HP, MP and inventory with \`${read}\`.`,
+    'Even if nothing has changed, repeating the command could spend more items. Until you know what happened, stop using or discarding items and report the unclear result.',
   ].join(' ');
 }
 
@@ -181,27 +181,26 @@ export function recoveryHint(
   const requestId =
     typeof detail.request_id === 'string' ? detail.request_id : undefined;
   const parts = [
-    'The outcome is unknown; do not start a different change before checking.',
+    'The result is unclear. Check what happened before taking another action.',
   ];
-  if (context.activity)
-    parts.push('It may have produced output that is not yet confirmed.');
+  if (context.activity) parts.push('Your activity may already have succeeded.');
   if (activityId) {
     parts.push(
-      `Read the activity with \`${activityCommand(activityId, context.character)}\`.`,
+      `Check your activity with \`${activityCommand(activityId, context.character)}\`.`,
     );
   } else if (context.activity && !requestId) {
     // Without an ID, only the current or latest activity can identify what the
     // lost response accepted. A request ID reconciles the same request instead.
     const current = `activity${context.character ? ` -c ${context.character}` : ''}`;
     parts.push(
-      `Read the current or latest activity with \`${current}\`, match its kind and time against what you sent, and do not resend the change if the match is ambiguous.`,
+      `Check your current or latest activity with \`${current}\`. Compare its kind and time with your command. If you cannot tell whether it is the same activity, do not repeat the command.`,
     );
   }
   if (requestId)
     parts.push(
       context.craft
-        ? `To reconcile the same craft, resend only that lot with the same recipe, fee limit and \`--request ${requestId}\`; the same ID returns the accepted craft or its result instead of starting a new one. Do not start another lot or resend the remaining count.`
-        : `To reconcile the same request, repeat it with the same arguments and \`--request ${requestId}\`; the same ID returns the accepted result instead of starting a new one.`,
+        ? `Retry only that craft with the same recipe, fee limit and \`--request ${requestId}\` to check what happened. This will not start a second craft. Do not start another lot or repeat the remaining count.`
+        : `Retry the same command with the same arguments and \`--request ${requestId}\` to check what happened. This will not repeat the action.`,
     );
   return parts.join(' ');
 }

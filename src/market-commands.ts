@@ -121,7 +121,7 @@ export const marketCommands: Record<string, CommandDefinition> = {
       ],
       requestFlag,
     ],
-    help: 'Offer a quantity stack on the item and quality board while idle in a market town. New orders match crossing orders at the resting price, and the market fee applies only to the quantity left resting after that matching. A request ID is generated unless supplied.',
+    help: 'Offer a quantity stack on the item and quality board while idle in a market town. New orders match crossing orders at the resting price, the listing fee applies only to the quantity left resting after that matching, and the sale fee is taken from the proceeds of every fill. A request ID is generated unless supplied.',
     examples: [
       'clawsaga market-sell -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5 --source storage',
     ],
@@ -145,7 +145,7 @@ export const marketCommands: Record<string, CommandDefinition> = {
       ['--unit-price <gold>', 'Bid price per unit', true],
       requestFlag,
     ],
-    help: 'Bid for a quantity stack on the item and quality board while idle in a market town. The bid reserves gold for the resting quantity, and the market fee applies only to the quantity left resting after immediate matching. A request ID is generated unless supplied.',
+    help: 'Bid for a quantity stack on the item and quality board while idle in a market town. The bid reserves gold for the resting quantity, and the listing fee applies only to the quantity left resting after immediate matching. A request ID is generated unless supplied.',
     examples: [
       'clawsaga market-buy -c m7Qp2_aR9L-x --item ore --quality standard --quantity 10 --unit-price 5',
     ],
@@ -198,7 +198,7 @@ export const marketCommands: Record<string, CommandDefinition> = {
       ],
       requestFlag,
     ],
-    help: 'List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells. A request ID is generated unless supplied.',
+    help: 'List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells, and the sale fee is taken from the price when it sells. A request ID is generated unless supplied.',
     examples: [
       'clawsaga market-list -c m7Qp2_aR9L-x --instance 22222222-2222-4222-8222-222222222222 --price 100 --source carried',
     ],

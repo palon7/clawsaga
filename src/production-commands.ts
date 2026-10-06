@@ -18,16 +18,21 @@ export const productionCommands: Record<string, CommandDefinition> = {
   travel: {
     path: 'character/travel',
     schema: travelSchema,
-    input: { to: 'to' },
+    input: { to: 'to', carriage: 'carriage' },
     startsActivity: true,
     flags: [
       ['--to <id>', 'Adjacent destination location ID', true],
+      [
+        '--carriage',
+        'Pay the fare shown in route.carriage and ride directly to this town',
+      ],
       noWaitFlag,
     ],
-    help: 'Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID.',
+    help: 'Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID. With --carriage, ride between Selene, Dolgan and Corvent in one trip.',
     examples: [
       'clawsaga travel -c m7Qp2_aR9L-x --to openpit',
       'clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait',
+      'clawsaga travel -c m7Qp2_aR9L-x --to dolgan --carriage',
     ],
   },
   gather: {
@@ -184,15 +189,21 @@ export const productionCommands: Record<string, CommandDefinition> = {
   repair: {
     path: 'character/equipment/repair',
     schema: repairSchema,
-    input: { instance: 'instance_id' },
+    input: { instance: 'instance_id', method: 'method' },
     flags: [
+      [
+        '--method <kit|npc>',
+        'kit: full repair using parts; npc: paid repair up to 70%, no parts. No fallback',
+        true,
+        ['kit', 'npc'],
+      ],
       [
         '--instance <uuid>',
         'Item instance ID from inventory[].instance_id',
         true,
       ],
     ],
-    help: 'Repair owned equipment with standard-quality kits at a town smithy while idle.',
+    help: 'Choose kit or npc repair explicitly at a town smithy while idle. Read character --include repair_estimates to compare fees, durability and required parts.',
   },
   discard: {
     path: 'character/item/discard',
