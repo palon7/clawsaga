@@ -11,6 +11,7 @@ import {
 import { GameClient, serverOrigin } from './client.js';
 import { CliError } from './errors.js';
 import { agentSchemaVersion } from './protocol.js';
+import { z } from 'zod';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs/promises')>();
@@ -369,7 +370,80 @@ it('shows the server message for 401 and 429 responses', async () => {
   });
   await expect(client.invoke('character/activity', {})).rejects.toMatchObject({
     code: 'RATE_LIMITED',
-    detail: { message: 'Too many requests.', retry_after: '3' },
+    detail: { message: 'Too many requests.', retry_after_seconds: 3 },
+  });
+});
+
+it.each(['invoke', 'readDocument', 'login'] as const)(
+  'preserves numeric body retry seconds without a header for %s',
+  async (method) => {
+    const { store } = await fixture();
+    await store.update((entries) => {
+      entries[origin]!.expires_at = Date.now() + 3600_000;
+    });
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          error: {
+            message: 'Too many requests. Retry after 5 seconds.',
+            retry_after_seconds: 5,
+          },
+        },
+        { status: 429 },
+      ),
+    );
+    const client = new GameClient(origin, store, request);
+    const actions = {
+      invoke: () => client.invoke('character/activity', {}),
+      readDocument: () => client.readDocument('guide', z.object({})),
+      login: () => client.login(),
+    };
+    const result = actions[method]();
+    await expect(result).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      detail: {
+        message: 'Too many requests. Retry after 5 seconds.',
+        retry_after_seconds: 5,
+      },
+    });
+  },
+);
+
+it('prefers body retry seconds over a conflicting header', async () => {
+  const request = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(
+      Response.json(
+        { error: { retry_after_seconds: 5 } },
+        { status: 429, headers: { 'Retry-After': '1' } },
+      ),
+    );
+  await expect(
+    new GameClient(origin, undefined, request).login(),
+  ).rejects.toMatchObject({
+    detail: {
+      message: 'Too many requests. Retry after 5 seconds.',
+      retry_after_seconds: 5,
+    },
+  });
+});
+
+it('uses numeric header seconds for OAuth rate limits', async () => {
+  const request = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(
+      Response.json(
+        { error: 'rate_limited' },
+        { status: 429, headers: { 'Retry-After': '1' } },
+      ),
+    );
+  await expect(
+    new GameClient(origin, undefined, request).login(),
+  ).rejects.toMatchObject({
+    detail: {
+      message: 'Too many requests. Retry after 1 second.',
+      retry_after_seconds: 1,
+    },
   });
 });
 

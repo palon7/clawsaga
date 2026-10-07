@@ -1,5 +1,6 @@
 import {
   travelSchema,
+  rideCarriageSchema,
   gatherSchema,
   getItemsSchema,
   getRecipesSchema,
@@ -18,21 +19,31 @@ export const productionCommands: Record<string, CommandDefinition> = {
   travel: {
     path: 'character/travel',
     schema: travelSchema,
-    input: { to: 'to', carriage: 'carriage' },
+    input: { to: 'to' },
     startsActivity: true,
     flags: [
       ['--to <id>', 'Adjacent destination location ID', true],
-      [
-        '--carriage',
-        'Pay the fare shown in route.carriage and ride directly to this town',
-      ],
       noWaitFlag,
     ],
-    help: 'Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID. With --carriage, ride between Selene, Dolgan and Corvent in one trip.',
+    help: 'Walk one step to an adjacent location while idle and wait for arrival.',
     examples: [
       'clawsaga travel -c m7Qp2_aR9L-x --to openpit',
       'clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait',
-      'clawsaga travel -c m7Qp2_aR9L-x --to dolgan --carriage',
+    ],
+  },
+  carriage: {
+    path: 'character/carriage',
+    schema: rideCarriageSchema,
+    input: { to: 'to' },
+    startsActivity: true,
+    flags: [
+      ['--to <id>', 'Destination carriage town ID from route', true],
+      noWaitFlag,
+    ],
+    help: 'Ride the carriage from your current town to another carriage town while idle: pay the fare, arrive faster than walking, no ambush.',
+    examples: [
+      'clawsaga carriage -c m7Qp2_aR9L-x --to dolgan',
+      'clawsaga carriage -c m7Qp2_aR9L-x --to dolgan --no-wait',
     ],
   },
   gather: {
@@ -141,6 +152,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
     schema: buySchema,
     input: {
       item: 'item_id',
+      quantity: ['quantity', 'number'],
       maxPayment: ['max_payment', 'number'],
       request: 'request_id',
     },
@@ -148,17 +160,24 @@ export const productionCommands: Record<string, CommandDefinition> = {
     errorContext: (values) => ({
       request_id: values.request,
       item_id: values.item,
-      max_payment: Number(values.maxPayment),
+      quantity: values.quantity === undefined ? 1 : Number(values.quantity),
+      ...(values.maxPayment === undefined
+        ? {}
+        : { max_payment: Number(values.maxPayment) }),
     }),
     flags: [
       ['--item <id>', 'Item ID from shop', true],
-      ['--max-payment <gold>', 'Maximum payment', true],
+      [
+        '--quantity <number>',
+        'Quantity of a stack item to buy in one purchase (default 1)',
+      ],
+      ['--max-payment <gold>', 'Optional maximum total payment for all items'],
       [
         '--request <uuid>',
         'Reuse the same ID and arguments after an uncertain purchase',
       ],
     ],
-    help: 'Buy one item while idle; a new request ID is generated unless supplied.',
+    help: 'Buy items while idle in one all-or-nothing purchase. Only stack items allow quantity above 1. Omit max-payment to accept the shop price, or cap the total payment. A new request ID is generated unless supplied; reuse the same ID, item and quantity after an uncertain purchase.',
   },
   equip: {
     path: 'character/equipment/equip',

@@ -6,7 +6,7 @@ Keep the selected server after errors. Do not switch to MCP or call the API dire
 
 If the error says authentication is required or asks you to sign in again, run `auth login`. It returns immediately with a verification URL containing the user code. Relay the URL and code to the human, do not approve on their behalf, and end the turn. After the human confirms approval, issue the intended game command explicitly. That command completes the pending authorization before sending the game request. If the human has not approved yet, stop on `Authorization was not completed`; do not poll repeatedly.
 
-On 429, pause sending for the returned retry interval; this alone does not end the adventure. Authentication errors may require human action. For an uncertain game change, read the affected activity or current state before deciding what to do. Read `guide --topic travel-production` for purchase and craft retries, and `guide --topic records` for record retries.
+On 429, pause sending for `error.retry_after_seconds` seconds; this alone does not end the adventure. Authentication errors may require human action. For an uncertain game change, read the affected activity or current state before deciding what to do. Read `guide --topic crafting-equipment` for purchase and craft retries, and `guide --topic records` for record retries.
 
 ## Response failures
 

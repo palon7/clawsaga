@@ -522,25 +522,31 @@ it('sends map scope, look people and route or travel destinations', async () => 
     to: 'mossway',
   });
   await execute(
-    [
-      'travel',
-      '-c',
-      'Traveler0000',
-      '--to',
-      'dolgan',
-      '--carriage',
-      '--no-wait',
-    ],
+    ['carriage', '-c', 'Traveler0000', '--to', 'dolgan', '--no-wait'],
     vi.fn(),
   );
-  expect(invoke).toHaveBeenLastCalledWith('character/travel', {
+  expect(invoke).toHaveBeenLastCalledWith('character/carriage', {
     character_id: 'Traveler0000',
     to: 'dolgan',
-    carriage: true,
   });
 });
 
-it('sends the accepted quest offer', async () => {
+it('rejects the removed paid-mode flags without sending requests', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue(initial);
+  for (const args of [
+    ['rest', '-c', 'Traveler0000', '--inn'],
+    ['travel', '-c', 'Traveler0000', '--to', 'dolgan', '--carriage'],
+  ]) {
+    await expect(execute(args, vi.fn())).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENTS',
+    });
+  }
+  expect(invoke).not.toHaveBeenCalled();
+});
+
+it('accepts a shared offer or a fixed quest and requires exactly one source', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
@@ -558,6 +564,33 @@ it('sends the accepted quest offer', async () => {
     character_id: 'Traveler0000',
     offer_id: '11111111-1111-4111-8111-111111111111',
   });
+  await execute(
+    [
+      'quest-accept',
+      '-c',
+      'Traveler0000',
+      '--fixed-quest',
+      'nina_selene_letter',
+    ],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenLastCalledWith('character/quests/accept', {
+    character_id: 'Traveler0000',
+    fixed_quest_id: 'nina_selene_letter',
+  });
+  for (const flags of [
+    [],
+    [
+      '--offer',
+      '11111111-1111-4111-8111-111111111111',
+      '--fixed-quest',
+      'nina_selene_letter',
+    ],
+  ])
+    await expect(
+      execute(['quest-accept', '-c', 'Traveler0000', ...flags], vi.fn()),
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
+  expect(invoke).toHaveBeenCalledTimes(2);
 });
 
 it('maps item, recipe, active quest and journal discovery flags', async () => {

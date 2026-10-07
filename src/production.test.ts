@@ -289,7 +289,9 @@ it('retains a generated purchase ID and payment arguments and reconciles by the 
       '-c',
       'Maker0000000',
       '--item',
-      'basic_pickaxe',
+      'healing_potion',
+      '--quantity',
+      '5',
       '--max-payment',
       '10',
     ],
@@ -299,7 +301,8 @@ it('retains a generated purchase ID and payment arguments and reconciles by the 
   expect(error.code).toBe('NETWORK_ERROR');
   expect(error.detail).toMatchObject({
     request_id: expect.any(String),
-    item_id: 'basic_pickaxe',
+    item_id: 'healing_potion',
+    quantity: 5,
     max_payment: 10,
   });
   const hint = String(error.detail.hint);
@@ -308,6 +311,60 @@ it('retains a generated purchase ID and payment arguments and reconciles by the 
   expect(hint).not.toContain('recipe');
   expect(hint).not.toContain('remaining count');
   expect(invoke).toHaveBeenCalledTimes(1);
+});
+
+it('sends a bulk purchase once without a payment cap', async () => {
+  const invoke = vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue({
+    ok: true,
+    schema_version: agentSchemaVersion,
+    server_time: '2026-09-09T00:00:00.000Z',
+    data: {},
+  });
+  await execute(
+    [
+      'buy',
+      '-c',
+      'Maker0000000',
+      '--item',
+      'healing_potion',
+      '--quantity',
+      '5',
+    ],
+    vi.fn(),
+  );
+  expect(invoke).toHaveBeenCalledTimes(1);
+  expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+    character_id: 'Maker0000000',
+    item_id: 'healing_potion',
+    quantity: 5,
+    request_id: expect.any(String),
+  });
+  expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty('max_payment');
+});
+
+it('keeps the quantity and omits an absent cap when a bulk purchase reply is lost', async () => {
+  vi.spyOn(GameClient.prototype, 'invoke').mockRejectedValue(
+    new CliError('NETWORK_ERROR', { outcome: 'unknown' }),
+  );
+  const error = await execute(
+    [
+      'buy',
+      '-c',
+      'Maker0000000',
+      '--item',
+      'healing_potion',
+      '--quantity',
+      '5',
+    ],
+    vi.fn(),
+  ).catch((thrown: unknown) => thrown);
+  if (!(error instanceof CliError)) throw new Error('Expected a CliError');
+  expect(error.detail).toMatchObject({
+    request_id: expect.any(String),
+    item_id: 'healing_potion',
+    quantity: 5,
+  });
+  expect(error.detail).not.toHaveProperty('max_payment');
 });
 
 const craftId = '22222222-2222-4222-8222-222222222222';

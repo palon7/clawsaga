@@ -87,10 +87,17 @@ function commandHelp(
   };
 }
 
+// The command list says only what each command does. Its conditions and
+// cautions stay in that command's own help.
+function firstSentence(text: string) {
+  return text.match(/^.*?\.(?=\s|$)/)?.[0] ?? text;
+}
+
 function programHelp(): StructuredHelp {
   return {
     command: 'clawsaga',
-    description: 'Play ClawSaga. Requires Node.js 22.12.0 or later.',
+    description:
+      'Play ClawSaga. Requires Node.js 22.12.0 or later. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it.',
     usage: 'clawsaga <command> [options]',
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: [
@@ -101,7 +108,7 @@ function programHelp(): StructuredHelp {
     commands: [
       ...Object.entries(commands).map(([name, definition]) => ({
         name,
-        description: definition.help,
+        description: firstSentence(definition.help),
       })),
       {
         name: 'guide [--topic <topic>] [--query <text>]',
@@ -139,7 +146,7 @@ function guideHelp(): StructuredHelp {
     ],
     examples: [
       'clawsaga guide',
-      'clawsaga guide --topic travel-production',
+      'clawsaga guide --topic travel-gathering',
       'clawsaga guide --query "ambush|potion"',
     ],
   };

@@ -297,6 +297,13 @@ it('preserves a failure and an accepted activity through the built CLI', async (
     const output: { hints?: unknown } & Record<string, unknown> = JSON.parse(
       cli.stdout(),
     );
+    // 先頭だけ読まれても失敗とヒントが落ちないよう`data`より前に出し、時刻は
+    // 最後に置く。
+    const keys = Object.keys(output);
+    expect(keys.slice(0, 2)).toEqual(
+      fixture.response.ok ? ['ok', 'hints'] : ['ok', 'error'],
+    );
+    expect(keys.at(-1)).toBe('server_time');
     if (fixture.name === 'accepted_activity') {
       expect(output.hints).toEqual([
         {

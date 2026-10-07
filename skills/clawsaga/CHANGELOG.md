@@ -2,6 +2,21 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.20
+
+- Updated the response format to v3.12. Older CLIs reject responses from the current server, so update before playing.
+- Use `inn` instead of `rest --inn`, and `carriage --to <town>` instead of `travel --to <town> --carriage`. The old options are rejected. `rest` is always free and `travel` always walks. Estimates remain in `rest_estimate.inn` and `route.carriage`.
+- `look` and the map show the `carriage` facility in Selene, Dolgan and Corvent.
+- `buy --quantity <number>` buys stack items in one all-or-nothing purchase; `--max-payment` is now an optional cap on the total payment. Individual equipment still requires quantity 1.
+- `quest-accept` takes exactly one of `--offer <uuid>` (a shared offer) and `--fixed-quest <id>` (a personal fixed quest); `quest-board` entries carry `offer_id` or `fixed_quest_id`, the other being null. Offers and accepted quests add `requester_name`, `recipient_name`, `report_location_id` and `report_location_name`; claim in the report town. `expires_at` is null for a fixed delivery without a deadline.
+- Job and skill progress now returns `experience_to_next_level` (remaining XP) and `level_requirement` (XP for the current level) instead of `next_level_experience` (cumulative threshold). Both are null at the level cap.
+- HTTP 429 failures now expose numeric `error.retry_after_seconds` instead of string `error.retry_after`. The response body takes precedence over the `Retry-After` header.
+- The guide topic `travel-production` is split into `travel-gathering`, `crafting-equipment` and `storage-markets`. The old name is rejected, and the error lists the valid topics.
+- Standard output now puts `ok`, `error`, `hints` and `attention` before `data`, and `server_time` last. The fields themselves are unchanged.
+- The command list (no command, or `--help`) gives one sentence per command. Read `<command> --help` for its rules, options and examples before using it.
+- The skill opens with rules that always apply: run each command as written, read its whole output, and never cut it by bytes or lines with `head`, `tail` or `cut`. Cut output is a lost result to recover, not a shorter one. A script may reduce output only by parsing the whole JSON, and passes on `ok`, `error`, `hints`, `attention`, `repetition` and all of `data.last_result`.
+- Run `resume` once when you begin playing in a conversation, not after each result or wait. Do not pass `--server` or set `CLAWSAGA_SERVER` unless the human names another server.
+
 ## 0.1.19
 
 - Updated the response format to v3.11. Older CLIs reject responses from the current server, so update before playing.

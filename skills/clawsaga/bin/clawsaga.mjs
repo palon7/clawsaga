@@ -23953,7 +23953,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.11";
+var agentSchemaVersion = "3.12";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   schema_version: external_exports.literal(agentSchemaVersion),
@@ -23990,7 +23990,8 @@ var lookSchema = external_exports.object({
   cursor: characterIdSchema.optional()
 }).strict();
 var getRouteSchema = external_exports.object({ ...common, to: locationIdSchema }).strict();
-var travelSchema = external_exports.object({ ...common, to: locationIdSchema, carriage: external_exports.boolean().optional() }).strict();
+var travelSchema = external_exports.object({ ...common, to: locationIdSchema }).strict();
+var rideCarriageSchema = travelSchema;
 var getActivitySchema = external_exports.object({
   ...common,
   activity_id: external_exports.uuid().optional()
@@ -24024,7 +24025,8 @@ var getShopSchema = external_exports.object(common2).strict();
 var buySchema = external_exports.object({
   ...common2,
   item_id: itemIdSchema,
-  max_payment: external_exports.number().int().min(0),
+  quantity: external_exports.number().int().positive().optional(),
+  max_payment: external_exports.number().int().min(0).optional(),
   request_id: external_exports.uuid()
 }).strict();
 var equipSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid() }).strict();
@@ -24138,12 +24140,8 @@ var startCombatSchema = external_exports.object({
   tactic: tacticSchema.optional(),
   practice: external_exports.boolean().optional()
 }).strict();
-var restSchema = external_exports.object({
-  ...target2,
-  inn: external_exports.boolean().optional().meta({
-    description: "true pays the inn fee from rest_estimate.inn for faster recovery. Omit for free rest."
-  })
-}).strict();
+var restSchema = external_exports.object(target2).strict();
+var stayAtInnSchema = restSchema;
 var useItemSchema = external_exports.object({
   ...target2,
   item_id: itemIdSchema,
@@ -24169,7 +24167,14 @@ var getQuestsSchema = external_exports.object({
 }).strict();
 var getQuestBoardSchema = external_exports.object(target3).strict();
 var questNumber = external_exports.number().int().min(1);
-var acceptQuestSchema = external_exports.object({ ...target3, offer_id: uuidSchema }).strict();
+var acceptQuestSchema = external_exports.object({
+  ...target3,
+  offer_id: uuidSchema.optional(),
+  fixed_quest_id: external_exports.string().regex(/^[a-z][a-z0-9_]{0,63}$/).optional()
+}).strict().refine(
+  (input2) => input2.offer_id !== void 0 !== (input2.fixed_quest_id !== void 0),
+  { message: "Supply exactly one of offer_id and fixed_quest_id" }
+);
 var claimQuestSchema = external_exports.object({ ...target3, quest_number: questNumber }).strict();
 var discardQuestSchema = external_exports.object({ ...target3, quest_number: questNumber }).strict();
 
@@ -24393,7 +24398,7 @@ var cliErrorMessages = {
   NETWORK_ERROR: "Could not reach the server. Check your connection. If an action was sent, its outcome is unknown; check it before another change.",
   SERVICE_UNAVAILABLE: "The server is temporarily unavailable. An action may still have been applied; check its outcome before another change.",
   AUTH_REQUIRED: "Authentication is required. Run auth login and try again.",
-  RATE_LIMITED: "Too many requests. Wait for the returned retry interval before retrying.",
+  RATE_LIMITED: "Too many requests. Wait error.retry_after_seconds seconds before retrying.",
   UPDATE_REQUIRED: "This CLI is older than the server response. Run `npx skills update clawsaga`, then check any uncertain action\u2019s outcome before another change.",
   INVALID_RESPONSE: "The server returned a response this CLI could not read.",
   AUTH_START_FAILED: "Could not start authorization. Try again later.",
@@ -24538,12 +24543,27 @@ var errorSchema = external_exports.object({ error: external_exports.string() });
 var serverMessageSchema = external_exports.object({
   error: external_exports.object({ message: external_exports.string() }).optional()
 });
+var retryAfterSchema = external_exports.object({
+  error: external_exports.object({ retry_after_seconds: external_exports.number().nonnegative() })
+});
 var schemaVersionSchema = external_exports.object({ schema_version: external_exports.string() });
 var [supportedSchemaMajor = 0, supportedSchemaMinor = 0] = agentSchemaVersion.split(".").map(Number);
 var checkOutcome = "The action may still have been applied; check its outcome before another change.";
 function serverMessage(body) {
   const parsed = serverMessageSchema.safeParse(body);
   return parsed.success ? parsed.data.error?.message : void 0;
+}
+function rateLimited(response, body) {
+  const parsed = retryAfterSchema.safeParse(body);
+  const header = response.headers.get("Retry-After");
+  const headerSeconds = header === null ? void 0 : Number(header);
+  const seconds = parsed.success ? parsed.data.error.retry_after_seconds : headerSeconds;
+  const retryAfterSeconds = seconds !== void 0 && Number.isFinite(seconds) && seconds >= 0 ? seconds : void 0;
+  const message = serverMessage(body) ?? (retryAfterSeconds === void 0 ? cliErrorMessage("RATE_LIMITED") : `Too many requests. Retry after ${retryAfterSeconds} ${retryAfterSeconds === 1 ? "second" : "seconds"}.`);
+  return new CliError("RATE_LIMITED", {
+    message,
+    ...retryAfterSeconds === void 0 ? {} : { retry_after_seconds: retryAfterSeconds }
+  });
 }
 function needsUpdate(body) {
   const parsed = schemaVersionSchema.safeParse(body);
@@ -24588,9 +24608,7 @@ var GameClient = class {
     });
     if (response.status >= 500) throw new CliError("SERVICE_UNAVAILABLE");
     if (response.status === 429)
-      throw new CliError("RATE_LIMITED", {
-        retry_after: response.headers.get("Retry-After")
-      });
+      throw rateLimited(response, await response.json().catch(() => void 0));
     return response;
   }
   async decodeTokens(response) {
@@ -24705,11 +24723,7 @@ var GameClient = class {
       throw new CliError("AUTH_REQUIRED", {
         message: message ? `${message} Run auth login and try again.` : cliErrorMessage("AUTH_REQUIRED")
       });
-    if (response.status === 429)
-      throw new CliError("RATE_LIMITED", {
-        retry_after: response.headers.get("Retry-After"),
-        ...message ? { message } : {}
-      });
+    if (response.status === 429) throw rateLimited(response, body);
     if (response.status >= 500)
       throw new CliError("SERVICE_UNAVAILABLE", message ? { message } : {});
     if (body === void 0)
@@ -24740,10 +24754,7 @@ var GameClient = class {
   async readDocument(path2, schema) {
     const response = await this.send(`/api/v1/${path2}`, { method: "GET" });
     const body = await response.json().catch(() => void 0);
-    if (response.status === 429)
-      throw new CliError("RATE_LIMITED", {
-        retry_after: response.headers.get("Retry-After")
-      });
+    if (response.status === 429) throw rateLimited(response, body);
     if (response.status >= 500) throw new CliError("SERVICE_UNAVAILABLE");
     const parsed = schema.safeParse(body);
     if (parsed.success) return parsed.data;
@@ -24938,7 +24949,7 @@ function versionParts(version2) {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.19",
+  version: "0.1.20",
   homepage: "https://clawsaga.net",
   repository: "github:palon7/clawsaga",
   license: "MIT",
@@ -25183,11 +25194,10 @@ var optionsSchema = external_exports.object({
   enemy: external_exports.string().optional(),
   preset: external_exports.string().optional(),
   practice: external_exports.boolean().optional(),
-  inn: external_exports.boolean().optional(),
-  carriage: external_exports.boolean().optional(),
   job: external_exports.string().optional(),
   drop: external_exports.string().optional(),
   offer: external_exports.string().optional(),
+  fixedQuest: external_exports.string().optional(),
   quest: external_exports.string().optional(),
   journal: external_exports.string().optional(),
   article: external_exports.string().optional(),
@@ -25401,20 +25411,23 @@ var adventureCommands = {
   rest: {
     path: "character/rest",
     schema: restSchema,
-    input: { inn: "inn" },
     startsActivity: true,
-    flags: [
-      [
-        "--inn",
-        "Pay the inn fee shown in rest_estimate.inn for faster recovery"
-      ],
-      noWaitFlag
-    ],
-    help: "Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early without refunding an inn fee.",
+    flags: [noWaitFlag],
+    help: "Rest for free while idle at a town or camp.",
     examples: [
       "clawsaga rest -c m7Qp2_aR9L-x",
-      "clawsaga rest -c m7Qp2_aR9L-x --inn",
       "clawsaga rest -c m7Qp2_aR9L-x --no-wait"
+    ]
+  },
+  inn: {
+    path: "character/inn",
+    schema: stayAtInnSchema,
+    startsActivity: true,
+    flags: [noWaitFlag],
+    help: "Stay at the inn in your current town while idle: pay its fee and recover faster than rest.",
+    examples: [
+      "clawsaga inn -c m7Qp2_aR9L-x",
+      "clawsaga inn -c m7Qp2_aR9L-x --no-wait"
     ]
   },
   use: {
@@ -25485,9 +25498,19 @@ var adventureCommands = {
   "quest-accept": {
     path: "character/quests/accept",
     schema: acceptQuestSchema,
-    input: { offer: "offer_id" },
-    flags: [["--offer <uuid>", "Offer ID from quest-board", true]],
-    help: "Accept one posted offer. Only the first adventurer takes it."
+    input: { offer: "offer_id", fixedQuest: "fixed_quest_id" },
+    buildInput: (values) => {
+      if (values.offer !== void 0 === (values.fixedQuest !== void 0))
+        throw new CliError("INVALID_ARGUMENTS", {
+          fields: ["offer", "fixedQuest"],
+          message: "Supply exactly one of --offer and --fixed-quest."
+        });
+    },
+    flags: [
+      ["--offer <uuid>", "Shared offer ID from quest-board"],
+      ["--fixed-quest <id>", "Personal fixed quest ID from quest-board"]
+    ],
+    help: "Accept one shared offer or personal fixed quest. Supply exactly one of --offer and --fixed-quest."
   },
   "quest-claim": {
     path: "character/quests/claim",
@@ -25496,7 +25519,7 @@ var adventureCommands = {
     flags: [
       ["--quest <number>", "Quest number from quests or quest-accept", true]
     ],
-    help: "Claim a quest reward when its objective is met. Be idle in its town and claim before the deadline. Delivery consumes standard-quality items."
+    help: "Claim when idle in the quest\u2019s report town. Supply quests consume standard-quality items; deliveries consume their issued individual. Check the deadline if present."
   },
   "quest-discard": {
     path: "character/quests/discard",
@@ -26093,21 +26116,31 @@ var productionCommands = {
   travel: {
     path: "character/travel",
     schema: travelSchema,
-    input: { to: "to", carriage: "carriage" },
+    input: { to: "to" },
     startsActivity: true,
     flags: [
       ["--to <id>", "Adjacent destination location ID", true],
-      [
-        "--carriage",
-        "Pay the fare shown in route.carriage and ride directly to this town"
-      ],
       noWaitFlag
     ],
-    help: "Travel one step to an adjacent location while idle and wait for arrival. An ambush may begin after arrival; the result includes its combat ID. With --carriage, ride between Selene, Dolgan and Corvent in one trip.",
+    help: "Walk one step to an adjacent location while idle and wait for arrival.",
     examples: [
       "clawsaga travel -c m7Qp2_aR9L-x --to openpit",
-      "clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait",
-      "clawsaga travel -c m7Qp2_aR9L-x --to dolgan --carriage"
+      "clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait"
+    ]
+  },
+  carriage: {
+    path: "character/carriage",
+    schema: rideCarriageSchema,
+    input: { to: "to" },
+    startsActivity: true,
+    flags: [
+      ["--to <id>", "Destination carriage town ID from route", true],
+      noWaitFlag
+    ],
+    help: "Ride the carriage from your current town to another carriage town while idle: pay the fare, arrive faster than walking, no ambush.",
+    examples: [
+      "clawsaga carriage -c m7Qp2_aR9L-x --to dolgan",
+      "clawsaga carriage -c m7Qp2_aR9L-x --to dolgan --no-wait"
     ]
   },
   gather: {
@@ -26216,6 +26249,7 @@ var productionCommands = {
     schema: buySchema,
     input: {
       item: "item_id",
+      quantity: ["quantity", "number"],
       maxPayment: ["max_payment", "number"],
       request: "request_id"
     },
@@ -26223,17 +26257,22 @@ var productionCommands = {
     errorContext: (values) => ({
       request_id: values.request,
       item_id: values.item,
-      max_payment: Number(values.maxPayment)
+      quantity: values.quantity === void 0 ? 1 : Number(values.quantity),
+      ...values.maxPayment === void 0 ? {} : { max_payment: Number(values.maxPayment) }
     }),
     flags: [
       ["--item <id>", "Item ID from shop", true],
-      ["--max-payment <gold>", "Maximum payment", true],
+      [
+        "--quantity <number>",
+        "Quantity of a stack item to buy in one purchase (default 1)"
+      ],
+      ["--max-payment <gold>", "Optional maximum total payment for all items"],
       [
         "--request <uuid>",
         "Reuse the same ID and arguments after an uncertain purchase"
       ]
     ],
-    help: "Buy one item while idle; a new request ID is generated unless supplied."
+    help: "Buy items while idle in one all-or-nothing purchase. Only stack items allow quantity above 1. Omit max-payment to accept the shop price, or cap the total payment. A new request ID is generated unless supplied; reuse the same ID, item and quantity after an uncertain purchase."
   },
   equip: {
     path: "character/equipment/equip",
@@ -26445,10 +26484,13 @@ function commandHelp(name, definition) {
     ...definition.inputExample ? { input_example: definition.inputExample } : {}
   };
 }
+function firstSentence(text2) {
+  return text2.match(/^.*?\.(?=\s|$)/)?.[0] ?? text2;
+}
 function programHelp() {
   return {
     command: "clawsaga",
-    description: "Play ClawSaga. Requires Node.js 22.12.0 or later.",
+    description: "Play ClawSaga. Requires Node.js 22.12.0 or later. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it.",
     usage: "clawsaga <command> [options]",
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: [
@@ -26459,7 +26501,7 @@ function programHelp() {
     commands: [
       ...Object.entries(commands).map(([name, definition]) => ({
         name,
-        description: definition.help
+        description: firstSentence(definition.help)
       })),
       {
         name: "guide [--topic <topic>] [--query <text>]",
@@ -26493,7 +26535,7 @@ function guideHelp() {
     ],
     examples: [
       "clawsaga guide",
-      "clawsaga guide --topic travel-production",
+      "clawsaga guide --topic travel-gathering",
       'clawsaga guide --query "ambush|potion"'
     ]
   };
@@ -26827,8 +26869,9 @@ function repeatCount(requestIdPerLot, values, requestedId) {
 
 // src/main.ts
 function print(stream, value) {
-  const output2 = { ...value };
-  delete output2.schema_version;
+  const { ok, error: error61, hints, attention, server_time, ...rest } = value;
+  delete rest.schema_version;
+  const output2 = { ok, error: error61, hints, attention, ...rest, server_time };
   stream.write(`${JSON.stringify(output2)}
 `);
 }

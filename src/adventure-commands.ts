@@ -6,6 +6,7 @@ import {
   startCombatSchema,
   getCombatReportSchema,
   restSchema,
+  stayAtInnSchema,
   useItemSchema,
   changeJobSchema,
   getLostItemsSchema,
@@ -159,20 +160,23 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   rest: {
     path: 'character/rest',
     schema: restSchema,
-    input: { inn: 'inn' },
     startsActivity: true,
-    flags: [
-      [
-        '--inn',
-        'Pay the inn fee shown in rest_estimate.inn for faster recovery',
-      ],
-      noWaitFlag,
-    ],
-    help: 'Rest while idle at a town or camp. Wait for completion before starting another main activity; stop can end rest early without refunding an inn fee.',
+    flags: [noWaitFlag],
+    help: 'Rest for free while idle at a town or camp.',
     examples: [
       'clawsaga rest -c m7Qp2_aR9L-x',
-      'clawsaga rest -c m7Qp2_aR9L-x --inn',
       'clawsaga rest -c m7Qp2_aR9L-x --no-wait',
+    ],
+  },
+  inn: {
+    path: 'character/inn',
+    schema: stayAtInnSchema,
+    startsActivity: true,
+    flags: [noWaitFlag],
+    help: 'Stay at the inn in your current town while idle: pay its fee and recover faster than rest.',
+    examples: [
+      'clawsaga inn -c m7Qp2_aR9L-x',
+      'clawsaga inn -c m7Qp2_aR9L-x --no-wait',
     ],
   },
   use: {
@@ -243,9 +247,19 @@ export const adventureCommands: Record<string, CommandDefinition> = {
   'quest-accept': {
     path: 'character/quests/accept',
     schema: acceptQuestSchema,
-    input: { offer: 'offer_id' },
-    flags: [['--offer <uuid>', 'Offer ID from quest-board', true]],
-    help: 'Accept one posted offer. Only the first adventurer takes it.',
+    input: { offer: 'offer_id', fixedQuest: 'fixed_quest_id' },
+    buildInput: (values) => {
+      if ((values.offer !== undefined) === (values.fixedQuest !== undefined))
+        throw new CliError('INVALID_ARGUMENTS', {
+          fields: ['offer', 'fixedQuest'],
+          message: 'Supply exactly one of --offer and --fixed-quest.',
+        });
+    },
+    flags: [
+      ['--offer <uuid>', 'Shared offer ID from quest-board'],
+      ['--fixed-quest <id>', 'Personal fixed quest ID from quest-board'],
+    ],
+    help: 'Accept one shared offer or personal fixed quest. Supply exactly one of --offer and --fixed-quest.',
   },
   'quest-claim': {
     path: 'character/quests/claim',
@@ -254,7 +268,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     flags: [
       ['--quest <number>', 'Quest number from quests or quest-accept', true],
     ],
-    help: 'Claim a quest reward when its objective is met. Be idle in its town and claim before the deadline. Delivery consumes standard-quality items.',
+    help: 'Claim when idle in the quest’s report town. Supply quests consume standard-quality items; deliveries consume their issued individual. Check the deadline if present.',
   },
   'quest-discard': {
     path: 'character/quests/discard',
