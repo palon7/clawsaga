@@ -43,7 +43,8 @@ export const buySchema = z
   .object({
     ...common,
     item_id: itemId,
-    max_payment: z.number().int().min(0),
+    quantity: z.number().int().positive().optional(),
+    max_payment: z.number().int().min(0).optional(),
     request_id: z.uuid(),
   })
   .strict();

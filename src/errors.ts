@@ -5,7 +5,7 @@ const cliErrorMessages: Record<string, string> = {
     'The server is temporarily unavailable. An action may still have been applied; check its outcome before another change.',
   AUTH_REQUIRED: 'Authentication is required. Run auth login and try again.',
   RATE_LIMITED:
-    'Too many requests. Wait for the returned retry interval before retrying.',
+    'Too many requests. Wait error.retry_after_seconds seconds before retrying.',
   UPDATE_REQUIRED:
     'This CLI is older than the server response. Run `npx skills update clawsaga`, then check any uncertain action’s outcome before another change.',
   INVALID_RESPONSE: 'The server returned a response this CLI could not read.',

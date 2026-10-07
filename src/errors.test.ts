@@ -4,13 +4,13 @@ import { CliError, cliErrorMessage, cliFailure } from './errors.js';
 it('emits a message-first public failure without the internal code', () => {
   const failure = cliFailure(
     new CliError('RATE_LIMITED', {
-      retry_after: '3',
+      retry_after_seconds: 3,
       message: 'Too many requests.',
     }),
   );
   expect(failure).toEqual({
     ok: false,
-    error: { message: 'Too many requests.', retry_after: '3' },
+    error: { message: 'Too many requests.', retry_after_seconds: 3 },
   });
   expect(JSON.stringify(failure)).not.toContain('RATE_LIMITED');
 });

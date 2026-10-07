@@ -23,6 +23,9 @@ const errorSchema = z.object({ error: z.string() });
 const serverMessageSchema = z.object({
   error: z.object({ message: z.string() }).optional(),
 });
+const retryAfterSchema = z.object({
+  error: z.object({ retry_after_seconds: z.number().nonnegative() }),
+});
 const schemaVersionSchema = z.object({ schema_version: z.string() });
 
 const [supportedSchemaMajor = 0, supportedSchemaMinor = 0] = agentSchemaVersion
@@ -36,6 +39,30 @@ const checkOutcome =
 function serverMessage(body: unknown): string | undefined {
   const parsed = serverMessageSchema.safeParse(body);
   return parsed.success ? parsed.data.error?.message : undefined;
+}
+
+function rateLimited(response: Response, body: unknown) {
+  const parsed = retryAfterSchema.safeParse(body);
+  const header = response.headers.get('Retry-After');
+  const headerSeconds = header === null ? undefined : Number(header);
+  const seconds = parsed.success
+    ? parsed.data.error.retry_after_seconds
+    : headerSeconds;
+  const retryAfterSeconds =
+    seconds !== undefined && Number.isFinite(seconds) && seconds >= 0
+      ? seconds
+      : undefined;
+  const message =
+    serverMessage(body) ??
+    (retryAfterSeconds === undefined
+      ? cliErrorMessage('RATE_LIMITED')
+      : `Too many requests. Retry after ${retryAfterSeconds} ${retryAfterSeconds === 1 ? 'second' : 'seconds'}.`);
+  return new CliError('RATE_LIMITED', {
+    message,
+    ...(retryAfterSeconds === undefined
+      ? {}
+      : { retry_after_seconds: retryAfterSeconds }),
+  });
 }
 
 function needsUpdate(body: unknown): boolean {
@@ -100,9 +127,7 @@ export class GameClient {
     });
     if (response.status >= 500) throw new CliError('SERVICE_UNAVAILABLE');
     if (response.status === 429)
-      throw new CliError('RATE_LIMITED', {
-        retry_after: response.headers.get('Retry-After'),
-      });
+      throw rateLimited(response, await response.json().catch(() => undefined));
     return response;
   }
   private async decodeTokens(response: Response): Promise<Credential> {
@@ -230,11 +255,7 @@ export class GameClient {
           ? `${message} Run auth login and try again.`
           : cliErrorMessage('AUTH_REQUIRED'),
       });
-    if (response.status === 429)
-      throw new CliError('RATE_LIMITED', {
-        retry_after: response.headers.get('Retry-After'),
-        ...(message ? { message } : {}),
-      });
+    if (response.status === 429) throw rateLimited(response, body);
     if (response.status >= 500)
       throw new CliError('SERVICE_UNAVAILABLE', message ? { message } : {});
     if (body === undefined)
@@ -269,10 +290,7 @@ export class GameClient {
   ): Promise<Output> {
     const response = await this.send(`/api/v1/${path}`, { method: 'GET' });
     const body: unknown = await response.json().catch(() => undefined);
-    if (response.status === 429)
-      throw new CliError('RATE_LIMITED', {
-        retry_after: response.headers.get('Retry-After'),
-      });
+    if (response.status === 429) throw rateLimited(response, body);
     if (response.status >= 500) throw new CliError('SERVICE_UNAVAILABLE');
     const parsed = schema.safeParse(body);
     if (parsed.success) return parsed.data;

@@ -21,8 +21,9 @@ export const getRouteSchema = z
   .object({ ...common, to: locationIdSchema })
   .strict();
 export const travelSchema = z
-  .object({ ...common, to: locationIdSchema, carriage: z.boolean().optional() })
+  .object({ ...common, to: locationIdSchema })
   .strict();
+export const rideCarriageSchema = travelSchema;
 export const getActivitySchema = z
   .object({
     ...common,

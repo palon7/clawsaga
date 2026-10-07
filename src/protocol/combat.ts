@@ -155,15 +155,8 @@ export const startCombatSchema = z
     practice: z.boolean().optional(),
   })
   .strict();
-export const restSchema = z
-  .object({
-    ...target,
-    inn: z.boolean().optional().meta({
-      description:
-        'true pays the inn fee from rest_estimate.inn for faster recovery. Omit for free rest.',
-    }),
-  })
-  .strict();
+export const restSchema = z.object(target).strict();
+export const stayAtInnSchema = restSchema;
 export const useItemSchema = z
   .object({
     ...target,

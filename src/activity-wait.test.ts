@@ -17,59 +17,62 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('waits the server interval and queries only the accepted activity until completion', async () => {
-  vi.useFakeTimers();
-  if (initial.data.activity?.kind !== 'travel')
-    throw new Error('Expected travel fixture');
-  const completed: AgentGameResponse = {
-    ...initial,
-    data: {
-      activity: null,
-      last_result: {
-        kind: 'travel',
-        activity_id: initial.data.activity.activity_id,
-        status: 'ENDED',
-        end_reason: 'COMPLETED',
-        ended_at: '2026-09-09T00:00:15.000Z',
-        to: initial.data.activity.to,
+it.each(['travel', 'carriage'])(
+  'waits for %s and queries only the accepted activity until completion',
+  async (command) => {
+    vi.useFakeTimers();
+    if (initial.data.activity?.kind !== 'travel')
+      throw new Error('Expected travel fixture');
+    const completed: AgentGameResponse = {
+      ...initial,
+      data: {
+        activity: null,
+        last_result: {
+          kind: 'travel',
+          activity_id: initial.data.activity.activity_id,
+          status: 'ENDED',
+          end_reason: 'COMPLETED',
+          ended_at: '2026-09-09T00:00:15.000Z',
+          to: initial.data.activity.to,
+        },
       },
-    },
-  };
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValueOnce(initial)
-    .mockResolvedValueOnce({ ...initial, next_poll_after_seconds: 10 })
-    .mockResolvedValueOnce(completed);
-  const notify = vi.fn();
-  const pending = execute(
-    ['travel', '-c', 'Traveler0000', '--to', 'openpit', '-l', 'en'],
-    notify,
-  );
-  await vi.advanceTimersByTimeAsync(4999);
-  expect(invoke).toHaveBeenCalledTimes(1);
-  expect(notify).toHaveBeenCalledTimes(1);
-  expect(notify).toHaveBeenCalledWith({
-    event: 'activity_accepted',
-    activity_id: initial.data.activity.activity_id,
-    kind: 'travel',
-    started_at: '2026-09-09T00:00:00.000Z',
-    arrives_at: '2026-09-09T00:00:15.000Z',
-    next_poll_after_seconds: 5,
-  });
-  await vi.advanceTimersByTimeAsync(1);
-  expect(invoke).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(10000);
-  expect(await pending).toEqual(completed);
-  expect(invoke).toHaveBeenCalledTimes(3);
-  expect(notify).toHaveBeenCalledTimes(1);
-  expect(invoke).toHaveBeenLastCalledWith('character/activity', {
-    character_id: 'Traveler0000',
-    activity_id: initial.data.activity.activity_id,
-    locale: 'en',
-  });
-});
+    };
+    const invoke = vi
+      .spyOn(GameClient.prototype, 'invoke')
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce({ ...initial, next_poll_after_seconds: 10 })
+      .mockResolvedValueOnce(completed);
+    const notify = vi.fn();
+    const pending = execute(
+      [command, '-c', 'Traveler0000', '--to', 'openpit', '-l', 'en'],
+      notify,
+    );
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith({
+      event: 'activity_accepted',
+      activity_id: initial.data.activity.activity_id,
+      kind: 'travel',
+      started_at: '2026-09-09T00:00:00.000Z',
+      arrives_at: '2026-09-09T00:00:15.000Z',
+      next_poll_after_seconds: 5,
+    });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(invoke).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(await pending).toEqual(completed);
+    expect(invoke).toHaveBeenCalledTimes(3);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenLastCalledWith('character/activity', {
+      character_id: 'Traveler0000',
+      activity_id: initial.data.activity.activity_id,
+      locale: 'en',
+    });
+  },
+);
 
-it('returns one acceptance for --no-wait travel and rest without polling or a wait input', async () => {
+it('returns one acceptance for --no-wait travel and inn without polling or a wait input', async () => {
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
@@ -84,10 +87,9 @@ it('returns one acceptance for --no-wait travel and rest without polling or a wa
     character_id: 'Traveler0000',
     to: 'openpit',
   });
-  await execute(['rest', '-c', 'Traveler0000', '--inn', '--no-wait'], notify);
-  expect(invoke).toHaveBeenLastCalledWith('character/rest', {
+  await execute(['inn', '-c', 'Traveler0000', '--no-wait'], notify);
+  expect(invoke).toHaveBeenLastCalledWith('character/inn', {
     character_id: 'Traveler0000',
-    inn: true,
   });
   // 開始1回ずつ。活動照会もstderr診断も出さない。
   expect(invoke).toHaveBeenCalledTimes(2);

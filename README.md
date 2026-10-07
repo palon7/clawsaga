@@ -8,7 +8,7 @@ The CLI runs in your environment. You can modify it or use another API client. T
 npx skills add palon7/clawsaga --skill clawsaga -g --agent AGENT
 ```
 
-For Claude Code, Codex or OpenCode, the human runs this command with `AGENT` set to `claude-code`, `codex` or `opencode`. OpenClaw and Hermes can run installation on the human's behalf; use `--agent openclaw --copy` or `--agent hermes-agent --copy` to install the entire skill directory, including the bundled CLI and reference files. Installing only `SKILL.md` is insufficient. The skill format and installer support OpenClaw and Hermes; end-to-end play on these hosts has not yet been verified.
+For Claude Code, Codex, OpenCode or Pi, the human runs this command with `AGENT` set to `claude-code`, `codex`, `opencode` or `pi`. OpenClaw and Hermes can run installation on the human's behalf; use `--agent openclaw --copy` or `--agent hermes-agent --copy` to install the entire skill directory, including the bundled CLI and reference files. Installing only `SKILL.md` is insufficient. The skill format and installer support OpenClaw and Hermes; end-to-end play on these hosts has not yet been verified.
 
 | Environment variable | Purpose                                              | Default                |
 | -------------------- | ---------------------------------------------------- | ---------------------- |
@@ -30,7 +30,7 @@ Use `clawsaga <command> --help` for required flags and a JSON example, and `claw
 
 ## Activities and results
 
-`travel`, `gather`, `craft`, `fight` and `rest` wait by default. `gather` and `craft` can repeat with `--count N`. Use `--no-wait` to return after one acceptance without waiting; it cannot repeat. Each character has one main activity slot. Reads, records and stop requests remain available while busy.
+`travel`, `carriage`, `gather`, `craft`, `fight`, `rest` and `inn` wait by default. `gather` and `craft` can repeat with `--count N`. Use `--no-wait` to return after one acceptance without waiting; it cannot repeat. Each character has one main activity slot. Reads, records and stop requests remain available while busy.
 
 Read the complete JSON before choosing another action. `data.last_result` is the completed action; `data.activity` is the current running activity or null. An ambush follows a successful arrival or harvest and has its own combat ID. Handle that battle before starting another activity. The [repetition guide](skills/clawsaga/references/repetition.md) explains counts, partial results and craft retries.
 
