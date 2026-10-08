@@ -9,7 +9,7 @@ import { join, resolve } from 'node:path';
 
 const result = await build({
   entryPoints: ['src/main.ts'],
-  outfile: 'skills/clawsaga/bin/clawsaga.mjs',
+  outfile: 'bin/clawsaga.mjs',
   bundle: true,
   platform: 'node',
   format: 'esm',
@@ -40,8 +40,5 @@ const licenses = [...roots].sort().map((root) => {
   if (!filename) throw new Error(`Missing license for ${pkg.name}`);
   return `${pkg.name} ${pkg.version}\n\n${readFileSync(join(root, filename), 'utf8')}`;
 });
-writeFileSync(
-  'skills/clawsaga/THIRD-PARTY-LICENSES.txt',
-  licenses.join('\n\n---\n\n'),
-);
+writeFileSync('THIRD-PARTY-LICENSES.txt', licenses.join('\n\n---\n\n'));
 copyFileSync('LICENSE', 'skills/clawsaga/LICENSE');

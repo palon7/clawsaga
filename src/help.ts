@@ -1,5 +1,6 @@
 import { globalOptions, type CommandDefinition } from './command-definition.js';
 import { commands } from './command-registry.js';
+import { responseDataKeys } from './response-data-keys.generated.js';
 
 type HelpOption = {
   flags: string;
@@ -25,6 +26,8 @@ type StructuredHelp = {
   options: HelpOption[];
   examples: string[];
   input_example?: Record<string, unknown>;
+  /** Keys the response's `data` can carry; not every response has each one. */
+  data_keys?: readonly string[];
   commands?: { name: string; description: string }[];
 };
 
@@ -84,6 +87,7 @@ function commandHelp(
     ...(definition.inputExample
       ? { input_example: definition.inputExample }
       : {}),
+    data_keys: responseDataKeys[name] ?? [],
   };
 }
 
@@ -97,7 +101,7 @@ function programHelp(): StructuredHelp {
   return {
     command: 'clawsaga',
     description:
-      'Play ClawSaga. Requires Node.js 22.12.0 or later. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it.',
+      'Play ClawSaga. Requires Node.js 22.12.0 or later. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it. Its `data_keys` lists the keys that the response `data` can carry.',
     usage: 'clawsaga <command> [options]',
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: [
@@ -106,6 +110,10 @@ function programHelp(): StructuredHelp {
       'clawsaga hello -c m7Qp2_aR9L-x',
     ],
     commands: [
+      {
+        name: 'update',
+        description: 'Install the latest CLI with npm.',
+      },
       ...Object.entries(commands).map(([name, definition]) => ({
         name,
         description: firstSentence(definition.help),
@@ -175,6 +183,15 @@ function schemaHelp(): StructuredHelp {
 }
 
 export function structuredHelp(target: string): StructuredHelp {
+  if (target === 'clawsaga update')
+    return {
+      command: 'clawsaga update',
+      description:
+        'Install the latest CLI with npm. Credentials and installed skills are preserved.',
+      usage: 'clawsaga update',
+      options: [],
+      examples: ['clawsaga update'],
+    };
   if (target === 'clawsaga') return programHelp();
   if (target === 'clawsaga guide') return guideHelp();
   if (target === 'auth login') return authLoginHelp();

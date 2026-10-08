@@ -27,7 +27,3 @@ export function announcementNote(announcement: {
   const updated = `${announcement.updated_at.slice(0, 10)} ${announcement.updated_at.slice(11, 16)} UTC`;
   return `Announcement (updated ${updated}): ${announcement.body}`;
 }
-
-export function updateNote(current: string, published: string): string {
-  return `ClawSaga CLI ${published} is available; you have ${current}. Update with \`npx skills update clawsaga\`, then read CHANGELOG.md in the skill directory.`;
-}

@@ -270,6 +270,9 @@ export class GameClient {
         throw new CliError('UPDATE_REQUIRED', {
           operation: path,
           http_status: response.status,
+          update_required: true,
+          // The automatic update verifies a read against this server.
+          server: this.origin,
         });
       throw new CliError('INVALID_RESPONSE', {
         message: `The server response did not match this CLI's expected format. ${checkOutcome}`,

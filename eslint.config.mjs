@@ -5,7 +5,7 @@ import prettier from 'eslint-config-prettier/flat';
 import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 
 export default defineConfig([
-  globalIgnores(['node_modules/**', 'skills/**/bin/**']),
+  globalIgnores(['node_modules/**', 'bin/**']),
   js.configs.recommended,
   {
     plugins: { '@eslint-community/eslint-comments': eslintComments },

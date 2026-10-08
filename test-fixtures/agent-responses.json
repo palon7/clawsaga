@@ -1,9 +1,48 @@
 [
   {
+    "name": "empty_channel_page",
+    "response": {
+      "ok": true,
+      "schema_version": "3.13",
+      "server_time": "2026-09-22T01:02:03Z",
+      "data": {
+        "chat": {
+          "channel": { "id": "selene", "name": "Selene" },
+          "messages": [],
+          "next_cursor": null
+        }
+      }
+    }
+  },
+  {
+    "name": "unread_direct_message_only",
+    "response": {
+      "ok": true,
+      "schema_version": "3.13",
+      "server_time": "2026-09-22T01:02:03Z",
+      "attention": { "unread_direct_messages": 1 },
+      "data": {}
+    }
+  },
+  {
+    "name": "unread_channel_board_and_news",
+    "response": {
+      "ok": true,
+      "schema_version": "3.13",
+      "server_time": "2026-09-22T01:02:03Z",
+      "attention": {
+        "chat": { "channel_id": "selene", "new_messages": 100 },
+        "board": { "unread_threads": 2 },
+        "news": { "unread": 3 }
+      },
+      "data": {}
+    }
+  },
+  {
     "name": "cancelled_travel",
     "response": {
       "ok": true,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "activity": null,
@@ -23,7 +62,7 @@
     "name": "gather_actual_experience",
     "response": {
       "ok": true,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "last_result": {
@@ -42,7 +81,7 @@
     "name": "craft_actual_experience",
     "response": {
       "ok": true,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "last_result": {
@@ -67,7 +106,7 @@
     "name": "settled_result_with_current_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-19T01:02:03.456Z",
       "next_poll_after_seconds": 7,
       "data": {
@@ -179,7 +218,7 @@
     "name": "accepted_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-19T01:08:00.456Z",
       "next_poll_after_seconds": 5,
       "data": {
@@ -212,7 +251,7 @@
     "name": "cancelled_result",
     "response": {
       "ok": true,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-19T02:03:04.567Z",
       "data": {
         "activity": null,
@@ -231,13 +270,10 @@
     "name": "location_chat",
     "response": {
       "ok": true,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-19T03:04:05.678Z",
       "attention": {
-        "unread_direct_messages": 0,
-        "chat": { "channel_id": "selene", "new_messages": 2 },
-        "board": { "unread_threads": 0 },
-        "news": { "unread": 0 }
+        "chat": { "channel_id": "selene", "new_messages": 2 }
       },
       "data": {
         "chat": {
@@ -266,7 +302,7 @@
     "name": "business_failure",
     "response": {
       "ok": false,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-19T04:05:06.789Z",
       "data": {},
       "error": {
@@ -279,7 +315,7 @@
     "name": "inventory_shortage",
     "response": {
       "ok": false,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-10-01T00:00:00Z",
       "data": {},
       "error": {
@@ -300,7 +336,7 @@
     "name": "delivery_shortage",
     "response": {
       "ok": false,
-      "schema_version": "3.12",
+      "schema_version": "3.13",
       "server_time": "2026-09-19T04:06:07.890Z",
       "data": {},
       "error": {

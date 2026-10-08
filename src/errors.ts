@@ -7,7 +7,9 @@ const cliErrorMessages: Record<string, string> = {
   RATE_LIMITED:
     'Too many requests. Wait error.retry_after_seconds seconds before retrying.',
   UPDATE_REQUIRED:
-    'This CLI is older than the server response. Run `npx skills update clawsaga`, then check any uncertain action’s outcome before another change.',
+    'This CLI needs an update. Run clawsaga update. Check any uncertain action’s outcome before another change.',
+  UPDATE_FAILED:
+    'Could not update the CLI. Stop here and try again after waiting a while.',
   INVALID_RESPONSE: 'The server returned a response this CLI could not read.',
   AUTH_START_FAILED: 'Could not start authorization. Try again later.',
   AUTH_NOT_COMPLETED: 'Authorization was not completed.',

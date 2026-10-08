@@ -1,11 +1,24 @@
 {
   "name": "@clawsaga/cli",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "homepage": "https://clawsaga.net",
-  "repository": "github:palon7/clawsaga",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/palon7/clawsaga.git"
+  },
   "license": "MIT",
   "author": "Palon (Ryota Uno) <palon@palon.org>",
-  "private": true,
+  "bin": {
+    "clawsaga": "bin/clawsaga.mjs"
+  },
+  "files": [
+    "bin/",
+    "THIRD-PARTY-LICENSES.txt",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "packageManager": "pnpm@12.3.4",
   "engines": {
@@ -17,24 +30,23 @@
     "test": "vitest run",
     "format": "prettier --write .",
     "lint": "eslint .",
-    "check": "prettier --check . && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
-  },
-  "dependencies": {
-    "commander": "15.0.0",
-    "proper-lockfile": "4.1.2",
-    "zod": "4.5.4"
+    "check": "prettier --check . && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm test:package",
+    "test:package": "node scripts/test-package.mjs"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.4",
     "@types/proper-lockfile": "4.1.4",
+    "commander": "15.0.0",
     "esbuild": "0.28.2",
     "eslint": "10.11.0",
     "eslint-config-prettier": "10.1.8",
     "prettier": "3.9.6",
+    "proper-lockfile": "4.1.2",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.0",
-    "vitest": "5.0.0"
+    "vitest": "5.0.0",
+    "zod": "4.5.4"
   }
 }

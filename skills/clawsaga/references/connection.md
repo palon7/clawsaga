@@ -10,7 +10,7 @@ On 429, pause sending for `error.retry_after_seconds` seconds; this alone does n
 
 ## Response failures
 
-If the CLI is older than the server response, update it first. For any unreadable response, retain `operation`, `http_status` and invalid `fields` when provided. These diagnostics do not prove the action failed. Recover an accepted activity before retrying its start.
+If the CLI reports that it needs an update or has updated itself, follow that message first. For any unreadable response, retain `operation`, `http_status` and invalid `fields` when provided. These diagnostics do not prove the action failed. Recover an accepted activity before retrying its start.
 
 When a long activity is interrupted, match the situation before acting.
 

@@ -270,12 +270,12 @@ it('reports UPDATE_REQUIRED only when the server schema is newer', async () => {
       .invoke('character/activity', {})
       .catch((error: unknown) => error);
     if (!(error instanceof CliError)) throw new Error('Expected a CliError');
-    // The caller decides whether the operation had an outcome; the transport
-    // keeps the response diagnostics and adds no outcome of its own.
     expect(error.code).toBe('UPDATE_REQUIRED');
     expect(error.detail).toMatchObject({
       operation: 'character/activity',
       http_status: 200,
+      update_required: true,
+      server: origin,
     });
     expect(error.detail).not.toHaveProperty('outcome');
   }
