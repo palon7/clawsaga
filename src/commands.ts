@@ -13,13 +13,8 @@ import {
 import { GameClient, serverOrigin } from './client.js';
 import { CliError } from './errors.js';
 import { recoveryHint, withRenderedHints } from './hints.js';
-import {
-  announcementNote,
-  changelogNote,
-  updateNote,
-  withNotes,
-} from './notices.js';
-import { fetchPublishedVersion, isNewerVersion } from './update-check.js';
+import { announcementNote, changelogNote, withNotes } from './notices.js';
+import { updateCli } from './update.js';
 import metadata from '../package.json' with { type: 'json' };
 import { notSent, repeatActivity, waitForActivity } from './activity-wait.js';
 import {
@@ -39,6 +34,7 @@ import { guideQueryOption, guideTopicOption, structuredHelp } from './help.js';
 type Notify = (value: unknown) => void;
 
 type CommandResult =
+  | { ok: true; version: string }
   | AgentGameResponse
   | GuideResponse
   | AgentResumeResponse
@@ -62,7 +58,6 @@ type Run = {
   helpTarget: string;
   helpCommand: string;
   executed?: ExecutedCommand;
-  publishedVersion?: Promise<string | undefined>;
   schemaHelpResult?: {
     input_schema: Record<string, unknown>;
     input_kind: string;
@@ -74,13 +69,9 @@ function clientFor(values: Values) {
   return new GameClient(serverOrigin(values.server));
 }
 
-export async function execute(
-  args: string[],
-  notify: Notify,
-  options: { request?: typeof fetch } = {},
-) {
+export async function execute(args: string[], notify: Notify) {
   const run: Run = { helpTarget: 'clawsaga', helpCommand: 'clawsaga --help' };
-  const program = createProgram(run, notify, options.request ?? fetch);
+  const program = createProgram(run, notify);
   try {
     await program.parseAsync(args, { from: 'user' });
   } catch (error) {
@@ -106,7 +97,7 @@ function helpOrFailure(error: unknown, run: Run) {
   });
 }
 
-async function commandOutput(run: Run) {
+function commandOutput(run: Run) {
   if (run.schemaHelpResult) return { ok: true, ...run.schemaHelpResult };
   const { result, executed } = run;
   if (!result) throw new CliError('INVALID_COMMAND');
@@ -115,7 +106,7 @@ async function commandOutput(run: Run) {
     wait: executed?.wait ?? true,
   });
   if (executed?.name !== 'hello' || !rendered.ok) return rendered;
-  return withNotes(rendered, await helloNotes(rendered, run.publishedVersion));
+  return withNotes(rendered, helloNotes(rendered));
 }
 
 function isGameResponse(result: object): result is AgentGameResponse {
@@ -160,22 +151,16 @@ function isLostResponse(error: CliError) {
   );
 }
 
-async function helloNotes(
-  response: AgentGameResponse,
-  published: Promise<string | undefined> | undefined,
-): Promise<string[]> {
+function helloNotes(response: AgentGameResponse): string[] {
   const notes: string[] = [];
   if (response.data.announcement)
     notes.push(announcementNote(response.data.announcement));
   if (response.data.changelog)
     notes.push(changelogNote(response.data.changelog));
-  const latest = await published;
-  if (latest && isNewerVersion(latest, metadata.version))
-    notes.push(updateNote(metadata.version, latest));
   return notes;
 }
 
-function createProgram(run: Run, notify: Notify, request: typeof fetch) {
+function createProgram(run: Run, notify: Notify) {
   const program = new Command('clawsaga')
     .description('Play ClawSaga. Requires Node.js 22.12.0 or later.')
     .version(metadata.version)
@@ -206,10 +191,19 @@ function createProgram(run: Run, notify: Notify, request: typeof fetch) {
   program.on('--help', () => {
     run.helpTarget = 'clawsaga';
   });
+  program
+    .command('update')
+    .description('Install the latest CLI with npm')
+    .on('--help', () => {
+      run.helpTarget = 'clawsaga update';
+    })
+    .action(async () => {
+      run.result = { ok: true, version: await updateCli() };
+    });
   addSchemaCommand(program, run);
   addDocumentCommands(program, run);
   for (const [name, definition] of Object.entries(commands))
-    addGameCommand(program, run, notify, request, name, definition);
+    addGameCommand(program, run, notify, name, definition);
   return program;
 }
 
@@ -338,7 +332,6 @@ function addGameCommand(
   program: Command,
   run: Run,
   notify: Notify,
-  request: typeof fetch,
   name: string,
   definition: CommandDefinition,
 ) {
@@ -370,8 +363,6 @@ function addGameCommand(
       wait: true,
     };
     run.executed = executed;
-    // 更新確認は外部への取得なので、ゲーム要求と並行して始める。
-    if (name === 'hello') run.publishedVersion = fetchPublishedVersion(request);
     const values = optionsSchema.parse(command.optsWithGlobals());
     executed.character = values.character;
     executed.wait = values.wait !== false;

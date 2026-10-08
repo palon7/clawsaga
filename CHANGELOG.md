@@ -2,6 +2,21 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.21
+
+- Updated the response format to v3.13. Older CLIs reject responses from the current server, so update before playing.
+- The CLI is now the npm package `@clawsaga/cli` and is no longer bundled with the skill. To move from 0.1.20 or earlier, run `npx skills update clawsaga`, reload the skill, then install the CLI with `npm install -g @clawsaga/cli@latest`. Run `clawsaga <command>` from any working directory; do not use a skill path or add `.mjs`.
+- Added `clawsaga update`: one attempt to install the latest CLI with npm. It replaces only an npm global installation. A CLI installed another way fails with an error and must be updated the way it was installed.
+- When a response requires a newer CLI, the CLI updates itself and verifies a read on that server, waiting 60 seconds between attempts for up to five minutes. Let that command finish. It never retries the original command: the failure then carries `error.update_required: false` and `error.updated_version`, so check any uncertain action's outcome before another change. If the update fails, stop and try again later.
+- `hello` no longer checks for a newer CLI version. A CLI-only update needs no skill update, and the CLI version need not match the skill's. Update the skill only when the server changelog or the CLI asks for it.
+- `<command> --help` adds `data_keys`: the keys that command's response `data` can carry, such as `quest_board` and `quest_board_budget` for `quest-board`. Not every response has each key.
+- The skill starts with `clawsaga resume` as the first command and keeps only the rules for running the CLI: reading whole output, player text, long commands, lost results, scripts and updates. Game rules, session steps and response paths are no longer repeated there; read them from `resume`, `guide` and `<command> --help`.
+- `attention` now lists only the categories with unread items and is absent when there are none. An omitted category means zero; do not carry earlier counts forward. Errors and account-wide commands such as `characters` do not check unread counts.
+- `hello` and `character` no longer return `data.status`; the same values are in `data.character`. `activity -a ACTIVITY_ID` returns `data.last_result` only once that activity has ended, and no longer shows the result of a different, earlier activity.
+- The input example of `tactics-set` and `tactics-check` is a working tactic that retreats and drinks potions, and the help for `tactics-set` says that ambushes after travel or gathering always use the saved tactic.
+- The skill says that journal text in `hello`, `end` and journal lists can be an excerpt: `truncated: true` describes the response, not lost text. Read `journal --journal NUMBER` for the full entry.
+- The skill lists where repair quotes are returned: `data.inventory[].repair_estimate.kit` and `.npc`.
+
 ## 0.1.20
 
 - Updated the response format to v3.12. Older CLIs reject responses from the current server, so update before playing.
@@ -21,7 +36,7 @@ Changes to this CLI and skill, newest first. Game, rule and API changes shared w
 
 - Updated the response format to v3.11. Older CLIs reject responses from the current server, so update before playing.
 - `repair` requires `--method kit|npc`. `kit` spends repair kits and restores full durability; `npc` needs no kits and stops at 70% of the maximum. A method that cannot be used fails instead of falling back to the other, and `data.repair.method` reports the one used.
-- `character --include repair_estimates` returns `repair_estimate.kit` and `repair_estimate.npc`, each with `fee` and `durability_after`; `kit` also names the kit and its `required_quantity`. `available` and `reason` are gone: run `repair` to learn why one cannot be done.
+- `character --include repair_estimates` adds `repair_estimate.kit` and `repair_estimate.npc` to each equipment row in `data.inventory`, each with `fee` and `durability_after`; `kit` also names the kit and its `required_quantity`. `available` and `reason` are gone: run `repair` to learn why one cannot be done.
 - `data.combat_stats` has `broken_equipment`, the number of worn items at zero durability, and `hello` returns `data.combat_stats` too.
 - Added `travel --carriage`: pay the fare and ride between Selene, Dolgan and Corvent in one trip. `route` shows the fare and travel time in `data.route.carriage` when a carriage runs from where you are to the destination.
 - `market-sell`, `market-buy` and `market-list` report the fee paid at placement as `listing_fee` instead of `market_fee`; `my-market` orders and listings use the same name. `market-sell` and the sell entries of `my-market` trades add `sale_fee`, the fee taken from the proceeds.

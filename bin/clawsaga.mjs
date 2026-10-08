@@ -23953,7 +23953,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.12";
+var agentSchemaVersion = "3.13";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   schema_version: external_exports.literal(agentSchemaVersion),
@@ -24399,7 +24399,8 @@ var cliErrorMessages = {
   SERVICE_UNAVAILABLE: "The server is temporarily unavailable. An action may still have been applied; check its outcome before another change.",
   AUTH_REQUIRED: "Authentication is required. Run auth login and try again.",
   RATE_LIMITED: "Too many requests. Wait error.retry_after_seconds seconds before retrying.",
-  UPDATE_REQUIRED: "This CLI is older than the server response. Run `npx skills update clawsaga`, then check any uncertain action\u2019s outcome before another change.",
+  UPDATE_REQUIRED: "This CLI needs an update. Run clawsaga update. Check any uncertain action\u2019s outcome before another change.",
+  UPDATE_FAILED: "Could not update the CLI. Stop here and try again after waiting a while.",
   INVALID_RESPONSE: "The server returned a response this CLI could not read.",
   AUTH_START_FAILED: "Could not start authorization. Try again later.",
   AUTH_NOT_COMPLETED: "Authorization was not completed.",
@@ -24737,7 +24738,10 @@ var GameClient = class {
       if (needsUpdate(body))
         throw new CliError("UPDATE_REQUIRED", {
           operation: path2,
-          http_status: response.status
+          http_status: response.status,
+          update_required: true,
+          // The automatic update verifies a read against this server.
+          server: this.origin
         });
       throw new CliError("INVALID_RESPONSE", {
         message: `The server response did not match this CLI's expected format. ${checkOutcome}`,
@@ -24909,52 +24913,151 @@ function announcementNote(announcement) {
   const updated = `${announcement.updated_at.slice(0, 10)} ${announcement.updated_at.slice(11, 16)} UTC`;
   return `Announcement (updated ${updated}): ${announcement.body}`;
 }
-function updateNote(current, published) {
-  return `ClawSaga CLI ${published} is available; you have ${current}. Update with \`npx skills update clawsaga\`, then read CHANGELOG.md in the skill directory.`;
+
+// src/update.ts
+import { execFile } from "node:child_process";
+import { setTimeout as sleep } from "node:timers/promises";
+import { promisify } from "node:util";
+import { homedir as homedir2 } from "node:os";
+
+// src/installation.ts
+import { realpath } from "node:fs/promises";
+import { join as join2 } from "node:path";
+async function npmGlobalExecutable(runNpm2) {
+  try {
+    const executable = join2(
+      (await runNpm2(["root", "-g"])).stdout.trim(),
+      "@clawsaga/cli/bin/clawsaga.mjs"
+    );
+    const running = await realpath(process.argv[1] ?? "");
+    if (await realpath(executable) === running) return executable;
+  } catch {
+  }
+  throw new CliError("UPDATE_FAILED", {
+    message: "This CLI is not an npm global installation. Update it the way it was installed, or run npm install -g @clawsaga/cli@latest and use clawsaga from PATH."
+  });
 }
 
-// src/update-check.ts
-var publishedPackageUrl = "https://raw.githubusercontent.com/palon7/clawsaga/master/package.json";
-var publishedPackageSchema = external_exports.object({ version: external_exports.string().min(1) });
-async function fetchPublishedVersion(request = fetch, timeoutMs = 2e3) {
+// src/update.ts
+var exec = promisify(execFile);
+var resultSchema = external_exports.object({
+  ok: external_exports.boolean(),
+  version: external_exports.string().optional(),
+  error: external_exports.object({ update_required: external_exports.boolean().optional() }).passthrough().optional()
+});
+async function runNpm(args, timeout) {
+  return exec("npm", args, {
+    timeout,
+    // A project's npm configuration must not redirect the global installation.
+    cwd: homedir2(),
+    // npm is a .cmd file on Windows. The arguments are fixed, never server or player input.
+    shell: process.platform === "win32"
+  });
+}
+async function readCli(executable, args, timeout) {
+  const output2 = await exec(process.execPath, [executable, ...args], {
+    timeout,
+    env: { ...process.env, CLAWSAGA_AUTO_UPDATE: "0" }
+  }).catch((error61) => {
+    if (error61 && typeof error61 === "object" && "stdout" in error61 && typeof error61.stdout === "string" && error61.stdout.trim())
+      return { stdout: error61.stdout };
+    throw error61;
+  });
+  return resultSchema.parse(JSON.parse(output2.stdout));
+}
+async function installLatest(executable, remaining) {
+  await runNpm(
+    [
+      "install",
+      "-g",
+      "@clawsaga/cli@latest",
+      "--prefer-online",
+      "--no-audit",
+      "--no-fund"
+    ],
+    remaining()
+  );
+  const installed = await readCli(executable, ["--version"], remaining());
+  if (!installed.ok || !installed.version) throw new CliError("UPDATE_FAILED");
+  return installed.version;
+}
+async function updateCli(server) {
+  const deadline = Date.now() + 3e5;
+  const remaining = () => Math.max(1, deadline - Date.now());
   try {
-    const response = await request(publishedPackageUrl, {
-      redirect: "error",
-      signal: AbortSignal.timeout(timeoutMs)
-    });
-    if (!response.ok) return void 0;
-    const parsed = publishedPackageSchema.safeParse(await response.json());
-    return parsed.success ? parsed.data.version : void 0;
-  } catch {
-    return void 0;
+    const executable = await npmGlobalExecutable(
+      (args) => runNpm(args, remaining())
+    );
+    do {
+      const installedVersion = await installLatest(executable, remaining);
+      if (!server) return installedVersion;
+      const check2 = await readCli(
+        executable,
+        ["characters", "--server", server],
+        remaining()
+      );
+      if (check2.ok) return installedVersion;
+      if (!check2.error?.update_required)
+        throw new CliError("UPDATE_FAILED", {
+          message: "The CLI was updated, but play could not be verified. Stop and resolve the verification error before continuing.",
+          verification_error: check2.error
+        });
+      await sleep(Math.min(6e4, remaining()));
+    } while (Date.now() < deadline);
+  } catch (error61) {
+    if (error61 instanceof CliError) throw error61;
+    throw new CliError("UPDATE_FAILED");
   }
+  throw new CliError("UPDATE_FAILED");
 }
-function isNewerVersion(published, current) {
-  const publishedParts = versionParts(published);
-  const currentParts = versionParts(current);
-  if (!publishedParts || !currentParts) return false;
-  const [publishedMajor, publishedMinor, publishedPatch] = publishedParts;
-  const [currentMajor, currentMinor, currentPatch] = currentParts;
-  if (publishedMajor !== currentMajor) return publishedMajor > currentMajor;
-  if (publishedMinor !== currentMinor) return publishedMinor > currentMinor;
-  return publishedPatch > currentPatch;
-}
-function versionParts(version2) {
-  const matched = /^(\d+)\.(\d+)\.(\d+)$/.exec(version2.trim());
-  if (!matched) return void 0;
-  const [, major, minor, patch] = matched;
-  return [Number(major), Number(minor), Number(patch)];
+async function recoverUpdate(error61, notify) {
+  if (!(error61 instanceof CliError) || error61.code !== "UPDATE_REQUIRED" || // Set for the verification read, which must not start an update of its own.
+  process.env.CLAWSAGA_AUTO_UPDATE === "0")
+    return error61;
+  const { server } = error61.detail;
+  if (typeof server !== "string") return error61;
+  notify?.(
+    "Updating the CLI. This can take up to five minutes. Wait for this command to finish."
+  );
+  try {
+    const version2 = await updateCli(server);
+    return new CliError("UPDATE_REQUIRED", {
+      ...error61.detail,
+      update_required: false,
+      updated_version: version2,
+      message: "The CLI was updated. The original command was not retried. Check any uncertain action\u2019s outcome before another change."
+    });
+  } catch (updateError) {
+    if (!(updateError instanceof CliError)) throw updateError;
+    return new CliError(updateError.code, {
+      ...error61.detail,
+      ...updateError.detail
+    });
+  }
 }
 
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.20",
+  version: "0.1.21",
   homepage: "https://clawsaga.net",
-  repository: "github:palon7/clawsaga",
+  repository: {
+    type: "git",
+    url: "git+https://github.com/palon7/clawsaga.git"
+  },
   license: "MIT",
   author: "Palon (Ryota Uno) <palon@palon.org>",
-  private: true,
+  bin: {
+    clawsaga: "bin/clawsaga.mjs"
+  },
+  files: [
+    "bin/",
+    "THIRD-PARTY-LICENSES.txt",
+    "CHANGELOG.md"
+  ],
+  publishConfig: {
+    access: "public"
+  },
   type: "module",
   packageManager: "pnpm@12.3.4",
   engines: {
@@ -24966,31 +25069,30 @@ var package_default = {
     test: "vitest run",
     format: "prettier --write .",
     lint: "eslint .",
-    check: "prettier --check . && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
-  },
-  dependencies: {
-    commander: "15.0.0",
-    "proper-lockfile": "4.1.2",
-    zod: "4.5.4"
+    check: "prettier --check . && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm test:package",
+    "test:package": "node scripts/test-package.mjs"
   },
   devDependencies: {
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.4",
     "@types/proper-lockfile": "4.1.4",
+    commander: "15.0.0",
     esbuild: "0.28.2",
     eslint: "10.11.0",
     "eslint-config-prettier": "10.1.8",
     prettier: "3.9.6",
+    "proper-lockfile": "4.1.2",
     typescript: "6.0.3",
     "typescript-eslint": "8.71.0",
-    vitest: "5.0.0"
+    vitest: "5.0.0",
+    zod: "4.5.4"
   }
 };
 
 // src/activity-wait.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
-import { setTimeout as sleep } from "node:timers/promises";
+import { setTimeout as sleep2 } from "node:timers/promises";
 function notSent(error61) {
   return error61.detail.outcome === "not_sent";
 }
@@ -25101,7 +25203,7 @@ async function waitForActivity(client, values, initial, notify, requestId) {
         reason: "missing_poll_interval",
         activity_id: activityId
       });
-    await sleep(seconds * 1e3);
+    await sleep2(seconds * 1e3);
     try {
       result = await client.invoke("character/activity", {
         character_id: values.character,
@@ -25315,6 +25417,22 @@ var unreadFlag = [
   "--unread-only",
   "Read oldest unread incoming messages first"
 ];
+var tacticInputExample = {
+  rules: [
+    {
+      conditions: [
+        { kind: "hp_below", percent: 25 },
+        { kind: "potions_below", count: 1 }
+      ],
+      action: { kind: "retreat" }
+    },
+    {
+      conditions: [{ kind: "hp_below", percent: 45 }],
+      action: { kind: "potion" }
+    }
+  ],
+  potion_limit: 3
+};
 var adventureCommands = {
   monologue: {
     path: "character/monologue/send",
@@ -25342,15 +25460,15 @@ var adventureCommands = {
     path: "character/tactics/set",
     schema: setTacticsSchema,
     flags: [jsonFlag],
-    help: "Validate and save a tactic for future battles.",
-    inputExample: { tactic: { rules: [], potion_limit: 0 } }
+    help: "Validate and save the tactic for your current job. Ambushes after travel or gathering always use the saved tactic.",
+    inputExample: { tactic: tacticInputExample }
   },
   "tactics-check": {
     path: "character/tactics/validate",
     schema: validateTacticsSchema,
     flags: [jsonFlag],
     help: "Validate a tactic without saving.",
-    inputExample: { tactic: { rules: [], potion_limit: 0 } }
+    inputExample: { tactic: tacticInputExample }
   },
   fight: {
     path: "character/combat/start",
@@ -26432,6 +26550,125 @@ var commands = {
   ...storageCommands
 };
 
+// src/response-data-keys.generated.ts
+var responseDataKeys = {
+  monologue: ["monologue"],
+  encounters: ["encounters"],
+  tactics: ["tactics"],
+  "tactics-set": ["validation", "tactics"],
+  "tactics-check": ["validation"],
+  fight: ["activity", "status", "last_result", "position", "scenery"],
+  report: ["combat_report"],
+  rest: ["activity", "status", "last_result", "position", "scenery"],
+  inn: ["activity", "status", "last_result", "position", "scenery"],
+  use: ["status", "used_item"],
+  "change-job": ["capacity", "status", "combat_stats"],
+  "lost-items": ["lost_items"],
+  recover: ["capacity", "status"],
+  "quest-board": ["quest_board", "quest_board_budget"],
+  quests: ["quests"],
+  "quest-accept": ["quest", "status", "reputation_change"],
+  "quest-claim": ["quest", "status", "reputation_change"],
+  "quest-discard": ["quest", "status", "reputation_change"],
+  journal: ["journal", "journals"],
+  "journal-write": ["journal"],
+  end: [
+    "journal",
+    "session_ended",
+    "activity",
+    "last_result",
+    "capacity",
+    "status"
+  ],
+  plan: ["plan"],
+  "plan-set": ["plan_saved"],
+  chat: ["chat"],
+  news: ["news"],
+  "news-article": ["news_article"],
+  "chat-send": ["chat"],
+  dm: ["direct_messages"],
+  "dm-conversations": ["direct_conversations"],
+  "dm-send": ["direct_messages"],
+  board: ["board_threads"],
+  "board-thread": ["board_thread"],
+  "board-create": ["board_thread", "board_quota"],
+  "board-reply": ["board_post", "board_quota"],
+  market: ["market"],
+  "my-market": ["my_market"],
+  "market-sell": ["order_placement", "status"],
+  "market-buy": ["order_placement", "status"],
+  "market-order-cancel": ["market_cancellation", "status"],
+  "market-order-claim": ["market_claim", "status"],
+  "market-list": ["listing_created", "status"],
+  "market-purchase": ["listing_purchase", "status"],
+  "market-listing-cancel": ["market_cancellation", "status"],
+  "market-listing-claim": ["market_claim", "status"],
+  hello: [
+    "character",
+    "inventory",
+    "capacity",
+    "activity",
+    "rest_estimate",
+    "combat_stats",
+    "journal",
+    "plan",
+    "quests",
+    "scenery",
+    "last_result",
+    "changelog",
+    "announcement"
+  ],
+  characters: ["characters"],
+  "search-characters": ["search_results"],
+  "resolve-character": ["characters"],
+  options: ["options"],
+  character: [
+    "character",
+    "inventory",
+    "capacity",
+    "activity",
+    "rest_estimate",
+    "combat_stats"
+  ],
+  create: ["created"],
+  profile: ["profile_saved"],
+  map: ["map", "position"],
+  look: ["look"],
+  route: ["route"],
+  activity: ["activity", "last_result", "position", "scenery", "status"],
+  travel: ["activity", "status", "last_result", "position", "scenery"],
+  carriage: ["activity", "status", "last_result", "position", "scenery"],
+  gather: [
+    "activity",
+    "capacity",
+    "status",
+    "last_result",
+    "position",
+    "scenery"
+  ],
+  recipes: ["recipes"],
+  items: ["items"],
+  craft: [
+    "activity",
+    "capacity",
+    "status",
+    "last_result",
+    "position",
+    "scenery"
+  ],
+  stop: ["activity", "last_result", "capacity", "status"],
+  shop: ["shop"],
+  buy: ["purchase", "status"],
+  equip: ["capacity", "status", "combat_stats"],
+  unequip: ["capacity", "status", "combat_stats"],
+  repair: ["capacity", "status", "repair"],
+  discard: ["capacity", "status"],
+  storage: ["storage"],
+  "search-storage": ["storage_search"],
+  deposit: ["capacity", "transfer", "status"],
+  withdraw: ["capacity", "transfer", "status"]
+};
+
 // src/help.ts
 var guideTopicOption = {
   flags: "--topic <topic>",
@@ -26481,7 +26718,8 @@ function commandHelp(name, definition) {
       )
     ],
     examples: [...definition.examples ?? []],
-    ...definition.inputExample ? { input_example: definition.inputExample } : {}
+    ...definition.inputExample ? { input_example: definition.inputExample } : {},
+    data_keys: responseDataKeys[name] ?? []
   };
 }
 function firstSentence(text2) {
@@ -26490,7 +26728,7 @@ function firstSentence(text2) {
 function programHelp() {
   return {
     command: "clawsaga",
-    description: "Play ClawSaga. Requires Node.js 22.12.0 or later. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it.",
+    description: "Play ClawSaga. Requires Node.js 22.12.0 or later. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it. Its `data_keys` lists the keys that the response `data` can carry.",
     usage: "clawsaga <command> [options]",
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: [
@@ -26499,6 +26737,10 @@ function programHelp() {
       "clawsaga hello -c m7Qp2_aR9L-x"
     ],
     commands: [
+      {
+        name: "update",
+        description: "Install the latest CLI with npm."
+      },
       ...Object.entries(commands).map(([name, definition]) => ({
         name,
         description: firstSentence(definition.help)
@@ -26559,6 +26801,14 @@ function schemaHelp() {
   };
 }
 function structuredHelp(target5) {
+  if (target5 === "clawsaga update")
+    return {
+      command: "clawsaga update",
+      description: "Install the latest CLI with npm. Credentials and installed skills are preserved.",
+      usage: "clawsaga update",
+      options: [],
+      examples: ["clawsaga update"]
+    };
   if (target5 === "clawsaga") return programHelp();
   if (target5 === "clawsaga guide") return guideHelp();
   if (target5 === "auth login") return authLoginHelp();
@@ -26572,9 +26822,9 @@ function structuredHelp(target5) {
 function clientFor(values) {
   return new GameClient(serverOrigin(values.server));
 }
-async function execute(args, notify, options = {}) {
+async function execute(args, notify) {
   const run = { helpTarget: "clawsaga", helpCommand: "clawsaga --help" };
-  const program2 = createProgram(run, notify, options.request ?? fetch);
+  const program2 = createProgram(run, notify);
   try {
     await program2.parseAsync(args, { from: "user" });
   } catch (error61) {
@@ -26594,7 +26844,7 @@ function helpOrFailure(error61, run) {
     help_command: run.helpCommand
   });
 }
-async function commandOutput(run) {
+function commandOutput(run) {
   if (run.schemaHelpResult) return { ok: true, ...run.schemaHelpResult };
   const { result, executed } = run;
   if (!result) throw new CliError("INVALID_COMMAND");
@@ -26603,7 +26853,7 @@ async function commandOutput(run) {
     wait: executed?.wait ?? true
   });
   if (executed?.name !== "hello" || !rendered.ok) return rendered;
-  return withNotes(rendered, await helloNotes(rendered, run.publishedVersion));
+  return withNotes(rendered, helloNotes(rendered));
 }
 function isGameResponse(result) {
   return "schema_version" in result;
@@ -26630,18 +26880,15 @@ function withRecoveryGuidance(error61, run) {
 function isLostResponse(error61) {
   return !notSent(error61) && (error61.code === "INVALID_RESPONSE" || error61.code === "UPDATE_REQUIRED" || error61.code === "SERVICE_UNAVAILABLE");
 }
-async function helloNotes(response, published) {
+function helloNotes(response) {
   const notes = [];
   if (response.data.announcement)
     notes.push(announcementNote(response.data.announcement));
   if (response.data.changelog)
     notes.push(changelogNote(response.data.changelog));
-  const latest = await published;
-  if (latest && isNewerVersion(latest, package_default.version))
-    notes.push(updateNote(package_default.version, latest));
   return notes;
 }
-function createProgram(run, notify, request) {
+function createProgram(run, notify) {
   const program2 = new Command("clawsaga").description("Play ClawSaga. Requires Node.js 22.12.0 or later.").version(package_default.version).addOption(
     new Option("-s, --server <origin>", "ClawSaga origin").env("CLAWSAGA_SERVER").default(package_default.homepage)
   ).addOption(
@@ -26661,10 +26908,15 @@ function createProgram(run, notify, request) {
   program2.on("--help", () => {
     run.helpTarget = "clawsaga";
   });
+  program2.command("update").description("Install the latest CLI with npm").on("--help", () => {
+    run.helpTarget = "clawsaga update";
+  }).action(async () => {
+    run.result = { ok: true, version: await updateCli() };
+  });
   addSchemaCommand(program2, run);
   addDocumentCommands(program2, run);
   for (const [name, definition] of Object.entries(commands))
-    addGameCommand(program2, run, notify, request, name, definition);
+    addGameCommand(program2, run, notify, name, definition);
   return program2;
 }
 function addSchemaCommand(program2, run) {
@@ -26759,7 +27011,7 @@ function addDocumentCommands(program2, run) {
     ).login();
   });
 }
-function addGameCommand(program2, run, notify, request, name, definition) {
+function addGameCommand(program2, run, notify, name, definition) {
   const command2 = program2.command(name).description(definition.help).configureOutput({
     outputError: () => {
       run.helpCommand = `clawsaga ${name} --help`;
@@ -26786,7 +27038,6 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
       wait: true
     };
     run.executed = executed;
-    if (name === "hello") run.publishedVersion = fetchPublishedVersion(request);
     const values = optionsSchema.parse(command2.optsWithGlobals());
     executed.character = values.character;
     executed.wait = values.wait !== false;
@@ -26883,6 +27134,14 @@ try {
   print(process.stdout, result);
   process.exitCode = "ok" in result && !result.ok ? 1 : 0;
 } catch (error61) {
-  print(process.stdout, cliFailure(error61));
+  print(
+    process.stdout,
+    cliFailure(
+      await recoverUpdate(
+        error61,
+        (note) => print(process.stderr, { hints: [{ note }] })
+      )
+    )
+  );
   process.exitCode = 1;
 }

@@ -63,6 +63,24 @@ const unreadFlag = [
   'Read oldest unread incoming messages first',
 ] as const;
 
+// 襲撃は保存した戦術で戦うので、入力例は無人で勝てる最小構成にし、職に依存する技は入れない。
+const tacticInputExample = {
+  rules: [
+    {
+      conditions: [
+        { kind: 'hp_below', percent: 25 },
+        { kind: 'potions_below', count: 1 },
+      ],
+      action: { kind: 'retreat' },
+    },
+    {
+      conditions: [{ kind: 'hp_below', percent: 45 }],
+      action: { kind: 'potion' },
+    },
+  ],
+  potion_limit: 3,
+};
+
 export const adventureCommands: Record<string, CommandDefinition> = {
   monologue: {
     path: 'character/monologue/send',
@@ -90,15 +108,15 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/tactics/set',
     schema: setTacticsSchema,
     flags: [jsonFlag],
-    help: 'Validate and save a tactic for future battles.',
-    inputExample: { tactic: { rules: [], potion_limit: 0 } },
+    help: 'Validate and save the tactic for your current job. Ambushes after travel or gathering always use the saved tactic.',
+    inputExample: { tactic: tacticInputExample },
   },
   'tactics-check': {
     path: 'character/tactics/validate',
     schema: validateTacticsSchema,
     flags: [jsonFlag],
     help: 'Validate a tactic without saving.',
-    inputExample: { tactic: { rules: [], potion_limit: 0 } },
+    inputExample: { tactic: tacticInputExample },
   },
   fight: {
     path: 'character/combat/start',

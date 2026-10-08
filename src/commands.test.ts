@@ -7,8 +7,6 @@ import { execute } from './commands.js';
 import { commands } from './command-registry.js';
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
-// 更新確認は公開リポジトリへ取りに行くため、単体試験では必ず失敗させて無効化する。
-vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')));
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -200,6 +198,20 @@ it('keeps English help available without authorization and separates content lan
   });
 });
 
+// The keys are generated from the server's schemas outside this package, so a
+// command added here without regenerating them would show an empty list.
+it('lists the response data keys of every game command in its help', async () => {
+  for (const name of Object.keys(commands)) {
+    const { help } = (await execute([name, '--help'], vi.fn())) as unknown as {
+      help: { data_keys: string[] };
+    };
+    expect(help.data_keys, name).not.toEqual([]);
+  }
+  expect(await execute(['quest-board', '--help'], vi.fn())).toMatchObject({
+    help: { data_keys: ['quest_board', 'quest_board_budget'] },
+  });
+});
+
 it('generates structured help examples from the command definitions without authorization', async () => {
   const createHelp = (await execute(
     ['create', '--help'],
@@ -270,6 +282,7 @@ it('parses every structured help command example with a fake client', async () =
     help: { commands: { name: string }[] };
   };
   const special = new Set([
+    'update',
     'guide [--topic <topic>] [--query <text>]',
     'resume',
     'changelog',
@@ -659,7 +672,7 @@ it('reads the server changelog without a character', async () => {
   expect(read).toHaveBeenCalledWith('changelog?locale=en', expect.anything());
 });
 
-it('adds the changelog and update notices to hello only', async () => {
+it('adds changelog notices to hello without checking for CLI updates', async () => {
   const hello: AgentGameResponse = {
     ...initial,
     data: {
@@ -667,40 +680,20 @@ it('adds the changelog and update notices to hello only', async () => {
       changelog: { published_at: '2026-09-18', title: 'Rest tuning' },
     },
   };
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(hello);
-  const request = (() =>
-    Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve({ version: '9.9.9' }),
-    })) as unknown as typeof fetch;
-
-  expect(
-    await execute(['hello', '-c', 'Traveler0000'], vi.fn(), { request }),
-  ).toMatchObject({
-    hints: [
-      { note: expect.stringContaining('Rest tuning') },
-      { note: expect.stringContaining('npx skills update clawsaga') },
-    ],
-  });
-
-  // 見出しを返しても、hello以外の応答には案内を足さない。
-  invoke.mockResolvedValue(hello);
-  expect(await execute(['characters'], vi.fn(), { request })).toEqual(hello);
-});
-
-it('keeps hello quiet when the published version is not newer', async () => {
-  vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue(initial);
-  const request = (() =>
-    Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve({ version: '0.1.7' }),
-    })) as unknown as typeof fetch;
-  const result = await execute(['hello', '-c', 'Traveler0000'], vi.fn(), {
-    request,
-  });
-  expect(result).not.toHaveProperty('hints');
+  vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue(hello);
+  const request = vi.fn();
+  vi.stubGlobal('fetch', request);
+  try {
+    expect(
+      await execute(['hello', '-c', 'Traveler0000'], vi.fn()),
+    ).toMatchObject({
+      hints: [{ note: expect.stringContaining('Rest tuning') }],
+    });
+    expect(await execute(['characters'], vi.fn())).toEqual(hello);
+    expect(request).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 it('reads the guide index, one topic or a search from the document route', async () => {

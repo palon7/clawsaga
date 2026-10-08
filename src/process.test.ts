@@ -16,9 +16,7 @@ import { agentSchemaVersion } from './protocol.js';
 // 実際の配布CLIを子プロセスで動かし、ローカルHTTPハーネスだけで受付・待機の
 // 中断と、別プロセスからの同じ活動の回収を確かめる。参照するbundleは
 // `pnpm build`の生成物で、`pnpm check`はtestより先にbuildする。
-const cli = fileURLToPath(
-  new URL('../skills/clawsaga/bin/clawsaga.mjs', import.meta.url),
-);
+const cli = fileURLToPath(new URL('../bin/clawsaga.mjs', import.meta.url));
 const characterId = 'Traveler0000';
 const travelId = '00000000-0000-4000-8000-000000000001';
 const serverTime = '2026-09-19T00:00:00.000Z';

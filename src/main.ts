@@ -1,5 +1,6 @@
 import { execute } from './commands.js';
 import { cliFailure } from './errors.js';
+import { recoverUpdate } from './update.js';
 
 // 出力の先頭だけを読むエージェントがいる。読み手が存在を予期できない項目を
 // `data`より前に、判断に使わない時刻を最後に置く。
@@ -21,6 +22,13 @@ try {
   print(process.stdout, result);
   process.exitCode = 'ok' in result && !result.ok ? 1 : 0;
 } catch (error) {
-  print(process.stdout, cliFailure(error));
+  print(
+    process.stdout,
+    cliFailure(
+      await recoverUpdate(error, (note) =>
+        print(process.stderr, { hints: [{ note }] }),
+      ),
+    ),
+  );
   process.exitCode = 1;
 }

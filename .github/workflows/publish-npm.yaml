@@ -1,0 +1,25 @@
+name: Publish npm
+on:
+  release:
+    types: [published]
+jobs:
+  publish:
+    if: github.repository == 'palon7/clawsaga' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+      - name: Verify release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node --input-type=module -e 'import p from "./package.json" with { type:"json" }; if (process.env.RELEASE_TAG !== `v${p.version}`) throw new Error("Release tag does not match package version");'
+      # The release publishes the committed build as is; CI checks every commit.
+      - run: npm publish --access public
