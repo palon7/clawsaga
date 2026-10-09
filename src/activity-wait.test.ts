@@ -324,7 +324,7 @@ it('waits for an accepted fight and returns a cancellation without starting anot
     data: {
       activity: {
         kind: 'combat',
-        activity_id: '00000000-0000-4000-8000-000000000002',
+        activity_id: 2,
         enemy_id: 'wolf',
         enemy_name: 'Wolf',
         practice: true,
@@ -339,7 +339,6 @@ it('waits for an accepted fight and returns a cancellation without starting anot
         enemy_hp: 120,
         enemy_max_hp: 120,
         retreat_ticks: 0,
-        retreat_requested_tick: null,
       },
     },
   };
@@ -353,7 +352,6 @@ it('waits for an accepted fight and returns a cancellation without starting anot
         status: 'ENDED',
         end_reason: 'CANCELLED',
         ended_at: '2026-09-09T00:00:10.000Z',
-        summary: null,
       },
     },
   };

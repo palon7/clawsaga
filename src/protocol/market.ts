@@ -4,6 +4,7 @@ import {
   itemIdSchema as itemId,
   localeSchema,
   uuidSchema,
+  instanceIdSchema,
 } from './ids.js';
 import { locationIdSchema } from './movement.js';
 
@@ -61,7 +62,7 @@ export const cancelMarketOrderSchema = z
   .strict();
 export const claimMarketOrderSchema = cancelMarketOrderSchema;
 export const createMarketListingSchema = z
-  .object({ ...change, instance_id: uuidSchema, price, source })
+  .object({ ...change, instance_id: instanceIdSchema, price, source })
   .strict();
 export const buyMarketListingSchema = z
   .object({

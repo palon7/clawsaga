@@ -16,13 +16,7 @@ it('requires an explicit repair method and sends that choice without fallback', 
   const invoke = vi
     .spyOn(GameClient.prototype, 'invoke')
     .mockResolvedValue(initial);
-  const args = [
-    'repair',
-    '-c',
-    'Maker0000000',
-    '--instance',
-    '11111111-1111-4111-8111-111111111111',
-  ];
+  const args = ['repair', '-c', 'Maker0000000', '--instance', 'k3v9q2m7xa'];
   await expect(execute(args, vi.fn())).rejects.toMatchObject({
     code: 'INVALID_ARGUMENTS',
   });
@@ -361,7 +355,7 @@ it('maps stack and individual discard flags', async () => {
     target: { kind: 'stack', item_id: 'wolf_meat', quantity: 2 },
   });
   invoke.mockClear();
-  const instance = '11111111-1111-4111-8111-111111111111';
+  const instance = 'k3v9q2m7xa';
   await execute(
     ['discard', '-c', 'Traveler0000', '--instance', instance],
     vi.fn(),
@@ -408,7 +402,7 @@ it('returns the parser reason and command-specific help without sending a reques
         '-c',
         'Traveler0000',
         '--instance',
-        '00000000-0000-4000-8000-000000000001',
+        'k3v9q2m7xa',
         '--item',
         'iron_sword',
       ],
@@ -417,7 +411,7 @@ it('returns the parser reason and command-specific help without sending a reques
     ],
     [
       ['equip', '--instance'],
-      "option '--instance <uuid>' argument missing",
+      "option '--instance <id>' argument missing",
       'clawsaga equip',
     ],
     [['characters', 'unexpected'], 'too many arguments', 'clawsaga characters'],
@@ -672,7 +666,7 @@ it('reads the server changelog without a character', async () => {
   expect(read).toHaveBeenCalledWith('changelog?locale=en', expect.anything());
 });
 
-it('adds changelog notices to hello without checking for CLI updates', async () => {
+it('adds changelog notices to hello only', async () => {
   const hello: AgentGameResponse = {
     ...initial,
     data: {
@@ -681,19 +675,10 @@ it('adds changelog notices to hello without checking for CLI updates', async () 
     },
   };
   vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue(hello);
-  const request = vi.fn();
-  vi.stubGlobal('fetch', request);
-  try {
-    expect(
-      await execute(['hello', '-c', 'Traveler0000'], vi.fn()),
-    ).toMatchObject({
-      hints: [{ note: expect.stringContaining('Rest tuning') }],
-    });
-    expect(await execute(['characters'], vi.fn())).toEqual(hello);
-    expect(request).not.toHaveBeenCalled();
-  } finally {
-    vi.unstubAllGlobals();
-  }
+  expect(await execute(['hello', '-c', 'Traveler0000'], vi.fn())).toMatchObject(
+    { hints: [{ note: expect.stringContaining('Rest tuning') }] },
+  );
+  expect(await execute(['characters'], vi.fn())).toEqual(hello);
 });
 
 it('reads the guide index, one topic or a search from the document route', async () => {

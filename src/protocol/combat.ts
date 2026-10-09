@@ -4,7 +4,8 @@ import {
   jobSchema,
   localeSchema,
   characterIdSchema,
-  uuidSchema,
+  activityIdSchema,
+  dropIdSchema,
 } from './ids.js';
 
 const target = {
@@ -119,8 +120,9 @@ export const tacticSchema = z
           .object({
             conditions: z
               .array(tacticConditionSchema)
+              .optional()
               .describe(
-                'All conditions must match (AND); an empty list always matches.',
+                'All conditions must match (AND); an omitted or empty list always matches.',
               ),
             action: tacticActionSchema,
           })
@@ -170,11 +172,16 @@ export const useItemSchema = z
 export const changeJobSchema = z
   .object({ ...target, job_id: jobSchema })
   .strict();
+export const combatReportIncludeSchema = z.enum(['frames', 'preparation']);
 export const getCombatReportSchema = z
-  .object({ ...target, activity_id: uuidSchema })
+  .object({
+    ...target,
+    activity_id: activityIdSchema,
+    include: z.array(combatReportIncludeSchema).optional(),
+  })
   .strict();
 export const getEncountersSchema = z.object(target).strict();
 export const getLostItemsSchema = z.object(target).strict();
 export const recoverLostItemsSchema = z
-  .object({ ...target, drop_id: uuidSchema })
+  .object({ ...target, drop_id: dropIdSchema })
   .strict();

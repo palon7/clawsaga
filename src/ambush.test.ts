@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
@@ -32,7 +31,7 @@ function requests() {
   return request;
 }
 
-function runningGather(activityId: string) {
+function runningGather(activityId: number) {
   return {
     kind: 'gather',
     activity_id: activityId,
@@ -44,7 +43,7 @@ function runningGather(activityId: string) {
   };
 }
 
-function runningCombat(activityId: string) {
+function runningCombat(activityId: number) {
   return {
     kind: 'combat',
     activity_id: activityId,
@@ -62,7 +61,6 @@ function runningCombat(activityId: string) {
     enemy_hp: 40,
     enemy_max_hp: 160,
     retreat_ticks: 0,
-    retreat_requested_tick: null,
   };
 }
 
@@ -73,16 +71,16 @@ it.each([
   'counts the ambushed harvest and ends --count $count after $before earlier harvests',
   async ({ count, before }) => {
     const request = requests();
-    const sourceIds: string[] = [];
+    const sourceIds: number[] = [];
     for (let index = 0; index <= before; index += 1) {
-      const activityId = randomUUID();
+      const activityId = index + 1;
       sourceIds.push(activityId);
       request.mockResolvedValueOnce(
         response({ activity: runningGather(activityId) }, true),
       );
       const ambush =
         index === before
-          ? { activity_id: randomUUID(), enemy_id: 'wolf' }
+          ? { activity_id: index + 2, enemy_id: 'wolf' }
           : undefined;
       request.mockResolvedValueOnce(
         response({
@@ -156,7 +154,7 @@ it.each([
 
 it('adds a recovery hint when a wait outcome is unknown', async () => {
   const request = requests();
-  const activityId = randomUUID();
+  const activityId = 5;
   request.mockResolvedValueOnce(
     response({ activity: runningGather(activityId) }, true),
   );

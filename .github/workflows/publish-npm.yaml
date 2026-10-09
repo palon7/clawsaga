@@ -22,4 +22,4 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: node --input-type=module -e 'import p from "./package.json" with { type:"json" }; if (process.env.RELEASE_TAG !== `v${p.version}`) throw new Error("Release tag does not match package version");'
       # The release publishes the committed build as is; CI checks every commit.
-      - run: npm publish --access public
+      - run: npm publish --tag next

@@ -5,6 +5,10 @@ export const jobSchema = z.enum(['warrior', 'rogue', 'mage', 'priest', 'bard']);
 export const characterIdSchema = z.string().regex(/^[A-Za-z0-9_-]{12}$/);
 export const discriminatorSchema = z.string().regex(/^[0-9]{4}$/);
 export const uuidSchema = z.uuid();
+// Activities are numbered per character; equipment and drops use short IDs.
+export const activityIdSchema = z.number().int().min(1);
+export const instanceIdSchema = z.string().regex(/^[0-9a-z]{10}$/);
+export const dropIdSchema = instanceIdSchema;
 export const itemIdSchema = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
 
 export const skillIdSchema = z.enum([

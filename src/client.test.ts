@@ -296,7 +296,7 @@ it('returns unknown content values and unknown fields from the server unchanged'
       character: { job_id: 'necromancer', max_mp: 250 },
       last_result: {
         kind: 'gather',
-        activity_id: '00000000-0000-4000-8000-000000000001',
+        activity_id: 1,
         status: 'ENDED',
         end_reason: 'COMPLETED',
         output: { item_id: 'sea_salt', quantity: 1, rarity: 'rare' },

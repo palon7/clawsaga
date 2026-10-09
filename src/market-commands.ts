@@ -188,7 +188,7 @@ export const marketCommands: Record<string, CommandDefinition> = {
     autoRequestId: true,
     errorContext: marketWriteContext,
     flags: [
-      ['--instance <uuid>', 'Item instance ID from inventory', true],
+      ['--instance <id>', 'Item instance ID from inventory', true],
       ['--price <gold>', 'Fixed price for the individual', true],
       [
         '--source <source>',
@@ -200,7 +200,7 @@ export const marketCommands: Record<string, CommandDefinition> = {
     ],
     help: 'List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells, and the sale fee is taken from the price when it sells. A request ID is generated unless supplied.',
     examples: [
-      'clawsaga market-list -c m7Qp2_aR9L-x --instance 22222222-2222-4222-8222-222222222222 --price 100 --source carried',
+      'clawsaga market-list -c m7Qp2_aR9L-x --instance k3v9q2m7xa --price 100 --source carried',
     ],
   },
   'market-purchase': {

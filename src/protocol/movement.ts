@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { localeSchema, characterIdSchema } from './ids.js';
+import { activityIdSchema, localeSchema, characterIdSchema } from './ids.js';
 
 export const locationIdSchema = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
 
@@ -27,6 +27,6 @@ export const rideCarriageSchema = travelSchema;
 export const getActivitySchema = z
   .object({
     ...common,
-    activity_id: z.uuid().optional(),
+    activity_id: activityIdSchema.optional(),
   })
   .strict();

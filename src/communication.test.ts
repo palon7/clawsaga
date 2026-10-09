@@ -2,7 +2,12 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
-import { agentSchemaVersion } from './protocol.js';
+import {
+  agentSchemaVersion,
+  endSessionSchema,
+  writeJournalSchema,
+} from './protocol.js';
+import { CliError } from './errors.js';
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
@@ -94,3 +99,59 @@ it('sends identical text twice as two explicit calls without adding request IDs'
     ]),
   );
 });
+
+it('generates a journal request ID unless the body file or --request supplies one', async () => {
+  const invoke = vi
+    .spyOn(GameClient.prototype, 'invoke')
+    .mockResolvedValue({ ...result });
+  const body = { text: 'Back from the forest.', language: 'en' };
+  vi.mocked(readFile).mockResolvedValue(JSON.stringify(body));
+  await execute(['journal-write', '-c', traveler, '-i', 'entry.json'], vi.fn());
+  expect(invoke.mock.calls[0]![1]).toMatchObject({
+    ...body,
+    request_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+  });
+
+  const retry = '44444444-4444-4444-8444-444444444444';
+  await execute(
+    ['journal-write', '-c', traveler, '-i', 'entry.json', '--request', retry],
+    vi.fn(),
+  );
+  expect(invoke.mock.calls[1]![1]).toMatchObject({ request_id: retry });
+
+  const saved = '55555555-5555-4555-8555-555555555555';
+  vi.mocked(readFile).mockResolvedValue(
+    JSON.stringify({ ...body, request_id: saved }),
+  );
+  await execute(['journal-write', '-c', traveler, '-i', 'entry.json'], vi.fn());
+  expect(invoke.mock.calls[2]![1]).toMatchObject({ request_id: saved });
+});
+
+it.each(['journal-write', 'end'])(
+  'reports the sent request ID after an uncertain %s and reuses it on retry',
+  async (command) => {
+    const invoke = vi
+      .spyOn(GameClient.prototype, 'invoke')
+      .mockRejectedValueOnce(new CliError('NETWORK_ERROR'))
+      .mockResolvedValue({ ...result });
+    vi.mocked(readFile).mockResolvedValue(
+      JSON.stringify({
+        text: 'Back from the forest.',
+        language: 'en',
+        ...(command === 'end' ? { activity_policy: 'continue' } : {}),
+      }),
+    );
+    const args = [command, '-c', traveler, '-i', 'entry.json'];
+    const failure = await execute(args, vi.fn()).catch(
+      (error: CliError) => error,
+    );
+    const schema = command === 'end' ? endSessionSchema : writeJournalSchema;
+    const sent = schema.parse(invoke.mock.calls[0]![1]);
+    expect(failure).toMatchObject({
+      code: 'NETWORK_ERROR',
+      detail: { request_id: sent.request_id },
+    });
+    await execute([...args, '--request', String(sent.request_id)], vi.fn());
+    expect(invoke.mock.calls[1]).toEqual(invoke.mock.calls[0]);
+  },
+);

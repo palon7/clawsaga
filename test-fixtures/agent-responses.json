@@ -3,7 +3,7 @@
     "name": "empty_channel_page",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "chat": {
@@ -18,7 +18,7 @@
     "name": "unread_direct_message_only",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-22T01:02:03Z",
       "attention": { "unread_direct_messages": 1 },
       "data": {}
@@ -28,7 +28,7 @@
     "name": "unread_channel_board_and_news",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-22T01:02:03Z",
       "attention": {
         "chat": { "channel_id": "selene", "new_messages": 100 },
@@ -42,13 +42,13 @@
     "name": "cancelled_travel",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "activity": null,
         "last_result": {
           "kind": "travel",
-          "activity_id": "00000000-0000-4000-8000-000000000003",
+          "activity_id": 3,
           "status": "ENDED",
           "ended_at": "2026-09-22T01:02:03Z",
           "end_reason": "CANCELLED",
@@ -62,12 +62,12 @@
     "name": "gather_actual_experience",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "last_result": {
           "kind": "gather",
-          "activity_id": "00000000-0000-4000-8000-000000000003",
+          "activity_id": 3,
           "status": "ENDED",
           "ended_at": "2026-09-22T01:02:03Z",
           "end_reason": "COMPLETED",
@@ -81,12 +81,12 @@
     "name": "craft_actual_experience",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-22T01:02:03Z",
       "data": {
         "last_result": {
           "kind": "craft",
-          "activity_id": "00000000-0000-4000-8000-000000000003",
+          "activity_id": 3,
           "status": "ENDED",
           "ended_at": "2026-09-22T01:02:03Z",
           "end_reason": "STOPPED",
@@ -106,7 +106,7 @@
     "name": "settled_result_with_current_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-19T01:02:03.456Z",
       "next_poll_after_seconds": 7,
       "data": {
@@ -123,7 +123,7 @@
           },
           {
             "kind": "individual",
-            "instance_id": "00000000-0000-4000-8000-000000000001",
+            "instance_id": "k3v9q2m7xa",
             "item_id": "oak_staff",
             "name": "Oak Staff",
             "unit_weight": 4,
@@ -134,7 +134,6 @@
               "equip_slot": "main_hand",
               "required_job": "mage",
               "required_job_name": "Mage",
-              "required_level": null,
               "power": 9,
               "armor": 0
             },
@@ -163,23 +162,20 @@
           "max_mp": 100,
           "gold": 127,
           "level": 3,
-          "experience": 219,
-          "weakened_until": null
+          "experience": 219
         },
         "rest_estimate": {
           "available": false,
           "reason": "busy",
-          "duration_seconds": null,
           "inn": {
             "available": false,
             "reason": "busy",
-            "fee": 8,
-            "duration_seconds": null
+            "fee": 8
           }
         },
         "activity": {
           "kind": "rest",
-          "activity_id": "00000000-0000-4000-8000-000000000002",
+          "activity_id": 2,
           "started_at": "2026-09-19T01:02:00.123Z",
           "completes_at": "2026-09-19T01:07:00.123Z",
           "duration_seconds": 300,
@@ -191,7 +187,7 @@
         },
         "last_result": {
           "kind": "combat",
-          "activity_id": "00000000-0000-4000-8000-000000000003",
+          "activity_id": 3,
           "status": "ENDED",
           "ended_at": "2026-09-19T01:01:59.987Z",
           "end_reason": "VICTORY",
@@ -218,7 +214,7 @@
     "name": "accepted_activity",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-19T01:08:00.456Z",
       "next_poll_after_seconds": 5,
       "data": {
@@ -231,12 +227,11 @@
           "max_mp": 100,
           "gold": 138,
           "level": 3,
-          "experience": 236,
-          "weakened_until": null
+          "experience": 236
         },
         "activity": {
           "kind": "travel",
-          "activity_id": "00000000-0000-4000-8000-000000000006",
+          "activity_id": 6,
           "from": { "id": "selene", "name": "Selene", "kind": "town" },
           "to": { "id": "openpit", "name": "Openpit", "kind": "field" },
           "started_at": "2026-09-19T01:08:00.123Z",
@@ -251,17 +246,16 @@
     "name": "cancelled_result",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-19T02:03:04.567Z",
       "data": {
         "activity": null,
         "last_result": {
           "kind": "combat",
-          "activity_id": "00000000-0000-4000-8000-000000000004",
+          "activity_id": 4,
           "status": "ENDED",
           "ended_at": "2026-09-19T02:03:04.321Z",
-          "end_reason": "CANCELLED",
-          "summary": null
+          "end_reason": "CANCELLED"
         }
       }
     }
@@ -270,7 +264,7 @@
     "name": "location_chat",
     "response": {
       "ok": true,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-19T03:04:05.678Z",
       "attention": {
         "chat": { "channel_id": "selene", "new_messages": 2 }
@@ -286,7 +280,6 @@
               "author_discriminator": "0042",
               "created_at": "2026-09-19T03:04:05.123Z",
               "language": "en",
-              "references": [],
               "user_content": {
                 "author_name": "Friend",
                 "text": "Meet me by the fountain."
@@ -302,7 +295,7 @@
     "name": "business_failure",
     "response": {
       "ok": false,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-19T04:05:06.789Z",
       "data": {},
       "error": {
@@ -315,7 +308,7 @@
     "name": "inventory_shortage",
     "response": {
       "ok": false,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-10-01T00:00:00Z",
       "data": {},
       "error": {
@@ -336,7 +329,7 @@
     "name": "delivery_shortage",
     "response": {
       "ok": false,
-      "schema_version": "3.13",
+      "schema_version": "3.14",
       "server_time": "2026-09-19T04:06:07.890Z",
       "data": {},
       "error": {

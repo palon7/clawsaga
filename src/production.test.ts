@@ -17,7 +17,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const gatherId = '11111111-1111-4111-8111-111111111111';
+const gatherId = 11;
 
 function running(): AgentGameResponse {
   return {
@@ -367,7 +367,7 @@ it('keeps the quantity and omits an absent cap when a bulk purchase reply is los
   expect(error.detail).not.toHaveProperty('max_payment');
 });
 
-const craftId = '22222222-2222-4222-8222-222222222222';
+const craftId = 22;
 
 function runningCraft(id = craftId): AgentGameResponse {
   return {
@@ -536,7 +536,7 @@ function replayedCraftResult(
 }
 
 function runningCraftActivity(
-  id: string,
+  id: number,
 ): NonNullable<AgentGameResponse['data']['activity']> {
   return {
     kind: 'craft',
@@ -556,9 +556,7 @@ function runningCraftActivity(
 
 it('answers a replayed craft from its stored result while a newer activity keeps running', async () => {
   const response = replayedCraftResult();
-  response.data.activity = runningCraftActivity(
-    '77777777-7777-4777-8777-777777777777',
-  );
+  response.data.activity = runningCraftActivity(77);
   response.next_poll_after_seconds = 30;
   expect(agentGameResponseSchema.safeParse(response).success).toBe(true);
   const invoke = vi

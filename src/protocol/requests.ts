@@ -19,6 +19,7 @@ export const includeSchema = z.enum([
   'profile',
   'inventory',
   'repair_estimates',
+  'growth',
 ]);
 
 export const helloSchema = z.object({ ...target, ...presentation }).strict();

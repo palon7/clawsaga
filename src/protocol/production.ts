@@ -4,6 +4,8 @@ import {
   localeSchema,
   characterIdSchema,
   skillIdSchema,
+  activityIdSchema,
+  instanceIdSchema,
 } from './ids.js';
 import { locationIdSchema } from './movement.js';
 
@@ -36,7 +38,7 @@ export const craftSchema = z
   })
   .strict();
 export const stopActivitySchema = z
-  .object({ ...common, activity_id: z.uuid() })
+  .object({ ...common, activity_id: activityIdSchema })
   .strict();
 export const getShopSchema = z.object(common).strict();
 export const buySchema = z
@@ -49,10 +51,14 @@ export const buySchema = z
   })
   .strict();
 export const equipSchema = z
-  .object({ ...common, instance_id: z.uuid() })
+  .object({ ...common, instance_id: instanceIdSchema })
   .strict();
 export const repairSchema = z
-  .object({ ...common, instance_id: z.uuid(), method: z.enum(['kit', 'npc']) })
+  .object({
+    ...common,
+    instance_id: instanceIdSchema,
+    method: z.enum(['kit', 'npc']),
+  })
   .strict();
 export const discardItemSchema = z
   .object({
@@ -68,7 +74,7 @@ export const discardItemSchema = z
       z
         .object({
           kind: z.literal('individual'),
-          instance_id: z.uuid(),
+          instance_id: instanceIdSchema,
         })
         .strict(),
     ]),

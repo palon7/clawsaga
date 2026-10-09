@@ -10,7 +10,7 @@ import type { Values } from './command-input.js';
 
 // The batch is one JSON array option. The server validates its elements; only
 // unparsable JSON is reported here.
-function addItemTargets(values: Values, input: Record<string, unknown>) {
+export function addItemTargets(values: Values, input: Record<string, unknown>) {
   if (values.items === undefined) return;
   try {
     input.items = JSON.parse(values.items);
@@ -43,7 +43,7 @@ export const storageCommands: Record<string, CommandDefinition> = {
         true,
       ],
     ],
-    help: 'Find an item across every town storage you own, grouped by town. No match returns an empty list.',
+    help: 'Find an item across every town storage you own, grouped by town. With no match, results is omitted.',
     examples: ['clawsaga search-storage -c m7Qp2_aR9L-x --query ore'],
   },
   deposit: {
@@ -61,9 +61,9 @@ export const storageCommands: Record<string, CommandDefinition> = {
         'Retry with the same ID, town and items after an uncertain deposit',
       ],
     ],
-    help: 'Deposit items while idle in that town. The entire --items array succeeds or fails together. A request ID is generated unless supplied.',
+    help: 'Deposit items while idle in that town. Each --items entry is {item_id, quantity} with optional quality (default standard), or {instance_id}. The entire array succeeds or fails together. A request ID is generated unless supplied.',
     examples: [
-      'clawsaga deposit -c m7Qp2_aR9L-x --town selene --items \'[{"kind":"stack","item_id":"ore","quality":"standard","quantity":10}]\'',
+      'clawsaga deposit -c m7Qp2_aR9L-x --town selene --items \'[{"item_id":"ore","quantity":10}]\'',
     ],
   },
   withdraw: {
@@ -81,9 +81,9 @@ export const storageCommands: Record<string, CommandDefinition> = {
         'Retry with the same ID, town and items after an uncertain withdrawal',
       ],
     ],
-    help: 'Withdraw items while idle in that town. The entire --items array succeeds or fails together. A request ID is generated unless supplied.',
+    help: 'Withdraw items while idle in that town. Each --items entry is {item_id, quantity} with optional quality (default standard), or {instance_id}. The entire array succeeds or fails together. A request ID is generated unless supplied.',
     examples: [
-      'clawsaga withdraw -c m7Qp2_aR9L-x --town selene --items \'[{"kind":"individual","instance_id":"00000000-0000-4000-8000-000000000001"}]\'',
+      'clawsaga withdraw -c m7Qp2_aR9L-x --town selene --items \'[{"instance_id":"k3v9q2m7xa"}]\'',
     ],
   },
 };

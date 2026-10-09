@@ -20,18 +20,18 @@ const response: AgentGameResponse = {
 it('renders server hints with CLI command syntax, adds the invoked character and keeps notes as written', () => {
   const hints: AgentHint[] = [
     { operation: 'hello', arguments: { character_id: 'm7Qp2_aR9L-x' } },
-    { operation: 'get_activity', arguments: { activity_id: 'a1b2c3d4' } },
+    { operation: 'get_activity', arguments: { activity_id: '7' } },
     {
       operation: 'equip_item',
-      arguments: { instance_id: '11111111-1111-4111-8111-111111111111' },
+      arguments: { instance_id: 'k3v9q2m7xa' },
     },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ];
   expect(withRenderedHints({ ...response, hints }).hints).toEqual([
     { note: 'Run `hello -c m7Qp2_aR9L-x`.' },
-    { note: 'Run `activity -a a1b2c3d4`.' },
+    { note: 'Run `activity -a 7`.' },
     {
-      note: 'Run `equip --instance 11111111-1111-4111-8111-111111111111`.',
+      note: 'Run `equip --instance k3v9q2m7xa`.',
     },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
@@ -39,9 +39,9 @@ it('renders server hints with CLI command syntax, adds the invoked character and
     withRenderedHints({ ...response, hints }, 'HintHero0000').hints,
   ).toEqual([
     { note: 'Run `hello -c m7Qp2_aR9L-x`.' },
-    { note: 'Run `activity -a a1b2c3d4 -c HintHero0000`.' },
+    { note: 'Run `activity -a 7 -c HintHero0000`.' },
     {
-      note: 'Run `equip --instance 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
+      note: 'Run `equip --instance k3v9q2m7xa -c HintHero0000`.',
     },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
@@ -62,7 +62,7 @@ it('renders hints from the result without another request', async () => {
     hints: [
       {
         operation: 'equip_item',
-        arguments: { instance_id: '11111111-1111-4111-8111-111111111111' },
+        arguments: { instance_id: 'k3v9q2m7xa' },
       },
     ],
   };
@@ -86,7 +86,7 @@ it('renders hints from the result without another request', async () => {
   expect(result).toMatchObject({
     hints: [
       {
-        note: 'Run `equip --instance 11111111-1111-4111-8111-111111111111 -c HintHero0000`.',
+        note: 'Run `equip --instance k3v9q2m7xa -c HintHero0000`.',
       },
     ],
   });
@@ -94,8 +94,8 @@ it('renders hints from the result without another request', async () => {
   expect(invoke).toHaveBeenCalledTimes(1);
 });
 
-const travelId = '00000000-0000-4000-8000-000000000001';
-const ambushId = '00000000-0000-4000-8000-000000000002';
+const travelId = 1;
+const ambushId = 2;
 
 function runningTravel(): AgentGameResponse {
   return {
@@ -116,7 +116,7 @@ function runningTravel(): AgentGameResponse {
   };
 }
 
-function runningCombat(activityId: string) {
+function runningCombat(activityId: number) {
   return {
     kind: 'combat',
     activity_id: activityId,
@@ -134,14 +134,13 @@ function runningCombat(activityId: string) {
     enemy_hp: 40,
     enemy_max_hp: 160,
     retreat_ticks: 0,
-    retreat_requested_tick: null,
   } as const;
 }
 
 function gatherResultWithAmbush() {
   return {
     kind: 'gather',
-    activity_id: '00000000-0000-4000-8000-000000000003',
+    activity_id: 3,
     status: 'ENDED',
     end_reason: 'COMPLETED',
     ended_at: '2026-09-12T00:00:45.000Z',
@@ -180,7 +179,6 @@ it('describes a --no-wait finished result as a past result, even while another a
         summary: {
           hp: 100,
           mp: 100,
-          weakened_until: null,
         },
       },
     },
@@ -211,7 +209,10 @@ it('confirms an ambush result and keeps a running combat without a read suggesti
       {
         ...response,
         hints: [
-          { operation: 'get_activity', arguments: { activity_id: ambushId } },
+          {
+            operation: 'get_activity',
+            arguments: { activity_id: String(ambushId) },
+          },
         ],
         data: {
           activity: runningCombat(ambushId),
@@ -233,7 +234,10 @@ it('describes a past ambush and only then suggests reading its combat', () => {
       {
         ...response,
         hints: [
-          { operation: 'get_activity', arguments: { activity_id: ambushId } },
+          {
+            operation: 'get_activity',
+            arguments: { activity_id: String(ambushId) },
+          },
         ],
         data: { activity: null, last_result: gatherResultWithAmbush() },
       },

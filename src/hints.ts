@@ -35,7 +35,7 @@ export type RepetitionSummary = {
   stopped_reason: string;
 };
 
-function activityCommand(activityId: string, character?: string) {
+function activityCommand(activityId: number, character?: string) {
   return `activity -a ${activityId}${character ? ` -c ${character}` : ''}`;
 }
 
@@ -48,7 +48,7 @@ function repetitionOf(
 function ambushNotes(
   response: AgentGameResponse,
   character: string | undefined,
-): { notes: string[]; supersededActivityId?: string } {
+): { notes: string[]; supersededActivityId?: number } {
   const notes: string[] = [];
   const lastResult = response.data.last_result;
   const activity: AgentRunningActivity | undefined =
@@ -115,10 +115,10 @@ function stateNotes(
   return { notes, supersededActivityId };
 }
 
-function supersededAmbushHint(hint: AgentHint, activityId: string) {
+function supersededAmbushHint(hint: AgentHint, activityId: number) {
   return (
     hint.operation === 'get_activity' &&
-    hint.arguments?.activity_id === activityId
+    hint.arguments?.activity_id === String(activityId)
   );
 }
 
@@ -177,7 +177,7 @@ export function recoveryHint(
     return undefined;
   if (context.itemChange) return itemChangeRecovery(context.character);
   const activityId =
-    typeof detail.activity_id === 'string' ? detail.activity_id : undefined;
+    typeof detail.activity_id === 'number' ? detail.activity_id : undefined;
   const requestId =
     typeof detail.request_id === 'string' ? detail.request_id : undefined;
   const parts = [

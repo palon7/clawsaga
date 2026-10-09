@@ -18,7 +18,7 @@ import { agentSchemaVersion } from './protocol.js';
 // `pnpm build`の生成物で、`pnpm check`はtestより先にbuildする。
 const cli = fileURLToPath(new URL('../bin/clawsaga.mjs', import.meta.url));
 const characterId = 'Traveler0000';
-const travelId = '00000000-0000-4000-8000-000000000001';
+const travelId = 1;
 const serverTime = '2026-09-19T00:00:00.000Z';
 const contractFixtures = JSON.parse(
   readFileSync(
@@ -305,7 +305,7 @@ it('preserves a failure and an accepted activity through the built CLI', async (
     if (fixture.name === 'accepted_activity') {
       expect(output.hints).toEqual([
         {
-          note: expect.stringContaining('00000000-0000-4000-8000-000000000006'),
+          note: expect.stringContaining('activity -a 6 -c Traveler0000'),
         },
       ]);
       delete output.hints;
