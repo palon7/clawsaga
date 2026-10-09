@@ -39,7 +39,7 @@ export type CommandDefinition = {
   /** Content language sent when neither -l nor the environment sets one. */
   defaultLocale?: 'en';
   requiresCharacter?: boolean;
-  /** Generates request_id unless --request supplies one. */
+  /** Generates request_id unless --request or the body file supplies one. */
   autoRequestId?: boolean;
   /** Starts a main activity: accepts --no-wait, otherwise waits for its result. */
   startsActivity?: boolean;
@@ -51,7 +51,10 @@ export type CommandDefinition = {
   /** A lost response may still have changed items, so the outcome is unknown. */
   changesItems?: boolean;
   /** Fields added to the detail of a CliError raised by the game request. */
-  errorContext?: (values: Values) => Record<string, unknown>;
+  errorContext?: (
+    values: Values,
+    input: Record<string, unknown>,
+  ) => Record<string, unknown>;
   help: string;
   examples?: readonly string[];
   inputExample?: Record<string, unknown>;
@@ -96,5 +99,10 @@ export const noWaitFlag = [
 export function bodySchema(definition: CommandDefinition) {
   const mask: Record<string, true> = { locale: true };
   if ('character_id' in definition.schema.shape) mask.character_id = true;
-  return z.strictObject(definition.schema.shape).omit(mask);
+  const { shape } = definition.schema;
+  const body = z.strictObject(shape).omit(mask);
+  // The CLI fills a missing request_id, so the body file may leave it out.
+  return definition.autoRequestId && shape.request_id
+    ? body.extend({ request_id: z.optional(shape.request_id) })
+    : body;
 }

@@ -54,6 +54,7 @@ export const optionsSchema = z.object({
   thread: z.string().optional(),
   town: z.string().optional(),
   items: z.string().optional(),
+  gold: z.string().optional(),
   quality: z.string().optional(),
   levels: z.string().optional(),
   maxPrice: z.string().optional(),
@@ -139,6 +140,7 @@ async function bodyFileInput(
   if (!isJsonObject(fileBody)) throw new CliError('INVALID_INPUT_FILE');
   const body = definition.bodyInput?.(values, fileBody) ?? fileBody;
   return {
+    ...(definition.autoRequestId ? { request_id: values.request } : {}),
     ...body,
     ...(values.character ? { character_id: values.character } : {}),
     ...(values.contentLanguage ? { locale: values.contentLanguage } : {}),

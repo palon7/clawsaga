@@ -7,4 +7,5 @@ export * from './protocol/combat.js';
 export * from './protocol/quests.js';
 export * from './protocol/social.js';
 export * from './protocol/storage.js';
+export * from './protocol/gift.js';
 export * from './protocol/market.js';

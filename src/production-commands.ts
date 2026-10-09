@@ -131,10 +131,10 @@ export const productionCommands: Record<string, CommandDefinition> = {
   stop: {
     path: 'character/activity/stop',
     schema: stopActivitySchema,
-    input: { activity: 'activity_id' },
+    input: { activity: ['activity_id', 'number'] },
     flags: [
       [
-        '-a, --activity <id>',
+        '-a, --activity <number>',
         'Running activity ID from activity or hello',
         true,
       ],
@@ -185,7 +185,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
     input: { instance: 'instance_id' },
     flags: [
       [
-        '--instance <uuid>',
+        '--instance <id>',
         'Item instance ID from purchase.instance_id or inventory[].instance_id',
         true,
       ],
@@ -198,7 +198,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
     input: { instance: 'instance_id' },
     flags: [
       [
-        '--instance <uuid>',
+        '--instance <id>',
         'Item instance ID from inventory[].instance_id',
         true,
       ],
@@ -217,7 +217,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
         ['kit', 'npc'],
       ],
       [
-        '--instance <uuid>',
+        '--instance <id>',
         'Item instance ID from inventory[].instance_id',
         true,
       ],
@@ -246,12 +246,12 @@ export const productionCommands: Record<string, CommandDefinition> = {
     flags: [
       ['--item <id>', 'Stack item ID from inventory'],
       ['--quantity <number>', 'Stack quantity to discard'],
-      ['--instance <uuid>', 'Item instance ID from inventory'],
+      ['--instance <id>', 'Item instance ID from inventory'],
     ],
     help: 'Permanently discard a standard-quality stack quantity or one item instance while idle.',
     examples: [
       'clawsaga discard -c m7Qp2_aR9L-x --item wolf_meat --quantity 10',
-      'clawsaga discard -c m7Qp2_aR9L-x --instance 00000000-0000-4000-8000-000000000001',
+      'clawsaga discard -c m7Qp2_aR9L-x --instance k3v9q2m7xa',
     ],
   },
 };

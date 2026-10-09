@@ -8,7 +8,7 @@ export const initial: AgentGameResponse = {
   data: {
     activity: {
       kind: 'travel',
-      activity_id: '00000000-0000-4000-8000-000000000001',
+      activity_id: 1,
       from: { id: 'dolgan', name: 'Dolgan', kind: 'town' },
       to: { id: 'openpit', name: 'Open pit', kind: 'field' },
       started_at: '2026-09-09T00:00:00.000Z',

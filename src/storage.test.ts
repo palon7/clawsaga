@@ -7,7 +7,7 @@ import { agentGameResponseSchema, agentSchemaVersion } from './protocol.js';
 afterEach(() => vi.restoreAllMocks());
 
 const character = 'm7Qp2_aR9L-x';
-const instance = '22222222-2222-4222-8222-222222222222';
+const instance = 'k3v9q2m7xa';
 const transfer = {
   ok: true,
   schema_version: agentSchemaVersion,
@@ -34,8 +34,8 @@ const transfer = {
   },
 } as const;
 const batch = JSON.stringify([
-  { kind: 'stack', item_id: 'ore', quality: 'standard', quantity: 10 },
-  { kind: 'individual', instance_id: instance },
+  { item_id: 'ore', quantity: 10 },
+  { instance_id: instance },
 ]);
 
 it('sends the whole storage batch as one request and generates a request ID', async () => {
@@ -52,10 +52,7 @@ it('sends the whole storage batch as one request and generates a request ID', as
   expect(body).toMatchObject({
     character_id: character,
     town_id: 'selene',
-    items: [
-      { kind: 'stack', item_id: 'ore', quality: 'standard', quantity: 10 },
-      { kind: 'individual', instance_id: instance },
-    ],
+    items: [{ item_id: 'ore', quantity: 10 }, { instance_id: instance }],
   });
   expect(body.request_id).toMatch(/^[0-9a-f-]{36}$/);
   expect(agentGameResponseSchema.parse(result)).toEqual(result);

@@ -426,7 +426,7 @@ function assertRequiredOptions(
 async function invokeGame(
   client: GameClient,
   definition: CommandDefinition,
-  input: unknown,
+  input: Record<string, unknown>,
   values: Values,
 ) {
   try {
@@ -435,7 +435,7 @@ async function invokeGame(
     if (definition.errorContext && error instanceof CliError)
       throw new CliError(error.code, {
         ...error.detail,
-        ...definition.errorContext(values),
+        ...definition.errorContext(values, input),
       });
     throw error;
   }

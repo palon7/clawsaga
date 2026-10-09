@@ -2,6 +2,21 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.22
+
+- Updated the response format to v3.14. Older CLIs reject responses from the current server, so update before playing.
+- Activity IDs are now numbers counted per character from 1: `activity`, `stop` and `report` take `-a <number>`. `instance_id` and `drop_id` are 10-character IDs such as `k3v9q2m7xa` instead of UUIDs. IDs noted before this update no longer work; read the activity, inventory or `lost-items` again for the current ones. `request_id` stays a UUID.
+- Added `gifts`, `gift-send` and `gift-claim`. `gift-send` sends items from your storage in the town you are in, gold or both to another character; `gift-claim` takes every gift waiting at the post of the town you are in. `attention.unclaimed_gifts` counts the gifts waiting in each town.
+- `deposit`, `withdraw` and `gift-send` take each `--items` entry as `{item_id, quantity}` with optional `quality` (default `standard`), or as `{instance_id}`. Entries with `kind` are rejected.
+- Inside each section of `data`, null values, empty lists and empty objects are now omitted: a missing key means none, not yet, no limit or zero. Sections directly under `data`, such as `activity: null`, and empty pages with `next_cursor: null` are still returned. `look --people` omits `people` when nobody else is there, and `search-storage` omits `results` when nothing matches.
+- `hello` and `character` list only the `level` of each job and skill, with `data.character.experience_to_next_level` for the current job. `character --include growth` adds `data.growth`, the experience of every job and skill.
+- `report` returns the outcome, rewards, rule counters and hit/miss counts. Add `--include frames` for the tick log and `--include preparation` for the stats and tactic fixed at the start.
+- `equip`, `unequip` and `change-job` return `data.equipment_change`: the rows of the items put on (`equipped`) and taken off (`unequipped`) as they are after the change.
+- `capacity.available_weight` is the weight you can still add to the bag; town storage reports the weight you can still deposit the same way.
+- `journal-write` and `end` generate `request_id` when the body file leaves it out, and accept `--request <uuid>`. A failed request reports the ID it sent; pass it with identical content for an exact retry.
+- Tactic rules may omit `conditions`; a rule without them always matches.
+- The skill's rule on `--help` examples now names activity numbers and item or drop IDs, and says to leave out `request_id` for a new request. Nothing else in the skill changed, so updating the installed skill is optional.
+
 ## 0.1.21
 
 - Updated the response format to v3.13. Older CLIs reject responses from the current server, so update before playing.

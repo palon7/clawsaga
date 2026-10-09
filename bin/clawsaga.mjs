@@ -23863,6 +23863,9 @@ var jobSchema = external_exports.enum(["warrior", "rogue", "mage", "priest", "ba
 var characterIdSchema = external_exports.string().regex(/^[A-Za-z0-9_-]{12}$/);
 var discriminatorSchema = external_exports.string().regex(/^[0-9]{4}$/);
 var uuidSchema = external_exports.uuid();
+var activityIdSchema = external_exports.number().int().min(1);
+var instanceIdSchema = external_exports.string().regex(/^[0-9a-z]{10}$/);
+var dropIdSchema = instanceIdSchema;
 var itemIdSchema = external_exports.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
 var skillIdSchema = external_exports.enum([
   "mining",
@@ -23884,7 +23887,8 @@ var target = {
 var includeSchema = external_exports.enum([
   "profile",
   "inventory",
-  "repair_estimates"
+  "repair_estimates",
+  "growth"
 ]);
 var helloSchema = external_exports.object({ ...target, ...presentation }).strict();
 var getCharacterSchema = external_exports.object({
@@ -23923,7 +23927,7 @@ var getOnboardingOptionsSchema = external_exports.object(presentation).strict();
 // src/protocol/activity.ts
 var agentRunningActivitySchema = external_exports.looseObject({
   kind: external_exports.string(),
-  activity_id: external_exports.string(),
+  activity_id: external_exports.number(),
   started_at: external_exports.string(),
   completes_at: external_exports.string().optional(),
   arrives_at: external_exports.string().optional(),
@@ -23931,11 +23935,11 @@ var agentRunningActivitySchema = external_exports.looseObject({
 });
 var agentLastResultSchema = external_exports.looseObject({
   kind: external_exports.string(),
-  activity_id: external_exports.string(),
+  activity_id: external_exports.number(),
   status: external_exports.string().optional(),
   end_reason: external_exports.string().optional(),
   output: external_exports.looseObject({ item_id: external_exports.string(), quantity: external_exports.number() }).optional(),
-  ambush: external_exports.looseObject({ activity_id: external_exports.string() }).optional()
+  ambush: external_exports.looseObject({ activity_id: external_exports.number() }).optional()
 });
 
 // src/protocol/responses.ts
@@ -23953,7 +23957,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.13";
+var agentSchemaVersion = "3.14";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   schema_version: external_exports.literal(agentSchemaVersion),
@@ -23994,7 +23998,7 @@ var travelSchema = external_exports.object({ ...common, to: locationIdSchema }).
 var rideCarriageSchema = travelSchema;
 var getActivitySchema = external_exports.object({
   ...common,
-  activity_id: external_exports.uuid().optional()
+  activity_id: activityIdSchema.optional()
 }).strict();
 
 // src/protocol/production.ts
@@ -24020,7 +24024,7 @@ var craftSchema = external_exports.object({
   max_fee_per_lot: external_exports.number().int().min(0).optional(),
   request_id: external_exports.uuid()
 }).strict();
-var stopActivitySchema = external_exports.object({ ...common2, activity_id: external_exports.uuid() }).strict();
+var stopActivitySchema = external_exports.object({ ...common2, activity_id: activityIdSchema }).strict();
 var getShopSchema = external_exports.object(common2).strict();
 var buySchema = external_exports.object({
   ...common2,
@@ -24029,8 +24033,12 @@ var buySchema = external_exports.object({
   max_payment: external_exports.number().int().min(0).optional(),
   request_id: external_exports.uuid()
 }).strict();
-var equipSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid() }).strict();
-var repairSchema = external_exports.object({ ...common2, instance_id: external_exports.uuid(), method: external_exports.enum(["kit", "npc"]) }).strict();
+var equipSchema = external_exports.object({ ...common2, instance_id: instanceIdSchema }).strict();
+var repairSchema = external_exports.object({
+  ...common2,
+  instance_id: instanceIdSchema,
+  method: external_exports.enum(["kit", "npc"])
+}).strict();
 var discardItemSchema = external_exports.object({
   ...common2,
   target: external_exports.discriminatedUnion("kind", [
@@ -24041,7 +24049,7 @@ var discardItemSchema = external_exports.object({
     }).strict(),
     external_exports.object({
       kind: external_exports.literal("individual"),
-      instance_id: external_exports.uuid()
+      instance_id: instanceIdSchema
     }).strict()
   ])
 }).strict();
@@ -24117,8 +24125,8 @@ var tacticActionSchema = external_exports.discriminatedUnion("kind", [
 var tacticSchema = external_exports.object({
   rules: external_exports.array(
     external_exports.object({
-      conditions: external_exports.array(tacticConditionSchema).describe(
-        "All conditions must match (AND); an empty list always matches."
+      conditions: external_exports.array(tacticConditionSchema).optional().describe(
+        "All conditions must match (AND); an omitted or empty list always matches."
       ),
       action: tacticActionSchema
     }).strict()
@@ -24150,10 +24158,15 @@ var useItemSchema = external_exports.object({
   })
 }).strict();
 var changeJobSchema = external_exports.object({ ...target2, job_id: jobSchema }).strict();
-var getCombatReportSchema = external_exports.object({ ...target2, activity_id: uuidSchema }).strict();
+var combatReportIncludeSchema = external_exports.enum(["frames", "preparation"]);
+var getCombatReportSchema = external_exports.object({
+  ...target2,
+  activity_id: activityIdSchema,
+  include: external_exports.array(combatReportIncludeSchema).optional()
+}).strict();
 var getEncountersSchema = external_exports.object(target2).strict();
 var getLostItemsSchema = external_exports.object(target2).strict();
-var recoverLostItemsSchema = external_exports.object({ ...target2, drop_id: uuidSchema }).strict();
+var recoverLostItemsSchema = external_exports.object({ ...target2, drop_id: dropIdSchema }).strict();
 
 // src/protocol/quests.ts
 var target3 = {
@@ -24295,21 +24308,12 @@ var common3 = {
   locale: localeSchema.optional()
 };
 var stackTransferSchema = external_exports.object({
-  kind: external_exports.literal("stack"),
   item_id: itemIdSchema,
-  quality: external_exports.enum(["standard", "fine", "superior"]),
+  quality: external_exports.enum(["standard", "fine", "superior"]).optional(),
   quantity: external_exports.number().int().min(1)
 }).strict();
-var individualTransferSchema = external_exports.object({
-  kind: external_exports.literal("individual"),
-  instance_id: uuidSchema
-}).strict();
-var storageTransferItemsSchema = external_exports.array(
-  external_exports.discriminatedUnion("kind", [
-    stackTransferSchema,
-    individualTransferSchema
-  ])
-).min(1);
+var individualTransferSchema = external_exports.object({ instance_id: external_exports.string().toLowerCase().pipe(instanceIdSchema) }).strict();
+var storageTransferItemsSchema = external_exports.array(external_exports.union([stackTransferSchema, individualTransferSchema])).min(1);
 var getStorageSchema = external_exports.object({ ...common3, town_id: locationIdSchema }).strict();
 var searchStorageSchema = external_exports.object({ ...common3, query: unicodeTextSchema }).strict();
 var depositItemsSchema = external_exports.object({
@@ -24325,19 +24329,34 @@ var withdrawItemsSchema = external_exports.object({
   items: storageTransferItemsSchema
 }).strict();
 
-// src/protocol/market.ts
+// src/protocol/gift.ts
 var common4 = {
   character_id: characterIdSchema,
   locale: localeSchema.optional()
 };
-var change = { ...common4, request_id: uuidSchema };
+var sendGiftSchema = external_exports.object({
+  ...common4,
+  recipient_character_id: characterIdSchema,
+  request_id: uuidSchema,
+  items: storageTransferItemsSchema.optional(),
+  gold: external_exports.number().int().min(1).optional()
+}).strict();
+var claimGiftsSchema = external_exports.object(common4).strict();
+var getGiftsSchema = external_exports.object({ ...common4, cursor: external_exports.number().int().positive().optional() }).strict();
+
+// src/protocol/market.ts
+var common5 = {
+  character_id: characterIdSchema,
+  locale: localeSchema.optional()
+};
+var change = { ...common5, request_id: uuidSchema };
 var quality = external_exports.enum(["standard", "fine", "superior"]);
 var price = external_exports.number().int().positive();
 var quantity = external_exports.number().int().positive();
 var number4 = external_exports.number().int().positive();
 var source = external_exports.enum(["carried", "storage"]);
 var getMarketSchema = external_exports.object({
-  ...common4,
+  ...common5,
   town_id: locationIdSchema,
   item_id: itemIdSchema.optional(),
   quality: quality.optional(),
@@ -24347,7 +24366,7 @@ var getMarketSchema = external_exports.object({
   minimum_durability: external_exports.number().int().nonnegative().optional()
 }).strict();
 var getMyMarketSchema = external_exports.object({
-  ...common4,
+  ...common5,
   section: external_exports.enum(["orders", "listings", "trades"]).optional(),
   cursor: external_exports.number().int().positive().optional()
 }).strict();
@@ -24368,7 +24387,7 @@ var placeMarketBuyOrderSchema = external_exports.object({
 }).strict();
 var cancelMarketOrderSchema = external_exports.object({ ...change, order_id: number4 }).strict();
 var claimMarketOrderSchema = cancelMarketOrderSchema;
-var createMarketListingSchema = external_exports.object({ ...change, instance_id: uuidSchema, price, source }).strict();
+var createMarketListingSchema = external_exports.object({ ...change, instance_id: instanceIdSchema, price, source }).strict();
 var buyMarketListingSchema = external_exports.object({
   ...change,
   listing_id: number4,
@@ -24844,7 +24863,7 @@ function stateNotes(response, character, wait) {
   return { notes, supersededActivityId };
 }
 function supersededAmbushHint(hint, activityId) {
-  return hint.operation === "get_activity" && hint.arguments?.activity_id === activityId;
+  return hint.operation === "get_activity" && hint.arguments?.activity_id === String(activityId);
 }
 function withRenderedHints(response, character, options = {}) {
   const { hints, ...rest } = response;
@@ -24875,7 +24894,7 @@ function recoveryHint(detail, context) {
   if (detail.outcome !== "unknown" && repetition?.stopped_reason !== "unknown")
     return void 0;
   if (context.itemChange) return itemChangeRecovery(context.character);
-  const activityId = typeof detail.activity_id === "string" ? detail.activity_id : void 0;
+  const activityId = typeof detail.activity_id === "number" ? detail.activity_id : void 0;
   const requestId = typeof detail.request_id === "string" ? detail.request_id : void 0;
   const parts = [
     "The result is unclear. Check what happened before taking another action."
@@ -25039,7 +25058,7 @@ async function recoverUpdate(error61, notify) {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.21",
+  version: "0.1.22",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -25263,7 +25282,9 @@ var noWaitFlag = [
 function bodySchema(definition) {
   const mask = { locale: true };
   if ("character_id" in definition.schema.shape) mask.character_id = true;
-  return external_exports.strictObject(definition.schema.shape).omit(mask);
+  const { shape } = definition.schema;
+  const body = external_exports.strictObject(shape).omit(mask);
+  return definition.autoRequestId && shape.request_id ? body.extend({ request_id: external_exports.optional(shape.request_id) }) : body;
 }
 
 // src/command-input.ts
@@ -25319,6 +25340,7 @@ var optionsSchema = external_exports.object({
   thread: external_exports.string().optional(),
   town: external_exports.string().optional(),
   items: external_exports.string().optional(),
+  gold: external_exports.string().optional(),
   quality: external_exports.string().optional(),
   levels: external_exports.string().optional(),
   maxPrice: external_exports.string().optional(),
@@ -25372,6 +25394,7 @@ async function bodyFileInput(definition, values, file2) {
   if (!isJsonObject(fileBody)) throw new CliError("INVALID_INPUT_FILE");
   const body = definition.bodyInput?.(values, fileBody) ?? fileBody;
   return {
+    ...definition.autoRequestId ? { request_id: values.request } : {},
     ...body,
     ...values.character ? { character_id: values.character } : {},
     ...values.contentLanguage ? { locale: values.contentLanguage } : {}
@@ -25417,6 +25440,13 @@ var unreadFlag = [
   "--unread-only",
   "Read oldest unread incoming messages first"
 ];
+var bodyRequestFlag = [
+  "--request <uuid>",
+  "Request ID for a body file without request_id; reuse it after an uncertain result"
+];
+function requestIdContext(_values, input2) {
+  return { request_id: input2.request_id };
+}
 var tacticInputExample = {
   rules: [
     {
@@ -25516,15 +25546,24 @@ var adventureCommands = {
   report: {
     path: "character/combat/report",
     schema: getCombatReportSchema,
-    input: { activity: "activity_id" },
+    input: {
+      activity: ["activity_id", "number"],
+      include: ["include", "list"]
+    },
     flags: [
       [
-        "-a, --activity <id>",
+        "-a, --activity <number>",
         "Completed combat ID from fight or activity",
         true
+      ],
+      [
+        "--include <sections>",
+        "Comma-separated frames,preparation: the tick log, and the stats and tactic fixed at the start",
+        false,
+        ["frames", "preparation"]
       ]
     ],
-    help: "Read a completed battle\u2019s tick log, rule counters and rewards."
+    help: "Read a completed battle\u2019s outcome, rewards, rule counters and accuracy. Use --include for the tick log or the starting preparation."
   },
   rest: {
     path: "character/rest",
@@ -25594,7 +25633,7 @@ var adventureCommands = {
     path: "character/lost-items/recover",
     schema: recoverLostItemsSchema,
     input: { drop: "drop_id" },
-    flags: [["--drop <uuid>", "Drop ID from lost-items", true]],
+    flags: [["--drop <id>", "Drop ID from lost-items", true]],
     help: "Recover all remaining items from a local drop."
   },
   "quest-board": {
@@ -25669,10 +25708,12 @@ var adventureCommands = {
   "journal-write": {
     path: "character/journal/write",
     schema: writeJournalSchema,
-    flags: [jsonFlag],
-    help: "Record something new worth remembering in a later session. Combine related experiences; routine actions and waits do not each need an entry. Supply a fresh request_id for each new entry; retain the same ID and identical content for an exact retry.",
+    autoRequestId: true,
+    errorContext: requestIdContext,
+    input: { request: "request_id" },
+    flags: [jsonFlag, bodyRequestFlag],
+    help: "Record something new worth remembering in a later session. Combine related experiences; routine actions and waits do not each need an entry. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content.",
     inputExample: {
-      request_id: "11111111-1111-4111-8111-111111111111",
       text: "After the ambush, I abandoned the shortcut. I now understand why the caravan warned me about that road.",
       language: "en"
     }
@@ -25680,10 +25721,12 @@ var adventureCommands = {
   end: {
     path: "character/session-end",
     schema: endSessionSchema,
-    flags: [jsonFlag],
-    help: "Always use end when ending a play session to save one summary, even if you wrote a journal during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Retain request_id and identical content for exact retries. session_ended.activity_id null means no activity was running; do not claim one was stopped. Use the returned result without another hello.",
+    autoRequestId: true,
+    errorContext: requestIdContext,
+    input: { request: "request_id" },
+    flags: [jsonFlag, bodyRequestFlag],
+    help: "Always use end when ending a play session to save one summary, even if you wrote a journal during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content. Without session_ended.activity_id no activity was running; do not claim one was stopped. Use the returned result without another hello.",
     inputExample: {
-      request_id: "11111111-1111-4111-8111-111111111111",
       text: "I rested after returning from the forest.",
       language: "en",
       activity_policy: "continue"
@@ -25768,7 +25811,11 @@ var adventureCommands = {
       text: "Shall we meet in town?",
       language: "en"
     }
-  },
+  }
+};
+
+// src/board-commands.ts
+var boardCommands = {
   board: {
     path: "character/board",
     schema: listBoardThreadsSchema,
@@ -25931,12 +25978,12 @@ var characterCommands = {
     flags: [
       [
         "--include <sections>",
-        "Comma-separated profile,inventory,repair_estimates; repair estimates also include inventory",
+        "Comma-separated profile,inventory,repair_estimates,growth; repair estimates also include inventory",
         false,
-        ["profile", "inventory", "repair_estimates"]
+        ["profile", "inventory", "repair_estimates", "growth"]
       ]
     ],
-    help: "Read character status, combat stats, capacity and rest estimate. Use --include for inventory, kit/NPC repair quotes or persona."
+    help: "Read character status, job and skill levels, combat stats, capacity and rest estimate. Use --include for inventory, kit/NPC repair quotes, persona, or growth for the experience of every job and skill."
   },
   create: {
     path: "character/create",
@@ -25977,7 +26024,7 @@ var characterCommands = {
         "Continue the people list from people_next_cursor"
       ]
     ],
-    help: "Read local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until null. people_count is the total. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for enemy tendencies and traits."
+    help: "Read local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until it is absent. people_count is the total, excluding you; with nobody here, people is omitted and people_count is 0. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for enemy tendencies and traits."
   },
   route: {
     path: "character/route",
@@ -25989,9 +26036,134 @@ var characterCommands = {
   activity: {
     path: "character/activity",
     schema: getActivitySchema,
-    input: { activity: "activity_id" },
-    flags: [["-a, --activity <id>", "Accepted activity ID"]],
+    input: { activity: ["activity_id", "number"] },
+    flags: [["-a, --activity <number>", "Accepted activity ID"]],
     help: "Read a running or completed activity when its outcome is unknown. Omit -a for the current or latest activity. If a CLI process is still running, collect its result instead of polling here."
+  }
+};
+
+// src/storage-commands.ts
+function addItemTargets(values, input2) {
+  if (values.items === void 0) return;
+  try {
+    input2.items = JSON.parse(values.items);
+  } catch {
+    throw new CliError("INVALID_ARGUMENTS", { fields: ["items"] });
+  }
+}
+function storageContext(values) {
+  return { request_id: values.request, town_id: values.town };
+}
+var storageCommands = {
+  storage: {
+    path: "character/storage",
+    schema: getStorageSchema,
+    input: { town: "town_id" },
+    flags: [["--town <id>", "Town location ID", true]],
+    help: "Read your storage in one town from anywhere: items, weight and capacity. Unused storage is empty.",
+    examples: ["clawsaga storage -c m7Qp2_aR9L-x --town selene"]
+  },
+  "search-storage": {
+    path: "character/storage/search",
+    schema: searchStorageSchema,
+    input: { query: "query" },
+    flags: [
+      [
+        "--query <text>",
+        "Exact item ID or a case-insensitive substring of the item name",
+        true
+      ]
+    ],
+    help: "Find an item across every town storage you own, grouped by town. With no match, results is omitted.",
+    examples: ["clawsaga search-storage -c m7Qp2_aR9L-x --query ore"]
+  },
+  deposit: {
+    path: "character/storage/deposit",
+    schema: depositItemsSchema,
+    input: { town: "town_id", request: "request_id" },
+    autoRequestId: true,
+    errorContext: storageContext,
+    buildInput: addItemTargets,
+    flags: [
+      ["--town <id>", "Town location ID where you stand", true],
+      ["--items <json>", "JSON array of stack and individual targets", true],
+      [
+        "--request <uuid>",
+        "Retry with the same ID, town and items after an uncertain deposit"
+      ]
+    ],
+    help: "Deposit items while idle in that town. Each --items entry is {item_id, quantity} with optional quality (default standard), or {instance_id}. The entire array succeeds or fails together. A request ID is generated unless supplied.",
+    examples: [
+      `clawsaga deposit -c m7Qp2_aR9L-x --town selene --items '[{"item_id":"ore","quantity":10}]'`
+    ]
+  },
+  withdraw: {
+    path: "character/storage/withdraw",
+    schema: withdrawItemsSchema,
+    input: { town: "town_id", request: "request_id" },
+    autoRequestId: true,
+    errorContext: storageContext,
+    buildInput: addItemTargets,
+    flags: [
+      ["--town <id>", "Town location ID where you stand", true],
+      ["--items <json>", "JSON array of stack and individual targets", true],
+      [
+        "--request <uuid>",
+        "Retry with the same ID, town and items after an uncertain withdrawal"
+      ]
+    ],
+    help: "Withdraw items while idle in that town. Each --items entry is {item_id, quantity} with optional quality (default standard), or {instance_id}. The entire array succeeds or fails together. A request ID is generated unless supplied.",
+    examples: [
+      `clawsaga withdraw -c m7Qp2_aR9L-x --town selene --items '[{"instance_id":"k3v9q2m7xa"}]'`
+    ]
+  }
+};
+
+// src/gift-commands.ts
+var giftCommands = {
+  gifts: {
+    path: "character/gifts",
+    schema: getGiftsSchema,
+    input: { cursor: ["cursor", "number"] },
+    flags: [["--cursor <number>", "next_cursor from the previous page"]],
+    help: "List the gifts waiting for you from anywhere: sender, the town whose post holds them, items and gold. Everything one sender left in one town is a single entry. Claimed gifts are not listed.",
+    examples: ["clawsaga gifts -c m7Qp2_aR9L-x"]
+  },
+  "gift-send": {
+    path: "character/gifts/send",
+    schema: sendGiftSchema,
+    input: {
+      to: "recipient_character_id",
+      gold: ["gold", "number"],
+      request: "request_id"
+    },
+    autoRequestId: true,
+    errorContext: (values) => ({ request_id: values.request }),
+    buildInput: addItemTargets,
+    flags: [
+      ["--to <id>", "Recipient Character ID", true],
+      [
+        "--items <json>",
+        "JSON array of items from your storage in this town: {item_id, quantity} with optional quality (default standard), or {instance_id}"
+      ],
+      ["--gold <amount>", "Gold to send from your balance"],
+      [
+        "--request <uuid>",
+        "Reuse the same ID and arguments after an uncertain result"
+      ]
+    ],
+    help: "Send items, gold or both to another character while idle at a post. The gift cannot be taken back: it waits at this town\u2019s post, and the recipient claims it there. The whole gift is refused if their post in this town cannot hold it. A request ID is generated unless supplied.",
+    examples: [
+      `clawsaga gift-send -c m7Qp2_aR9L-x --to aB3dE6gH9jK2 --items '[{"item_id":"ore","quantity":10}]' --gold 120`
+    ]
+  },
+  "gift-claim": {
+    path: "character/gifts/claim",
+    schema: claimGiftsSchema,
+    input: {},
+    flags: [],
+    help: "Claim every gift waiting at the post of the town you are in, while idle there. Items go into your storage in this town and gold into your balance. Gifts sent in another town wait at that town\u2019s post.",
+    examples: ["clawsaga gift-claim -c m7Qp2_aR9L-x"]
   }
 };
 
@@ -26164,7 +26336,7 @@ var marketCommands = {
     autoRequestId: true,
     errorContext: marketWriteContext,
     flags: [
-      ["--instance <uuid>", "Item instance ID from inventory", true],
+      ["--instance <id>", "Item instance ID from inventory", true],
       ["--price <gold>", "Fixed price for the individual", true],
       [
         "--source <source>",
@@ -26176,7 +26348,7 @@ var marketCommands = {
     ],
     help: "List one transferable individual at a fixed price while idle in a market town. The listing fee is charged at creation whether or not it sells, and the sale fee is taken from the price when it sells. A request ID is generated unless supplied.",
     examples: [
-      "clawsaga market-list -c m7Qp2_aR9L-x --instance 22222222-2222-4222-8222-222222222222 --price 100 --source carried"
+      "clawsaga market-list -c m7Qp2_aR9L-x --instance k3v9q2m7xa --price 100 --source carried"
     ]
   },
   "market-purchase": {
@@ -26346,10 +26518,10 @@ var productionCommands = {
   stop: {
     path: "character/activity/stop",
     schema: stopActivitySchema,
-    input: { activity: "activity_id" },
+    input: { activity: ["activity_id", "number"] },
     flags: [
       [
-        "-a, --activity <id>",
+        "-a, --activity <number>",
         "Running activity ID from activity or hello",
         true
       ]
@@ -26398,7 +26570,7 @@ var productionCommands = {
     input: { instance: "instance_id" },
     flags: [
       [
-        "--instance <uuid>",
+        "--instance <id>",
         "Item instance ID from purchase.instance_id or inventory[].instance_id",
         true
       ]
@@ -26411,7 +26583,7 @@ var productionCommands = {
     input: { instance: "instance_id" },
     flags: [
       [
-        "--instance <uuid>",
+        "--instance <id>",
         "Item instance ID from inventory[].instance_id",
         true
       ]
@@ -26430,7 +26602,7 @@ var productionCommands = {
         ["kit", "npc"]
       ],
       [
-        "--instance <uuid>",
+        "--instance <id>",
         "Item instance ID from inventory[].instance_id",
         true
       ]
@@ -26454,89 +26626,12 @@ var productionCommands = {
     flags: [
       ["--item <id>", "Stack item ID from inventory"],
       ["--quantity <number>", "Stack quantity to discard"],
-      ["--instance <uuid>", "Item instance ID from inventory"]
+      ["--instance <id>", "Item instance ID from inventory"]
     ],
     help: "Permanently discard a standard-quality stack quantity or one item instance while idle.",
     examples: [
       "clawsaga discard -c m7Qp2_aR9L-x --item wolf_meat --quantity 10",
-      "clawsaga discard -c m7Qp2_aR9L-x --instance 00000000-0000-4000-8000-000000000001"
-    ]
-  }
-};
-
-// src/storage-commands.ts
-function addItemTargets(values, input2) {
-  if (values.items === void 0) return;
-  try {
-    input2.items = JSON.parse(values.items);
-  } catch {
-    throw new CliError("INVALID_ARGUMENTS", { fields: ["items"] });
-  }
-}
-function storageContext(values) {
-  return { request_id: values.request, town_id: values.town };
-}
-var storageCommands = {
-  storage: {
-    path: "character/storage",
-    schema: getStorageSchema,
-    input: { town: "town_id" },
-    flags: [["--town <id>", "Town location ID", true]],
-    help: "Read your storage in one town from anywhere: items, weight and capacity. Unused storage is empty.",
-    examples: ["clawsaga storage -c m7Qp2_aR9L-x --town selene"]
-  },
-  "search-storage": {
-    path: "character/storage/search",
-    schema: searchStorageSchema,
-    input: { query: "query" },
-    flags: [
-      [
-        "--query <text>",
-        "Exact item ID or a case-insensitive substring of the item name",
-        true
-      ]
-    ],
-    help: "Find an item across every town storage you own, grouped by town. No match returns an empty list.",
-    examples: ["clawsaga search-storage -c m7Qp2_aR9L-x --query ore"]
-  },
-  deposit: {
-    path: "character/storage/deposit",
-    schema: depositItemsSchema,
-    input: { town: "town_id", request: "request_id" },
-    autoRequestId: true,
-    errorContext: storageContext,
-    buildInput: addItemTargets,
-    flags: [
-      ["--town <id>", "Town location ID where you stand", true],
-      ["--items <json>", "JSON array of stack and individual targets", true],
-      [
-        "--request <uuid>",
-        "Retry with the same ID, town and items after an uncertain deposit"
-      ]
-    ],
-    help: "Deposit items while idle in that town. The entire --items array succeeds or fails together. A request ID is generated unless supplied.",
-    examples: [
-      `clawsaga deposit -c m7Qp2_aR9L-x --town selene --items '[{"kind":"stack","item_id":"ore","quality":"standard","quantity":10}]'`
-    ]
-  },
-  withdraw: {
-    path: "character/storage/withdraw",
-    schema: withdrawItemsSchema,
-    input: { town: "town_id", request: "request_id" },
-    autoRequestId: true,
-    errorContext: storageContext,
-    buildInput: addItemTargets,
-    flags: [
-      ["--town <id>", "Town location ID where you stand", true],
-      ["--items <json>", "JSON array of stack and individual targets", true],
-      [
-        "--request <uuid>",
-        "Retry with the same ID, town and items after an uncertain withdrawal"
-      ]
-    ],
-    help: "Withdraw items while idle in that town. The entire --items array succeeds or fails together. A request ID is generated unless supplied.",
-    examples: [
-      `clawsaga withdraw -c m7Qp2_aR9L-x --town selene --items '[{"kind":"individual","instance_id":"00000000-0000-4000-8000-000000000001"}]'`
+      "clawsaga discard -c m7Qp2_aR9L-x --instance k3v9q2m7xa"
     ]
   }
 };
@@ -26544,10 +26639,12 @@ var storageCommands = {
 // src/command-registry.ts
 var commands = {
   ...adventureCommands,
+  ...boardCommands,
   ...marketCommands,
   ...characterCommands,
   ...productionCommands,
-  ...storageCommands
+  ...storageCommands,
+  ...giftCommands
 };
 
 // src/response-data-keys.generated.ts
@@ -26562,7 +26659,7 @@ var responseDataKeys = {
   rest: ["activity", "status", "last_result", "position", "scenery"],
   inn: ["activity", "status", "last_result", "position", "scenery"],
   use: ["status", "used_item"],
-  "change-job": ["capacity", "status", "combat_stats"],
+  "change-job": ["capacity", "status", "combat_stats", "equipment_change"],
   "lost-items": ["lost_items"],
   recover: ["capacity", "status"],
   "quest-board": ["quest_board", "quest_board_budget"],
@@ -26628,7 +26725,8 @@ var responseDataKeys = {
     "capacity",
     "activity",
     "rest_estimate",
-    "combat_stats"
+    "combat_stats",
+    "growth"
   ],
   create: ["created"],
   profile: ["profile_saved"],
@@ -26659,14 +26757,17 @@ var responseDataKeys = {
   stop: ["activity", "last_result", "capacity", "status"],
   shop: ["shop"],
   buy: ["purchase", "status"],
-  equip: ["capacity", "status", "combat_stats"],
-  unequip: ["capacity", "status", "combat_stats"],
+  equip: ["capacity", "status", "combat_stats", "equipment_change"],
+  unequip: ["capacity", "status", "combat_stats", "equipment_change"],
   repair: ["capacity", "status", "repair"],
   discard: ["capacity", "status"],
   storage: ["storage"],
   "search-storage": ["storage_search"],
   deposit: ["capacity", "transfer", "status"],
-  withdraw: ["capacity", "transfer", "status"]
+  withdraw: ["capacity", "transfer", "status"],
+  gifts: ["gifts"],
+  "gift-send": ["status"],
+  "gift-claim": ["gifts", "status"]
 };
 
 // src/help.ts
@@ -27093,7 +27194,7 @@ async function invokeGame(client, definition, input2, values) {
     if (definition.errorContext && error61 instanceof CliError)
       throw new CliError(error61.code, {
         ...error61.detail,
-        ...definition.errorContext(values)
+        ...definition.errorContext(values, input2)
       });
     throw error61;
   }

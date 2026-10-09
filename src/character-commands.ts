@@ -94,12 +94,12 @@ export const characterCommands: Record<string, CommandDefinition> = {
     flags: [
       [
         '--include <sections>',
-        'Comma-separated profile,inventory,repair_estimates; repair estimates also include inventory',
+        'Comma-separated profile,inventory,repair_estimates,growth; repair estimates also include inventory',
         false,
-        ['profile', 'inventory', 'repair_estimates'],
+        ['profile', 'inventory', 'repair_estimates', 'growth'],
       ],
     ],
-    help: 'Read character status, combat stats, capacity and rest estimate. Use --include for inventory, kit/NPC repair quotes or persona.',
+    help: 'Read character status, job and skill levels, combat stats, capacity and rest estimate. Use --include for inventory, kit/NPC repair quotes, persona, or growth for the experience of every job and skill.',
   },
   create: {
     path: 'character/create',
@@ -140,7 +140,7 @@ export const characterCommands: Record<string, CommandDefinition> = {
         'Continue the people list from people_next_cursor',
       ],
     ],
-    help: 'Read local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until null. people_count is the total. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for enemy tendencies and traits.',
+    help: 'Read local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until it is absent. people_count is the total, excluding you; with nobody here, people is omitted and people_count is 0. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for enemy tendencies and traits.',
   },
   route: {
     path: 'character/route',
@@ -152,8 +152,8 @@ export const characterCommands: Record<string, CommandDefinition> = {
   activity: {
     path: 'character/activity',
     schema: getActivitySchema,
-    input: { activity: 'activity_id' },
-    flags: [['-a, --activity <id>', 'Accepted activity ID']],
+    input: { activity: ['activity_id', 'number'] },
+    flags: [['-a, --activity <number>', 'Accepted activity ID']],
     help: 'Read a running or completed activity when its outcome is unknown. Omit -a for the current or latest activity. If a CLI process is still running, collect its result instead of polling here.',
   },
 };

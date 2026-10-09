@@ -7,7 +7,7 @@ import { agentSchemaVersion } from './protocol.js';
 afterEach(() => vi.restoreAllMocks());
 
 const character = 'm7Qp2_aR9L-x';
-const instance = '22222222-2222-4222-8222-222222222222';
+const instance = 'k3v9q2m7xa';
 const envelope = {
   schema_version: agentSchemaVersion,
   server_time: '2026-09-20T00:00:00.000Z',
