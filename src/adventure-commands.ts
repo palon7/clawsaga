@@ -327,7 +327,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
       ['--item <id>', 'Item ID to deliver', true],
       ['--quantity <number>', 'Number of standard-quality items', true],
     ],
-    help: 'Deliver standard-quality items from your bag to a joined world quest while idle in its town. The items are consumed; data.delivered reports the points, gold and experience paid.',
+    help: 'Deliver standard-quality items from your bag to a joined world quest while idle in its town. The items are consumed; data.delivered reports the points earned. Rewards are paid only by claiming after the world quest ends.',
   },
   'quest-claim': {
     path: 'character/quests/claim',
@@ -344,7 +344,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
       ['--quest <number>', 'Quest number from quests or quest-accept'],
       ['--goal <id>', 'Ended world quest ID from quests'],
     ],
-    help: 'Claim when idle in the quest’s report town. Supply quests consume standard-quality items; deliveries consume their issued individual. Check the deadline if present. --goal claims an ended world quest’s reputation and items in its town.',
+    help: 'Claim when idle in the quest’s report town. Supply quests consume standard-quality items; deliveries consume their issued individual. Check the deadline if present. --goal claims an ended world quest’s gold, experience, reputation and items in its town.',
   },
   'quest-discard': {
     path: 'character/quests/discard',

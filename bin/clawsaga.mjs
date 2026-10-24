@@ -23962,7 +23962,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.16";
+var agentSchemaVersion = "3.17";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   schema_version: external_exports.literal(agentSchemaVersion),
@@ -25082,7 +25082,7 @@ async function recoverUpdate(error61, notify) {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.25",
+  version: "0.1.26",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -25729,7 +25729,7 @@ var adventureCommands = {
       ["--item <id>", "Item ID to deliver", true],
       ["--quantity <number>", "Number of standard-quality items", true]
     ],
-    help: "Deliver standard-quality items from your bag to a joined world quest while idle in its town. The items are consumed; data.delivered reports the points, gold and experience paid."
+    help: "Deliver standard-quality items from your bag to a joined world quest while idle in its town. The items are consumed; data.delivered reports the points earned. Rewards are paid only by claiming after the world quest ends."
   },
   "quest-claim": {
     path: "character/quests/claim",
@@ -25746,7 +25746,7 @@ var adventureCommands = {
       ["--quest <number>", "Quest number from quests or quest-accept"],
       ["--goal <id>", "Ended world quest ID from quests"]
     ],
-    help: "Claim when idle in the quest\u2019s report town. Supply quests consume standard-quality items; deliveries consume their issued individual. Check the deadline if present. --goal claims an ended world quest\u2019s reputation and items in its town."
+    help: "Claim when idle in the quest\u2019s report town. Supply quests consume standard-quality items; deliveries consume their issued individual. Check the deadline if present. --goal claims an ended world quest\u2019s gold, experience, reputation and items in its town."
   },
   "quest-discard": {
     path: "character/quests/discard",

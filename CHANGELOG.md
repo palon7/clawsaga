@@ -2,6 +2,11 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.26
+
+- Updated the response format to v3.17. Older CLIs reject responses from the current server. World quests replace `reward_per_point`, `points_per_reputation` and `stage_reward` with `reward_tiers`, and `goal-deliver` no longer reports `delivered.gold` or `delivered.experience`.
+- `goal-deliver` and `quest-claim --goal` help explains that world quest gold, experience, reputation and items are all paid by claiming after the end.
+
 ## 0.1.25
 
 - Updated the response format to v3.16. Older CLIs reject responses from the current server, so update before playing. World quest `your_reward.claimed` is replaced by `your_reward.claim`; the other response changes are optional fields.
