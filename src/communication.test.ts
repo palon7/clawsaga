@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { GameClient } from './client.js';
+import { stubInvoke } from './test-responses.js';
 import { execute } from './commands.js';
 import {
   agentSchemaVersion,
@@ -22,9 +23,7 @@ const traveler = 'Traveler0000';
 const friend = 'Friend000000';
 
 it('maps communication flags', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue({ ...result });
+  const invoke = stubInvoke({ ...result });
 
   await execute(
     ['chat', '-c', traveler, '--after', '10', '--limit', '50'],
@@ -89,9 +88,7 @@ it('maps communication flags', async () => {
 });
 
 it('sends identical text twice as two explicit calls without adding request IDs', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue({ ...result });
+  const invoke = stubInvoke({ ...result });
 
   const body = {
     recipient_character_id: friend,
@@ -114,9 +111,7 @@ it('sends identical text twice as two explicit calls without adding request IDs'
 });
 
 it('generates a journal request ID unless the body file or --request supplies one', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue({ ...result });
+  const invoke = stubInvoke({ ...result });
 
   const body = { text: 'Back from the forest.', language: 'en' };
   vi.mocked(readFile).mockResolvedValue(JSON.stringify(body));

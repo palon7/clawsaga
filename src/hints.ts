@@ -37,14 +37,49 @@ export type RepetitionSummary = {
   stopped_reason: string;
 };
 
+/** The summary `travel` adds instead when `--to` lists several locations. */
+export type RouteSummary = {
+  requested_locations: string[];
+  arrived_locations: string[];
+  stopped_reason: string;
+};
+
 function activityCommand(activityId: number, character?: string) {
   return `activity -a ${activityId}${character ? ` -c ${character}` : ''}`;
 }
 
 function repetitionOf(
   response: AgentGameResponse,
-): RepetitionSummary | undefined {
-  return (response as { repetition?: RepetitionSummary }).repetition;
+): RepetitionSummary | RouteSummary | undefined {
+  return (response as { repetition?: RepetitionSummary | RouteSummary })
+    .repetition;
+}
+
+// A failed read leaves the attempt or step in progress unconfirmed, so the
+// confirmed count must not read as if the stopped one did nothing.
+function stoppedEarlyNote(repetition: RepetitionSummary | RouteSummary) {
+  const failedRead = repetition.stopped_reason === 'activity_failed';
+  if ('requested_locations' in repetition) {
+    const arrived = repetition.arrived_locations.length;
+    const requested = repetition.requested_locations.length;
+    if (arrived >= requested) return undefined;
+
+    const unconfirmed = failedRead
+      ? ' The last step may also have arrived. Check your current or latest activity before continuing.'
+      : '';
+
+    return `Stopped after arriving at ${arrived} of ${requested} locations. No further steps were sent.${unconfirmed}`;
+  }
+
+  if (repetition.completed_count >= repetition.requested_count) {
+    return undefined;
+  }
+
+  const unconfirmed = failedRead
+    ? ' The last attempt may also have succeeded. Check your current or latest activity before continuing.'
+    : '';
+
+  return `Stopped with ${repetition.completed_count} of ${repetition.requested_count} attempts completed. You keep their results.${unconfirmed}`;
 }
 
 function ambushNotes(
@@ -99,18 +134,10 @@ function stateNotes(
     response.data.activity ?? undefined;
 
   const repetition = repetitionOf(response);
+  const stopped = repetition && stoppedEarlyNote(repetition);
 
-  if (repetition && repetition.completed_count < repetition.requested_count) {
-    // A failed read leaves the attempt that was in progress unconfirmed, so the
-    // confirmed count must not read as if the stopped attempt produced nothing.
-    const unconfirmed =
-      repetition.stopped_reason === 'activity_failed'
-        ? ' The last attempt may also have succeeded. Check your current or latest activity before continuing.'
-        : '';
-
-    notes.push(
-      `Stopped with ${repetition.completed_count} of ${repetition.requested_count} attempts completed. You keep their results.${unconfirmed}`,
-    );
+  if (stopped) {
+    notes.push(stopped);
   } else if (!wait && response.ok) {
     if (lastResult) {
       notes.push(
@@ -187,7 +214,9 @@ export function recoveryHint(
   detail: Record<string, unknown>,
   context: RecoveryContext,
 ): string | undefined {
-  const repetition = detail.repetition as RepetitionSummary | undefined;
+  const repetition = detail.repetition as
+    RepetitionSummary | RouteSummary | undefined;
+
   if (
     detail.outcome !== 'unknown' &&
     repetition?.stopped_reason !== 'unknown'

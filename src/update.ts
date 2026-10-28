@@ -3,7 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { homedir } from 'node:os';
 import { z } from 'zod';
-import { CliError } from './errors.js';
+import { CliError, cliFailure } from './errors.js';
 import { npmGlobalExecutable } from './installation.js';
 
 const exec = promisify(execFile);
@@ -108,6 +108,30 @@ export async function updateCli(server?: string): Promise<string> {
   }
 
   throw new CliError('UPDATE_FAILED');
+}
+
+/**
+ * Installs the newer CLI a server announced, after the command's result has
+ * been printed. A failed update is reported and does not change the result.
+ */
+export async function updateAnnouncedCli(
+  version: string,
+  notify: (message: string) => void,
+) {
+  // Set for the verification read, which must not start an update of its own.
+  if (process.env.CLAWSAGA_AUTO_UPDATE === '0') return;
+
+  notify(
+    `Updating the CLI to ${version}. The result above is final; wait for this command to finish.`,
+  );
+  try {
+    notify(`The CLI was updated to ${await updateCli()}.`);
+  } catch (error) {
+    const reason = cliFailure(error).error.message;
+    notify(
+      `The CLI could not be updated automatically: ${reason} Run clawsaga update later.`,
+    );
+  }
 }
 
 export async function recoverUpdate(

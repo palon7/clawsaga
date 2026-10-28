@@ -24,13 +24,22 @@ export const productionCommands: Record<string, CommandDefinition> = {
     schema: travelSchema,
     input: { to: 'to' },
     startsActivity: true,
+    walksRoute: true,
     flags: [
-      ['--to <id>', 'Adjacent destination location ID', true],
-      noWaitFlag,
+      [
+        '--to <ids>',
+        'Adjacent destination location ID, or comma-separated location IDs to walk in order from your current location',
+        true,
+      ],
+      [
+        '--no-wait',
+        'Return after acceptance without waiting for arrival; --to must name one location',
+      ],
     ],
-    help: 'Walk one step to an adjacent location while idle and wait for arrival.',
+    help: 'Walk one step to an adjacent location while idle and wait for arrival. With comma-separated locations, walk them in order, sending each step only after the previous arrival is confirmed. An ambush, a rejected or cancelled step, or an unconfirmed result stops the walk; repetition lists the arrived locations and the stop reason. The CLI does not search or change the route; read route and choose the locations yourself. Finish the whole command before starting another main activity.',
     examples: [
       'clawsaga travel -c m7Qp2_aR9L-x --to openpit',
+      'clawsaga travel -c m7Qp2_aR9L-x --to darras,openpit',
       'clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait',
     ],
   },
@@ -98,12 +107,10 @@ export const productionCommands: Record<string, CommandDefinition> = {
     input: {
       recipe: 'recipe_id',
       maxFeePerLot: ['max_fee_per_lot', 'number'],
-      request: 'request_id',
     },
     startsActivity: true,
     repeat: { requestIdPerLot: true },
     autoRequestId: true,
-    errorContext: (values) => ({ request_id: values.request }),
     flags: [
       ['--recipe <id>', 'Recipe ID from recipes', true],
       [
@@ -149,11 +156,9 @@ export const productionCommands: Record<string, CommandDefinition> = {
       item: 'item_id',
       quantity: ['quantity', 'number'],
       maxPayment: ['max_payment', 'number'],
-      request: 'request_id',
     },
     autoRequestId: true,
     errorContext: (values) => ({
-      request_id: values.request,
       item_id: values.item,
       quantity: values.quantity === undefined ? 1 : Number(values.quantity),
       ...(values.maxPayment === undefined

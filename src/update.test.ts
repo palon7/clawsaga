@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CliError } from './errors.js';
-import { recoverUpdate, updateCli } from './update.js';
+import { recoverUpdate, updateAnnouncedCli, updateCli } from './update.js';
 
 const mocks = vi.hoisted(() => ({
   exec: vi.fn(),
@@ -135,6 +135,17 @@ it('does not update unreadable responses or from the verification read', async (
 
   expect(await recoverUpdate(incompatible)).toBe(incompatible);
   expect(mocks.npmGlobalExecutable).not.toHaveBeenCalled();
+});
+
+it('reports a failed update after the result without throwing', async () => {
+  const notes: string[] = [];
+  mocks.npmGlobalExecutable.mockRejectedValue(
+    new CliError('UPDATE_FAILED', { message: 'Not an npm installation.' }),
+  );
+
+  await updateAnnouncedCli('9.0.0', (note) => notes.push(note));
+
+  expect(notes.at(-1)).toContain('Not an npm installation.');
 });
 
 it('manual update finishes after one install even when already current', async () => {

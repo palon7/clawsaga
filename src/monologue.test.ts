@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { GameClient } from './client.js';
+import { stubInvoke } from './test-responses.js';
 import { execute } from './commands.js';
 import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
 
@@ -22,9 +22,7 @@ it('posts an aside to the monologue endpoint', async () => {
     },
   };
 
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(receipt);
+  const invoke = stubInvoke(receipt);
 
   await execute(
     ['monologue', '-c', 'AsideHero000', '-i', 'aside.json'],

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { GameClient } from './client.js';
+import { stubInvoke } from './test-responses.js';
 import { execute } from './commands.js';
 import { agentSchemaVersion } from './protocol.js';
 
@@ -18,7 +18,7 @@ const traveler = 'Traveler0000';
 const thread = '123';
 
 it('maps Community Board flags and cursors to the board requests', async () => {
-  const invoke = vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue({
+  const invoke = stubInvoke({
     ...result,
   });
 
@@ -67,9 +67,7 @@ it('maps Community Board flags and cursors to the board requests', async () => {
 });
 
 it('sends a body from an input file', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue({ ...result });
+  const invoke = stubInvoke({ ...result });
 
   const body = 'Coal is cheap in Dolgan.';
   vi.mocked(readFile).mockResolvedValue(

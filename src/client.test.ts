@@ -8,10 +8,11 @@ import {
   credentialPath,
   isPendingAuthorization,
 } from './credentials.js';
-import { GameClient, serverOrigin } from './client.js';
+import { announcedCliUpdate, GameClient, serverOrigin } from './client.js';
 import { CliError } from './errors.js';
 import { agentSchemaVersion } from './protocol.js';
 import { z } from 'zod';
+import metadata from '../package.json' with { type: 'json' };
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs/promises')>();
@@ -307,6 +308,39 @@ it('reports UPDATE_REQUIRED only when the server schema is newer', async () => {
       server: origin,
     });
     expect(error.detail).not.toHaveProperty('outcome');
+  }
+});
+
+it('reads an older server and notes only a newer announced CLI version', async () => {
+  const { store } = await fixture();
+  await store.update((entries) => {
+    entries[origin]!.expires_at = Date.now() + 3600_000;
+  });
+  const [major = 0, minor = 0] = agentSchemaVersion.split('.').map(Number);
+  const respond = (cliVersion?: string) =>
+    Response.json(
+      {
+        ok: true,
+        schema_version: `${major}.${minor - 1}`,
+        server_time: '2026-09-11T00:00:00.000Z',
+        data: {},
+      },
+      cliVersion ? { headers: { 'ClawSaga-CLI-Version': cliVersion } } : {},
+    );
+
+  for (const cliVersion of [undefined, '0.0.1', metadata.version, '99.0.0']) {
+    const client = new GameClient(
+      origin,
+      store,
+      vi.fn<typeof fetch>().mockResolvedValue(respond(cliVersion)),
+    );
+
+    await expect(client.invoke('character/activity', {})).resolves.toEqual(
+      expect.objectContaining({ ok: true }),
+    );
+    expect(announcedCliUpdate()).toBe(
+      cliVersion === '99.0.0' ? '99.0.0' : undefined,
+    );
   }
 });
 

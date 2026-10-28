@@ -3,7 +3,13 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import type { AgentGameResponse, AgentRunningActivity } from './protocol.js';
 import type { GameClient } from './client.js';
 import { CliError } from './errors.js';
-import type { RepetitionSummary } from './hints.js';
+import type { RepetitionSummary, RouteSummary } from './hints.js';
+
+/** The global options an activity read repeats. */
+type ActivityValues = {
+  character: string | undefined;
+  locale?: 'ja' | 'en' | undefined;
+};
 
 // invoke marks a failure that happened before the game request was sent, so the
 // start cannot have taken effect.
@@ -35,7 +41,7 @@ export async function repeatActivity(
   client: GameClient,
   path: string,
   input: Record<string, unknown>,
-  values: { character: string | undefined; locale?: 'ja' | 'en' | undefined },
+  values: ActivityValues,
   count: number,
   options?: {
     requestIdPerLot?: boolean;
@@ -151,6 +157,106 @@ export async function repeatActivity(
   throw new CliError('INVALID_ARGUMENTS', { fields: ['count'] });
 }
 
+/**
+ * Travels to each location in `route` in turn, one step per request. The next
+ * step is sent only after the previous one arrived at its location without an
+ * ambush; any other result ends the walk with that step's response.
+ */
+export async function walkRoute(
+  client: GameClient,
+  path: string,
+  input: Record<string, unknown>,
+  values: ActivityValues,
+  route: readonly string[],
+  notify?: (value: unknown) => void,
+) {
+  const arrived: string[] = [];
+
+  const summary = (stoppedReason: string): RouteSummary => ({
+    requested_locations: [...route],
+    arrived_locations: [...arrived],
+    stopped_reason: stoppedReason,
+  });
+
+  const incomplete = (response: AgentGameResponse, stoppedReason: string) => ({
+    ...response,
+    ok: false as const,
+    error: { message: 'The travel stopped before reaching every location.' },
+    repetition: summary(stoppedReason),
+  });
+
+  // Returns the command's final response, or undefined to go on to the next step.
+  const step = async (to: string) => {
+    const started = await client.invoke(path, { ...input, to });
+    if (!started.ok) {
+      return { ...started, repetition: summary('start_rejected') };
+    }
+
+    const completed = await waitForActivity(client, values, started, notify);
+    if (!completed.ok) {
+      return { ...completed, repetition: summary('activity_failed') };
+    }
+
+    const result = endedTravel(completed, to);
+    if (result.end_reason !== 'COMPLETED') {
+      return incomplete(completed, 'activity_stopped');
+    }
+
+    arrived.push(to);
+    const last = arrived.length === route.length;
+    if (result.ambush) {
+      return last
+        ? { ...completed, repetition: summary('ambush') }
+        : incomplete(completed, 'ambush');
+    }
+
+    if (last) return { ...completed, repetition: summary('route_completed') };
+
+    // Only the final response reaches stdout, so each earlier arrival reports
+    // what it brought, such as quest progress, here.
+    notify?.({ event: 'activity_result', last_result: result });
+
+    return undefined;
+  };
+
+  for (const to of route) {
+    try {
+      const final = await step(to);
+      if (final) return final;
+    } catch (error) {
+      if (error instanceof CliError) {
+        throw new CliError(error.code, {
+          ...error.detail,
+          repetition: summary(notSent(error) ? 'start_rejected' : 'unknown'),
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  throw new CliError('INVALID_ARGUMENTS', { fields: ['to'] });
+}
+
+function endedTravel(response: AgentGameResponse, to: string) {
+  const result = response.data.last_result;
+  const arrivedElsewhere =
+    result?.end_reason === 'COMPLETED' && result.to?.id !== to;
+
+  if (
+    !result ||
+    result.kind !== 'travel' ||
+    result.status !== 'ENDED' ||
+    arrivedElsewhere
+  ) {
+    throw new CliError('INVALID_RESPONSE', {
+      reason: 'unexpected_travel_result',
+    });
+  }
+
+  return result;
+}
+
 function endedProduction(response: AgentGameResponse) {
   const result = response.data.last_result;
   if (
@@ -168,7 +274,7 @@ function endedProduction(response: AgentGameResponse) {
 
 export async function waitForActivity(
   client: GameClient,
-  values: { character: string | undefined; locale?: 'ja' | 'en' | undefined },
+  values: ActivityValues,
   initial: AgentGameResponse,
   notify?: (value: unknown) => void,
   requestId?: string,

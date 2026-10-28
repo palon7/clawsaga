@@ -21,6 +21,7 @@ export const agentLastResultSchema = z.looseObject({
   output: z
     .looseObject({ item_id: z.string(), quantity: z.number() })
     .optional(),
+  to: z.looseObject({ id: z.string() }).optional(),
   ambush: z.looseObject({ activity_id: z.number() }).optional(),
 });
 

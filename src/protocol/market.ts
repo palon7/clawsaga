@@ -9,9 +9,7 @@ import { locationIdSchema } from './movement.js';
 
 const change = { ...characterTarget, request_id: uuidSchema };
 export const marketQualitySchema = z.enum(['standard', 'fine', 'superior']);
-const price = z.number().int().positive();
-const quantity = z.number().int().positive();
-const number = z.number().int().positive();
+const positiveInteger = z.number().int().positive();
 export const marketSourceSchema = z.enum(['carried', 'storage']);
 export const marketSectionSchema = z.enum(['orders', 'listings', 'trades']);
 
@@ -23,7 +21,7 @@ export const getMarketSchema = z
     quality: marketQualitySchema.optional(),
     levels: z.number().int().min(1).optional(),
     cursor: z.number().int().positive().optional(),
-    max_price: price.optional(),
+    max_price: positiveInteger.optional(),
     minimum_durability: z.number().int().nonnegative().optional(),
   })
   .strict();
@@ -41,8 +39,8 @@ export const placeMarketSellOrderSchema = z
     ...change,
     item_id: itemId,
     quality: marketQualitySchema,
-    quantity,
-    unit_price: price,
+    quantity: positiveInteger,
+    unit_price: positiveInteger,
     source: marketSourceSchema,
   })
   .strict();
@@ -52,13 +50,13 @@ export const placeMarketBuyOrderSchema = z
     ...change,
     item_id: itemId,
     quality: marketQualitySchema,
-    quantity,
-    unit_price: price,
+    quantity: positiveInteger,
+    unit_price: positiveInteger,
   })
   .strict();
 
 export const cancelMarketOrderSchema = z
-  .object({ ...change, order_id: number })
+  .object({ ...change, order_id: positiveInteger })
   .strict();
 
 export const claimMarketOrderSchema = cancelMarketOrderSchema;
@@ -66,7 +64,7 @@ export const createMarketListingSchema = z
   .object({
     ...change,
     instance_id: instanceIdSchema,
-    price,
+    price: positiveInteger,
     source: marketSourceSchema,
   })
   .strict();
@@ -74,14 +72,14 @@ export const createMarketListingSchema = z
 export const buyMarketListingSchema = z
   .object({
     ...change,
-    listing_id: number,
-    max_price: price,
+    listing_id: positiveInteger,
+    max_price: positiveInteger,
     minimum_durability: z.number().int().nonnegative().optional(),
   })
   .strict();
 
 export const cancelMarketListingSchema = z
-  .object({ ...change, listing_id: number })
+  .object({ ...change, listing_id: positiveInteger })
   .strict();
 
 export const claimMarketListingSchema = cancelMarketListingSchema;

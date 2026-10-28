@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { execute } from './commands.js';
-import { GameClient } from './client.js';
+import { stubInvoke } from './test-responses.js';
 import { agentSchemaVersion } from './protocol.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -15,9 +15,7 @@ const accepted = {
 } as const;
 
 it('sends items and gold as one gift with a generated request ID', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(accepted));
+  const invoke = stubInvoke(structuredClone(accepted));
 
   await execute(
     [
@@ -46,9 +44,7 @@ it('sends items and gold as one gift with a generated request ID', async () => {
 });
 
 it('sends gold alone, and lists and claims without a town', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(accepted));
+  const invoke = stubInvoke(structuredClone(accepted));
 
   await execute(
     ['gift-send', '-c', character, '--to', recipient, '--gold', '5'],

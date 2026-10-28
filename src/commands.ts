@@ -17,18 +17,19 @@ import { recoveryHint, withRenderedHints } from './hints.js';
 import { announcementNote, changelogNote, withNotes } from './notices.js';
 import { updateCli } from './update.js';
 import metadata from '../package.json' with { type: 'json' };
-import { notSent, repeatActivity, waitForActivity } from './activity-wait.js';
+import {
+  notSent,
+  repeatActivity,
+  waitForActivity,
+  walkRoute,
+} from './activity-wait.js';
+import { locationIdSchema } from './protocol/movement.js';
 import {
   bodySchema,
   jsonFlag,
   type CommandDefinition,
 } from './command-definition.js';
-import {
-  commandInput,
-  optionKey,
-  optionsSchema,
-  type Values,
-} from './command-input.js';
+import { commandInput, optionsSchema, type Values } from './command-input.js';
 import { commands } from './command-registry.js';
 import { guideQueryOption, guideTopicOption, structuredHelp } from './help.js';
 import { withCliResumeInstructions } from './resume.js';
@@ -230,6 +231,30 @@ function createProgram(run: Run, notify: Notify) {
   return program;
 }
 
+/**
+ * Points a failure of this command, from commander or its action, at
+ * `helpCommand`, and `--help` at the structured help of `target`.
+ */
+function trackHelp(
+  command: Command,
+  run: Run,
+  target: string,
+  helpCommand: string,
+) {
+  command
+    .configureOutput({
+      outputError: () => {
+        run.helpCommand = helpCommand;
+      },
+    })
+    .on('--help', () => {
+      run.helpTarget = target;
+    })
+    .hook('preAction', () => {
+      run.helpCommand = helpCommand;
+    });
+}
+
 function addSchemaCommand(program: Command, run: Run) {
   const schemaCommand = program
     .command('schema')
@@ -237,13 +262,7 @@ function addSchemaCommand(program: Command, run: Run) {
       'Read the local input structure for a command. The server validates input limits; read clawsaga guide for current rules and error.fields when input is rejected.',
     )
     .argument('<command>', 'Game command name')
-    .configureOutput({
-      outputError: () => {
-        run.helpCommand = 'clawsaga schema --help';
-      },
-    })
     .action((name: string) => {
-      run.helpCommand = 'clawsaga schema --help';
       const definition = commands[name];
       if (!definition) {
         throw invalidArguments(
@@ -262,9 +281,7 @@ function addSchemaCommand(program: Command, run: Run) {
       };
     });
 
-  schemaCommand.on('--help', () => {
-    run.helpTarget = 'schema';
-  });
+  trackHelp(schemaCommand, run, 'schema', 'clawsaga schema --help');
 }
 
 /** A command that reads a server document and takes no character. */
@@ -315,24 +332,15 @@ function addDocumentCommands(program: Command, run: Run) {
   for (const document of documentCommands) {
     const command = program
       .command(document.name)
-      .description(document.description)
-      .configureOutput({
-        outputError: () => {
-          run.helpCommand = `clawsaga ${document.name} --help`;
-        },
-      });
+      .description(document.description);
 
     for (const option of document.options) {
       command.option(option.flags, option.description);
     }
 
-    command.on('--help', () => {
-      run.helpTarget = `clawsaga ${document.name}`;
-      run.helpCommand = `clawsaga ${document.name} --help`;
-    });
-
+    const target = `clawsaga ${document.name}`;
+    trackHelp(command, run, target, `${target} --help`);
     command.action(async () => {
-      run.helpCommand = `clawsaga ${document.name} --help`;
       const values = optionsSchema.parse(command.optsWithGlobals());
       run.result = await clientFor(values).readDocument(
         document.path(values),
@@ -345,16 +353,9 @@ function addDocumentCommands(program: Command, run: Run) {
     .command('auth')
     .description('Manage authorization')
     .command('login')
-    .description('Return a device verification URL without waiting')
-    .configureOutput({
-      outputError: () => {
-        run.helpCommand = 'clawsaga auth login --help';
-      },
-    });
+    .description('Return a device verification URL without waiting');
 
-  login.on('--help', () => {
-    run.helpTarget = 'auth login';
-  });
+  trackHelp(login, run, 'auth login', 'clawsaga auth login --help');
   login.action(async () => {
     run.result = await clientFor(
       optionsSchema.parse(login.optsWithGlobals()),
@@ -369,14 +370,7 @@ function addGameCommand(
   name: string,
   definition: CommandDefinition,
 ) {
-  const command = program
-    .command(name)
-    .description(definition.help)
-    .configureOutput({
-      outputError: () => {
-        run.helpCommand = `clawsaga ${name} --help`;
-      },
-    });
+  const command = program.command(name).description(definition.help);
 
   for (const [flags, description] of definition.flags) {
     command.option(flags, description);
@@ -389,12 +383,8 @@ function addGameCommand(
     );
   }
 
-  command.on('--help', () => {
-    run.helpTarget = `clawsaga ${name}`;
-  });
-
+  trackHelp(command, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
   command.action(async () => {
-    run.helpCommand = `clawsaga ${name} --help`;
     const executed: ExecutedCommand = {
       name,
       definition,
@@ -408,6 +398,7 @@ function addGameCommand(
     executed.character = values.character;
     executed.wait = values.wait !== false;
     assertRequiredOptions(definition, values, command.opts());
+    const route = definition.walksRoute ? routeLocations(values) : undefined;
 
     const requestedId = values.request;
     if (definition.autoRequestId && !values.request) {
@@ -430,6 +421,19 @@ function addGameCommand(
             { requestIdPerLot, notify },
           )
         : await invokeGame(client, definition, input, values);
+
+      return;
+    }
+
+    if (route) {
+      run.result = await walkRoute(
+        client,
+        definition.path,
+        input,
+        activityValues(values),
+        route,
+        notify,
+      );
 
       return;
     }
@@ -464,9 +468,10 @@ function assertRequiredOptions(
   }
 
   for (const [flags, , required] of definition.flags) {
-    if (!required || provided[optionKey(flags)] !== undefined) continue;
+    const key = new Option(flags).attributeName();
+    if (!required || provided[key] !== undefined) continue;
     throw invalidArguments(
-      [optionKey(flags)],
+      [key],
       `Required option '${flags}' was not provided.`,
     );
   }
@@ -481,15 +486,43 @@ async function invokeGame(
   try {
     return await client.invoke(definition.path, input);
   } catch (error) {
-    if (definition.errorContext && error instanceof CliError) {
+    // A failed request reports the request_id it sent, so an exact retry can
+    // reuse it even when the CLI generated it.
+    if (definition.autoRequestId && error instanceof CliError) {
       throw new CliError(error.code, {
         ...error.detail,
-        ...definition.errorContext(values, input),
+        request_id: input.request_id,
+        ...definition.errorContext?.(values, input),
       });
     }
 
     throw error;
   }
+}
+
+/**
+ * The locations of a comma-separated `--to`, or undefined for one location,
+ * which travels as before. The server checks each step's destination.
+ */
+function routeLocations(values: Values) {
+  const route = values.to?.split(',') ?? [];
+  if (route.length < 2) return undefined;
+
+  if (!route.every((id) => locationIdSchema.safeParse(id).success)) {
+    throw invalidArguments(
+      ['to'],
+      '--to takes location IDs separated by commas, without spaces or empty entries.',
+    );
+  }
+
+  if (values.wait === false) {
+    throw invalidArguments(
+      ['to'],
+      '--no-wait starts one step; give one location with --to or omit --no-wait.',
+    );
+  }
+
+  return route;
 }
 
 function repeatCount(

@@ -36,12 +36,14 @@ export const changelogResponseSchema = z.looseObject({
 
 export type ChangelogResponse = z.infer<typeof changelogResponseSchema>;
 
-export const agentSchemaVersion = '3.17';
+export const agentSchemaVersion = '3.18';
 
 export const agentGameResponseSchema = z
   .looseObject({
     ok: z.boolean(),
-    schema_version: z.literal(agentSchemaVersion),
+    // The client rejects a newer version before parsing. An older server's
+    // response is read when it still matches this CLI's format.
+    schema_version: z.string(),
     server_time: z.string(),
     next_poll_after_seconds: z.number().optional(),
     hints: z.array(agentHintSchema).optional(),

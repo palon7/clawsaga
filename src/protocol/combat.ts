@@ -62,7 +62,7 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
     })
     .strict()
     .describe(
-      'Matches when usable healing potions remaining in this battle are strictly below count.',
+      'Matches when usable potions remaining in this battle are strictly below count.',
     ),
   z
     .object({ kind: z.literal('enemy_weak_to'), damage_type: damageTypeSchema })
@@ -111,6 +111,11 @@ export const tacticActionSchema = z.discriminatedUnion('kind', [
     ),
 ]);
 
+export const combatPotionIdSchema = z.enum([
+  'healing_potion',
+  'manastone_potion',
+]);
+
 export const tacticSchema = z
   .object({
     rules: z
@@ -135,7 +140,18 @@ export const tacticSchema = z
       .int()
       .min(0)
       .describe(
-        'Maximum healing potions the tactic may use in one battle, limited by the bag quantity at start. Each potion is consumed when used; zero disables potion use.',
+        'Most potions one battle may use in total, capped by the bag at start. Each is consumed when used; zero disables potions.',
+      ),
+    potion_items: z
+      .array(combatPotionIdSchema)
+      .min(1)
+      .refine(
+        (itemIds) => new Set(itemIds).size === itemIds.length,
+        'potion_items must not repeat',
+      )
+      .optional()
+      .describe(
+        'Potions in drinking order. Defaults to healing_potion, then manastone_potion.',
       ),
   })
   .strict()
@@ -191,6 +207,7 @@ export const getCombatReportSchema = z
   .strict();
 
 export const getEncountersSchema = z.object(characterTarget).strict();
+export const getRaidsSchema = z.object(characterTarget).strict();
 export const getLostItemsSchema = z.object(characterTarget).strict();
 
 export const recoverLostItemsSchema = z

@@ -1,5 +1,6 @@
 import {
   getEncountersSchema,
+  getRaidsSchema,
   getTacticsSchema,
   setTacticsSchema,
   validateTacticsSchema,
@@ -72,12 +73,6 @@ const bodyRequestFlag = [
   'Request ID for a body file without request_id; reuse it after an uncertain result',
 ] as const;
 
-// A failed journal or session-end request reports the request_id it sent, so an
-// exact retry can reuse it even when the CLI generated it.
-function requestIdContext(_values: unknown, input: Record<string, unknown>) {
-  return { request_id: input.request_id };
-}
-
 // Rejects a command line that names none or several of options that exclude each other.
 function exactlyOne(fields: (keyof Values)[], message: string) {
   return (values: Values) => {
@@ -121,6 +116,12 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     schema: getEncountersSchema,
     flags: [],
     help: 'List local enemies or town training dummies.',
+  },
+  raids: {
+    path: 'character/raids',
+    schema: getRaidsSchema,
+    flags: [],
+    help: 'Read the running raid boss and the last one that ended: location, deadline, shared HP left, and your attempts and damage. Fight it with fight at its location.',
   },
   tactics: {
     path: 'character/tactics',
@@ -183,7 +184,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
       ],
       noWaitFlag,
     ],
-    help: 'Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes.',
+    help: 'Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes. A raid boss enemy_id at its location uses a daily raid attempt (see raids).',
     inputExample: { enemy_id: 'wolf', tactic: { rules: [], potion_limit: 0 } },
     examples: [
       'clawsaga fight -c m7Qp2_aR9L-x --enemy wolf',
@@ -377,7 +378,6 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/journal/write',
     schema: writeJournalSchema,
     autoRequestId: true,
-    errorContext: requestIdContext,
     flags: [jsonFlag, bodyRequestFlag],
     help: 'Record something new worth remembering in a later session. Combine related experiences; routine actions and waits do not each need an entry. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content.',
     inputExample: {
@@ -389,7 +389,6 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/session-end',
     schema: endSessionSchema,
     autoRequestId: true,
-    errorContext: requestIdContext,
     flags: [jsonFlag, bodyRequestFlag],
     help: 'Always use end when ending a play session to save one summary, even if you wrote a journal during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content. Without session_ended.activity_id no activity was running; do not claim one was stopped. Use the returned result without another hello.',
     inputExample: {
