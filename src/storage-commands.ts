@@ -20,7 +20,7 @@ export function addItemTargets(values: Values, input: Record<string, unknown>) {
 }
 
 function storageContext(values: Values) {
-  return { request_id: values.request, town_id: values.town };
+  return { town_id: values.town };
 }
 
 export const storageCommands: Record<string, CommandDefinition> = {
@@ -49,7 +49,7 @@ export const storageCommands: Record<string, CommandDefinition> = {
   deposit: {
     path: 'character/storage/deposit',
     schema: depositItemsSchema,
-    input: { town: 'town_id', request: 'request_id' },
+    input: { town: 'town_id' },
     autoRequestId: true,
     errorContext: storageContext,
     buildInput: addItemTargets,
@@ -69,7 +69,7 @@ export const storageCommands: Record<string, CommandDefinition> = {
   withdraw: {
     path: 'character/storage/withdraw',
     schema: withdrawItemsSchema,
-    input: { town: 'town_id', request: 'request_id' },
+    input: { town: 'town_id' },
     autoRequestId: true,
     errorContext: storageContext,
     buildInput: addItemTargets,

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { execute } from './commands.js';
 import { GameClient } from './client.js';
+import { stubInvoke } from './test-responses.js';
 import { CliError } from './errors.js';
 import { agentSchemaVersion } from './protocol.js';
 
@@ -163,9 +164,7 @@ const purchase = {
 } as const;
 
 it('reads every active item without an item filter', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(overview));
+  const invoke = stubInvoke(structuredClone(overview));
 
   await execute(['market', '-c', character, '--town', 'corvent'], vi.fn());
   expect(invoke.mock.calls[0]![1]).toEqual({
@@ -175,9 +174,7 @@ it('reads every active item without an item filter', async () => {
 });
 
 it('reads one board remotely and maps every optional filter to typed numbers', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(orderBook));
+  const invoke = stubInvoke(structuredClone(orderBook));
 
   await execute(
     [
@@ -215,9 +212,7 @@ it('reads one board remotely and maps every optional filter to typed numbers', a
 });
 
 it('reads listings with their pagination cursor', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(listings));
+  const invoke = stubInvoke(structuredClone(listings));
 
   await execute(
     ['market', '-c', character, '--town', 'corvent', '--item', 'iron_sword'],
@@ -231,9 +226,7 @@ it('reads listings with their pagination cursor', async () => {
 });
 
 it('reads own orders, held items and trades from anywhere', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(myMarket));
+  const invoke = stubInvoke(structuredClone(myMarket));
 
   await execute(
     ['my-market', '-c', character, '--section', 'trades', '--cursor', '9'],
@@ -248,9 +241,7 @@ it('reads own orders, held items and trades from anywhere', async () => {
 });
 
 it('posts each write to its order or listing path with a request ID', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(placement));
+  const invoke = stubInvoke(structuredClone(placement));
 
   const request = '44444444-4444-4444-8444-444444444444';
   await execute(
@@ -342,9 +333,7 @@ it('posts each write to its order or listing path with a request ID', async () =
 });
 
 it('posts a purchase with numeric bounds', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(purchase));
+  const invoke = stubInvoke(structuredClone(purchase));
 
   await execute(
     [

@@ -13,6 +13,8 @@ const cliErrorMessages: Record<string, string> = {
   INVALID_RESPONSE: 'The server returned a response this CLI could not read.',
   AUTH_START_FAILED: 'Could not start authorization. Try again later.',
   AUTH_NOT_COMPLETED: 'Authorization was not completed.',
+  CREDENTIAL_STORAGE_FAILED:
+    'Could not read or save ~/.clawsaga/credentials.json. Check the file and its directory permissions.',
   INVALID_SERVER: 'The server origin is invalid.',
   INVALID_AUTH_SERVER:
     'The authorization server origin does not match the game server.',

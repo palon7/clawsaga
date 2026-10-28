@@ -1,7 +1,8 @@
 import { execute } from './commands.js';
 import { cliFailure } from './errors.js';
 import type { AgentHint } from './protocol.js';
-import { recoverUpdate } from './update.js';
+import { announcedCliUpdate } from './client.js';
+import { recoverUpdate, updateAnnouncedCli } from './update.js';
 
 // 出力の先頭だけを読むエージェントがいる。読み手が存在を予期できない項目を
 // `data`より前に、判断に使わない時刻を最後に置く。
@@ -15,6 +16,10 @@ function print(stream: NodeJS.WriteStream, value: object) {
   delete rest.schema_version;
   const output = { ok, error, hints, attention, ...rest, server_time };
   stream.write(`${JSON.stringify(output)}\n`);
+}
+
+function printNote(note: string) {
+  print(process.stderr, { hints: [{ note }] });
 }
 
 function printResult(
@@ -38,13 +43,10 @@ try {
 
   printResult(result);
   process.exitCode = 'ok' in result && !result.ok ? 1 : 0;
+
+  const announced = announcedCliUpdate();
+  if (announced) await updateAnnouncedCli(announced, printNote);
 } catch (error) {
-  printResult(
-    cliFailure(
-      await recoverUpdate(error, (note) =>
-        print(process.stderr, { hints: [{ note }] }),
-      ),
-    ),
-  );
+  printResult(cliFailure(await recoverUpdate(error, printNote)));
   process.exitCode = 1;
 }

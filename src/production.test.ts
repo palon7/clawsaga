@@ -5,6 +5,7 @@ import {
   type AgentGameResponse,
 } from './protocol.js';
 import { GameClient } from './client.js';
+import { stubInvoke } from './test-responses.js';
 import { execute } from './commands.js';
 import { repeatActivity } from './activity-wait.js';
 import { CliError } from './errors.js';
@@ -341,7 +342,7 @@ it('retains a generated purchase ID and payment arguments and reconciles by the 
 });
 
 it('sends a bulk purchase once without a payment cap', async () => {
-  const invoke = vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue({
+  const invoke = stubInvoke({
     ok: true,
     schema_version: agentSchemaVersion,
     server_time: '2026-09-09T00:00:00.000Z',
@@ -606,9 +607,7 @@ it('answers a replayed craft from its stored result while a newer activity keeps
   response.next_poll_after_seconds = 30;
 
   expect(agentGameResponseSchema.safeParse(response).success).toBe(true);
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(response);
+  const invoke = stubInvoke(response);
 
   const replay = (requestId: string) =>
     execute(
@@ -696,9 +695,7 @@ it('reports the current craft lot request ID when its result is unknown', async 
 });
 
 it('returns one acceptance for --no-wait gather as a receipt, without polling or a repetition summary', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(running());
+  const invoke = stubInvoke(running());
 
   const notify = vi.fn();
   const response = await execute([...args, '--no-wait'], notify);
@@ -729,9 +726,7 @@ it('rejects --no-wait with --count above one before any change', async () => {
 });
 
 it('sends one generated request ID for a --no-wait craft without a repetition summary', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(runningCraft());
+  const invoke = stubInvoke(runningCraft());
 
   const response = await execute(
     [
@@ -760,9 +755,7 @@ it('sends one generated request ID for a --no-wait craft without a repetition su
 });
 
 it('omits the fee limit when the craft does not set one', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(runningCraft());
+  const invoke = stubInvoke(runningCraft());
 
   const response = await execute(
     ['craft', '-c', 'Maker0000000', '--recipe', 'wolf_jerky', '--no-wait'],

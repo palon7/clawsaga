@@ -1,10 +1,11 @@
+import { Option } from 'commander';
 import { expect, it } from 'vitest';
 import { jsonFlag } from './command-definition.js';
 import { commands } from './command-registry.js';
-import { integerFlag, optionKey } from './command-input.js';
+import { integerFlag } from './command-input.js';
 
 // Options that steer the CLI and never reach the request body.
-const localOptions = ['input', 'noWait', 'count'];
+const localOptions = ['input', 'wait', 'count'];
 
 it('maps every flag of a command to a request field unless the command builds it or requires a body file', () => {
   for (const [name, definition] of Object.entries(commands)) {
@@ -21,8 +22,15 @@ it('maps every flag of a command to a request field unless the command builds it
       continue;
     }
 
-    const options = definition.flags.map(([flags]) => optionKey(flags));
-    const mapped = Object.keys(definition.input ?? {});
+    const options = definition.flags.map(([flags]) =>
+      new Option(flags).attributeName(),
+    );
+
+    const mapped = [
+      ...Object.keys(definition.input ?? {}),
+      ...(definition.autoRequestId ? ['request'] : []),
+    ];
+
     expect(
       mapped.filter((option) => !options.includes(option)),
       `${name} maps an option it does not have`,

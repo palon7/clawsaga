@@ -98,18 +98,6 @@ async function readJsonFile(file: string): Promise<unknown> {
   }
 }
 
-/** The commander option key of a flag declaration: `--max-price <gold>` is `maxPrice`. */
-export function optionKey(flags: string) {
-  const long = flags
-    .split(',')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith('--'));
-
-  const name = (long ?? flags).replace(/^--?/, '').split(' ')[0] ?? flags;
-
-  return name.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
-}
-
 /**
  * Converts a numeric flag after checking only its form: every numeric field the
  * CLI sends is a non-negative integer. The server checks the allowed range.
@@ -174,6 +162,7 @@ function flagInput(definition: CommandDefinition, values: Values) {
     else input[key] = value;
   }
 
+  if (definition.autoRequestId) input.request_id = values.request;
   definition.buildInput?.(values, input);
 
   return input;

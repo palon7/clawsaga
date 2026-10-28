@@ -46,11 +46,4 @@ export const depositItemsSchema = z
   })
   .strict();
 
-export const withdrawItemsSchema = z
-  .object({
-    ...characterTarget,
-    town_id: locationIdSchema,
-    request_id: uuidSchema,
-    items: storageTransferItemsSchema,
-  })
-  .strict();
+export const withdrawItemsSchema = depositItemsSchema;

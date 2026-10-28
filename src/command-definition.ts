@@ -43,7 +43,10 @@ export type CommandDefinition = {
   /** Content language sent when neither -l nor the environment sets one. */
   defaultLocale?: 'en';
   requiresCharacter?: boolean;
-  /** Generates request_id unless --request or the body file supplies one. */
+  /**
+   * Generates request_id unless --request or the body file supplies one, and
+   * adds it to the detail of a CliError raised by the game request.
+   */
   autoRequestId?: boolean;
   /** Starts a main activity: accepts --no-wait, otherwise waits for its result. */
   startsActivity?: boolean;
@@ -52,9 +55,14 @@ export type CommandDefinition = {
    * sends a new request ID per lot.
    */
   repeat?: { requestIdPerLot: boolean };
+  /**
+   * Accepts comma-separated `--to` locations and walks them one step at a time,
+   * sending each step only after the previous one arrived without an ambush.
+   */
+  walksRoute?: boolean;
   /** A lost response may still have changed items, so the outcome is unknown. */
   changesItems?: boolean;
-  /** Fields added to the detail of a CliError raised by the game request. */
+  /** With autoRequestId, fields added after request_id to the error detail. */
   errorContext?: (
     values: Values,
     input: Record<string, unknown>,
@@ -86,6 +94,11 @@ export const jsonFlag = [
   '-i, --input <file>',
   'JSON body file, or - for stdin; the body fields are shown in input_example',
   true,
+] as const;
+
+export const requestFlag = [
+  '--request <uuid>',
+  'Reuse the same ID and arguments after an uncertain result',
 ] as const;
 
 export const limitFlag = [

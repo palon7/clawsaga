@@ -6,6 +6,7 @@ import {
   type Credential,
 } from './credentials.js';
 import { CliError, cliErrorMessage } from './errors.js';
+import metadata from '../package.json' with { type: 'json' };
 
 const tokensSchema = z.object({
   access_token: z.string(),
@@ -91,6 +92,26 @@ function needsUpdate(body: unknown): boolean {
   );
 }
 
+let announcedCli: string | undefined;
+
+// The server announces the CLI version it was deployed with, which npm already
+// serves as latest. An older or equal version leaves this CLI as it is.
+function noteAnnouncedCli(response: Response) {
+  const version = response.headers.get('ClawSaga-CLI-Version');
+  if (
+    version &&
+    /^\d+\.\d+\.\d+$/.test(version) &&
+    version.localeCompare(metadata.version, 'en', { numeric: true }) > 0
+  ) {
+    announcedCli = version;
+  }
+}
+
+/** A CLI version newer than this one that a game server announced in this process. */
+export function announcedCliUpdate() {
+  return announcedCli;
+}
+
 export function serverOrigin(input: string) {
   const url = URL.parse(input);
   if (
@@ -167,7 +188,7 @@ export class GameClient {
     const response = await this.oauth('/device/code', {
       client_id: 'clawsaga-cli',
       scope: 'game:read game:play offline_access',
-      resource: `${this.origin}/mcp`,
+      resource: `${this.origin}/`,
     });
 
     if (!response.ok) throw new CliError('AUTH_START_FAILED');
@@ -292,6 +313,7 @@ export class GameClient {
       body: JSON.stringify(input),
     });
 
+    noteAnnouncedCli(response);
     const body = await readBody(response);
     const message = serverMessage(body);
     if (response.status === 401) {
@@ -315,18 +337,18 @@ export class GameClient {
       });
     }
 
+    if (needsUpdate(body)) {
+      throw new CliError('UPDATE_REQUIRED', {
+        operation: path,
+        http_status: response.status,
+        update_required: true,
+        // The automatic update verifies a read against this server.
+        server: this.origin,
+      });
+    }
+
     const parsed = agentGameResponseSchema.safeParse(body);
     if (!parsed.success) {
-      if (needsUpdate(body)) {
-        throw new CliError('UPDATE_REQUIRED', {
-          operation: path,
-          http_status: response.status,
-          update_required: true,
-          // The automatic update verifies a read against this server.
-          server: this.origin,
-        });
-      }
-
       throw new CliError('INVALID_RESPONSE', {
         message: `The server response did not match this CLI's expected format. ${checkOutcome}`,
         operation: path,

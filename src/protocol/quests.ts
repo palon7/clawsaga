@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { combatIdSchema } from './combat.js';
 import { characterTarget, itemIdSchema, uuidSchema } from './ids.js';
 
 export const getQuestsSchema = z
@@ -16,10 +17,7 @@ export const acceptQuestSchema = z
   .object({
     ...characterTarget,
     offer_id: uuidSchema.optional(),
-    fixed_quest_id: z
-      .string()
-      .regex(/^[a-z][a-z0-9_]{0,63}$/)
-      .optional(),
+    fixed_quest_id: combatIdSchema.optional(),
     goal_id: questNumber.optional(),
   })
   .strict()

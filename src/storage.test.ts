@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { execute } from './commands.js';
 import { GameClient } from './client.js';
+import { stubInvoke } from './test-responses.js';
 import { CliError } from './errors.js';
 import { agentGameResponseSchema, agentSchemaVersion } from './protocol.js';
 
@@ -40,9 +41,7 @@ const batch = JSON.stringify([
 ]);
 
 it('sends the whole storage batch as one request and generates a request ID', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(transfer));
+  const invoke = stubInvoke(structuredClone(transfer));
 
   const result = await execute(
     ['deposit', '-c', character, '--town', 'selene', '--items', batch],
@@ -62,9 +61,7 @@ it('sends the whole storage batch as one request and generates a request ID', as
 });
 
 it('keeps a supplied request ID and the withdrawal path', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(transfer));
+  const invoke = stubInvoke(structuredClone(transfer));
 
   const request = '44444444-4444-4444-8444-444444444444';
 
@@ -120,9 +117,7 @@ it('retains the request ID in an uncertain-result error and rejects a malformed 
 });
 
 it('reads one town and searches across towns', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(structuredClone(transfer));
+  const invoke = stubInvoke(structuredClone(transfer));
 
   await execute(['storage', '-c', character, '--town', 'selene'], vi.fn());
   expect(invoke.mock.calls[0]![0]).toBe('character/storage');

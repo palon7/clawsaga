@@ -1,4 +1,11 @@
+import { vi } from 'vitest';
+import { GameClient } from './client.js';
 import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
+
+/** Answers every game request with `response`. */
+export function stubInvoke(response: AgentGameResponse) {
+  return vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue(response);
+}
 
 export const initial: AgentGameResponse = {
   ok: true,

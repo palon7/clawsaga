@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
-import { initial } from './test-responses.js';
+import { initial, stubInvoke } from './test-responses.js';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
 import { commands } from './command-registry.js';
@@ -13,9 +13,7 @@ afterEach(() => {
 });
 
 it('requires an explicit repair method and sends that choice without fallback', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   const args = ['repair', '-c', 'Maker0000000', '--instance', 'k3v9q2m7xa'];
 
@@ -81,9 +79,7 @@ it('uses one selected origin for authorization and game commands, with explicit 
 });
 
 it('accepts a reusable one-battle tactic file and rejects fight inputs the CLI cannot build', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   const tactic = {
     rules: [
@@ -147,9 +143,7 @@ it('accepts a reusable one-battle tactic file and rejects fight inputs the CLI c
 });
 
 it('resolves a named character to a Character ID without -c or a JSON body', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(['resolve-character', '--name', 'Aster'], vi.fn());
   expect(invoke).toHaveBeenCalledWith('characters/resolve', {
@@ -202,9 +196,7 @@ it('keeps English help available without authorization and separates content lan
     input_schema: { required: ['character_id'] },
   });
 
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(
     ['hello', '-s', 'https://example.com', '-c', 'Traveler0000', '-l', 'ja'],
@@ -230,7 +222,12 @@ it('lists the response data keys of every game command in its help', async () =>
 
   expect(await execute(['quest-board', '--help'], vi.fn())).toMatchObject({
     help: {
-      data_keys: ['quest_board', 'quest_board_budget', 'community_goals'],
+      data_keys: [
+        'quest_board',
+        'quest_board_budget',
+        'community_goals',
+        'raids',
+      ],
     },
   });
 });
@@ -304,9 +301,7 @@ it('parses every structured help command example with a fake client', async () =
     error: { message: 'Fixture response.' },
   };
 
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(failure);
+  const invoke = stubInvoke(failure);
 
   const program = (await execute([], vi.fn())) as unknown as {
     help: { commands: { name: string }[] };
@@ -360,9 +355,7 @@ function shellArguments(example: string) {
 }
 
 it('passes a Character ID that begins with a dash without treating it as an option', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(['hello', '-c', '-AbC123xyz_9'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('character/hello', {
@@ -371,9 +364,7 @@ it('passes a Character ID that begins with a dash without treating it as an opti
 });
 
 it('accepts comma-separated include sections', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(
     ['character', '-c', 'Aster0000000', '--include', 'profile,inventory'],
@@ -387,9 +378,7 @@ it('accepts comma-separated include sections', async () => {
 });
 
 it('maps bag-expand --tier to the tier to buy', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(['bag-expand', '-c', 'Traveler0000', '--tier', '2'], vi.fn());
 
@@ -400,9 +389,7 @@ it('maps bag-expand --tier to the tier to buy', async () => {
 });
 
 it('maps stack and individual discard flags', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(
     ['discard', '-c', 'Traveler0000', '--item', 'wolf_meat', '--quantity', '2'],
@@ -431,9 +418,7 @@ it('maps stack and individual discard flags', async () => {
 });
 
 it('sends a value outside the documented enum to the server instead of rejecting it locally', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(
     [
@@ -512,9 +497,7 @@ it('returns the parser reason and command-specific help without sending a reques
 });
 
 it('sends JSON examples with the character and locale flags added to the body', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   const program = (await execute([], vi.fn())) as unknown as {
     help: { commands: { name: string }[] };
@@ -566,9 +549,7 @@ it('sends JSON examples with the character and locale flags added to the body', 
 });
 
 it('sends map scope, look people and route or travel destinations', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(['map', '-c', 'Traveler0000', '--full'], vi.fn());
   expect(invoke).toHaveBeenLastCalledWith('world/map', {
@@ -620,9 +601,7 @@ it('sends map scope, look people and route or travel destinations', async () => 
 });
 
 it('rejects the removed paid-mode flags without sending requests', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   for (const args of [
     ['rest', '-c', 'Traveler0000', '--inn'],
@@ -637,9 +616,7 @@ it('rejects the removed paid-mode flags without sending requests', async () => {
 });
 
 it('accepts a shared offer or a fixed quest and requires exactly one source', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(
     [
@@ -696,9 +673,7 @@ it('accepts a shared offer or a fixed quest and requires exactly one source', as
 });
 
 it('maps goal-deliver flags to the delivery request', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(
     [
@@ -724,9 +699,7 @@ it('maps goal-deliver flags to the delivery request', async () => {
 });
 
 it('claims a quest or an ended world quest and requires exactly one', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(['quest-claim', '-c', 'Traveler0000', '--quest', '4'], vi.fn());
   expect(invoke).toHaveBeenCalledWith('character/quests/claim', {
@@ -750,9 +723,7 @@ it('claims a quest or an ended world quest and requires exactly one', async () =
 });
 
 it('maps item, recipe, active quest and journal discovery flags', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(['items', '-c', 'Traveler0000', '--query', 'MP 回復'], vi.fn());
   await execute(
@@ -774,9 +745,7 @@ it('maps item, recipe, active quest and journal discovery flags', async () => {
 });
 
 it('passes item IDs to the server, including definitions unknown to this CLI', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(
     ['use', '-c', 'Traveler0000', '--item', 'future_tonic'],
@@ -790,9 +759,7 @@ it('passes item IDs to the server, including definitions unknown to this CLI', a
 });
 
 it('sends use --count as one request and does not repeat it', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   await execute(
     ['use', '-c', 'Traveler0000', '--item', 'wolf_jerky', '--count', '5'],
@@ -832,7 +799,7 @@ it('adds changelog notices to hello only', async () => {
     },
   };
 
-  vi.spyOn(GameClient.prototype, 'invoke').mockResolvedValue(hello);
+  stubInvoke(hello);
   expect(await execute(['hello', '-c', 'Traveler0000'], vi.fn())).toMatchObject(
     { hints: [{ note: expect.stringContaining('Rest tuning') }] },
   );

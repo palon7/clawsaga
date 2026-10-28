@@ -2621,9 +2621,9 @@ var DualOptions = class {
    * @returns {boolean}
    */
   valueFromOption(value, option) {
-    const optionKey2 = option.attributeName();
-    if (!this.dualOptions.has(optionKey2)) return true;
-    const preset = this.negativeOptions.get(optionKey2).presetArg;
+    const optionKey = option.attributeName();
+    if (!this.dualOptions.has(optionKey)) return true;
+    const preset = this.negativeOptions.get(optionKey).presetArg;
     const negativeValue = preset !== void 0 ? preset : false;
     return option.negate === (negativeValue === value);
   }
@@ -4152,11 +4152,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
    */
   _checkForConflictingLocalOptions() {
     const definedNonDefaultOptions = this.options.filter((option) => {
-      const optionKey2 = option.attributeName();
-      if (this.getOptionValue(optionKey2) === void 0) {
+      const optionKey = option.attributeName();
+      if (this.getOptionValue(optionKey) === void 0) {
         return false;
       }
-      return this.getOptionValueSource(optionKey2) !== "default";
+      return this.getOptionValueSource(optionKey) !== "default";
     });
     const optionsWithConflicting = definedNonDefaultOptions.filter(
       (option) => option.conflictsWith.length > 0
@@ -4354,9 +4354,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
   _parseOptionsEnv() {
     this.options.forEach((option) => {
       if (option.envVar && option.envVar in process2.env) {
-        const optionKey2 = option.attributeName();
-        if (this.getOptionValue(optionKey2) === void 0 || ["default", "config", "env"].includes(
-          this.getOptionValueSource(optionKey2)
+        const optionKey = option.attributeName();
+        if (this.getOptionValue(optionKey) === void 0 || ["default", "config", "env"].includes(
+          this.getOptionValueSource(optionKey)
         )) {
           if (option.required || option.optional) {
             this.emit(`optionEnv:${option.name()}`, process2.env[option.envVar]);
@@ -4374,8 +4374,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
    */
   _parseOptionsImplied() {
     const dualHelper = new DualOptions(this.options);
-    const hasCustomOptionValue = (optionKey2) => {
-      return this.getOptionValue(optionKey2) !== void 0 && !["default", "implied"].includes(this.getOptionValueSource(optionKey2));
+    const hasCustomOptionValue = (optionKey) => {
+      return this.getOptionValue(optionKey) !== void 0 && !["default", "implied"].includes(this.getOptionValueSource(optionKey));
     };
     this.options.filter(
       (option) => option.implied !== void 0 && hasCustomOptionValue(option.attributeName()) && dualHelper.valueFromOption(
@@ -4431,13 +4431,13 @@ Expecting one of '${allowedValues.join("', '")}'`);
    */
   _conflictingOption(option, conflictingOption) {
     const findBestOptionFromValue = (option2) => {
-      const optionKey2 = option2.attributeName();
-      const optionValue = this.getOptionValue(optionKey2);
+      const optionKey = option2.attributeName();
+      const optionValue = this.getOptionValue(optionKey);
       const negativeOption = this.options.find(
-        (target2) => target2.negate && optionKey2 === target2.attributeName()
+        (target2) => target2.negate && optionKey === target2.attributeName()
       );
       const positiveOption = this.options.find(
-        (target2) => !target2.negate && optionKey2 === target2.attributeName()
+        (target2) => !target2.negate && optionKey === target2.attributeName()
       );
       if (negativeOption && (negativeOption.presetArg === void 0 && optionValue === false || negativeOption.presetArg !== void 0 && optionValue === negativeOption.presetArg)) {
         return negativeOption;
@@ -4446,8 +4446,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
     };
     const getErrorMessage = (option2) => {
       const bestOption = findBestOptionFromValue(option2);
-      const optionKey2 = bestOption.attributeName();
-      const source = this.getOptionValueSource(optionKey2);
+      const optionKey = bestOption.attributeName();
+      const source = this.getOptionValueSource(optionKey);
       if (source === "env") {
         return `environment variable '${bestOption.envVar}'`;
       }
@@ -14073,8 +14073,8 @@ function ko_default() {
 var capitalizeFirstCharacter = (text2) => {
   return text2.charAt(0).toUpperCase() + text2.slice(1);
 };
-function getUnitTypeFromNumber(number5) {
-  const abs = Math.abs(number5);
+function getUnitTypeFromNumber(number4) {
+  const abs = Math.abs(number4);
   const last = abs % 10;
   const last2 = abs % 100;
   if (last2 >= 11 && last2 <= 19 || last === 0)
@@ -23944,6 +23944,7 @@ var agentLastResultSchema = external_exports.looseObject({
   status: external_exports.string().optional(),
   end_reason: external_exports.string().optional(),
   output: external_exports.looseObject({ item_id: external_exports.string(), quantity: external_exports.number() }).optional(),
+  to: external_exports.looseObject({ id: external_exports.string() }).optional(),
   ambush: external_exports.looseObject({ activity_id: external_exports.number() }).optional()
 });
 
@@ -23962,10 +23963,12 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.17";
+var agentSchemaVersion = "3.18";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
-  schema_version: external_exports.literal(agentSchemaVersion),
+  // The client rejects a newer version before parsing. An older server's
+  // response is read when it still matches this CLI's format.
+  schema_version: external_exports.string(),
   server_time: external_exports.string(),
   next_poll_after_seconds: external_exports.number().optional(),
   hints: external_exports.array(agentHintSchema).optional(),
@@ -24092,7 +24095,7 @@ var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
     kind: external_exports.literal("potions_below"),
     count: external_exports.number().int().min(1)
   }).strict().describe(
-    "Matches when usable healing potions remaining in this battle are strictly below count."
+    "Matches when usable potions remaining in this battle are strictly below count."
   ),
   external_exports.object({ kind: external_exports.literal("enemy_weak_to"), damage_type: damageTypeSchema }).strict().describe("Matches when the enemy resistance for damage_type is negative."),
   external_exports.object({
@@ -24121,6 +24124,10 @@ var tacticActionSchema = external_exports.discriminatedUnion("kind", [
     "Uses the ability when it is unlocked, off cooldown, affordable in MP and its effect is currently applicable."
   )
 ]);
+var combatPotionIdSchema = external_exports.enum([
+  "healing_potion",
+  "manastone_potion"
+]);
 var tacticSchema = external_exports.object({
   rules: external_exports.array(
     external_exports.object({
@@ -24133,7 +24140,13 @@ var tacticSchema = external_exports.object({
     "Evaluated from top to bottom each tick. The first matching, usable action runs; otherwise use a basic attack."
   ),
   potion_limit: external_exports.number().int().min(0).describe(
-    "Maximum healing potions the tactic may use in one battle, limited by the bag quantity at start. Each potion is consumed when used; zero disables potion use."
+    "Most potions one battle may use in total, capped by the bag at start. Each is consumed when used; zero disables potions."
+  ),
+  potion_items: external_exports.array(combatPotionIdSchema).min(1).refine(
+    (itemIds) => new Set(itemIds).size === itemIds.length,
+    "potion_items must not repeat"
+  ).optional().describe(
+    "Potions in drinking order. Defaults to healing_potion, then manastone_potion."
   )
 }).strict().meta({ id: "Tactic" });
 var presetIdSchema = external_exports.enum(["safe", "aggressive"]);
@@ -24164,6 +24177,7 @@ var getCombatReportSchema = external_exports.object({
   include: external_exports.array(combatReportIncludeSchema).optional()
 }).strict();
 var getEncountersSchema = external_exports.object(characterTarget).strict();
+var getRaidsSchema = external_exports.object(characterTarget).strict();
 var getLostItemsSchema = external_exports.object(characterTarget).strict();
 var recoverLostItemsSchema = external_exports.object({ ...characterTarget, drop_id: dropIdSchema }).strict();
 
@@ -24178,7 +24192,7 @@ var questNumber = external_exports.number().int().min(1);
 var acceptQuestSchema = external_exports.object({
   ...characterTarget,
   offer_id: uuidSchema.optional(),
-  fixed_quest_id: external_exports.string().regex(/^[a-z][a-z0-9_]{0,63}$/).optional(),
+  fixed_quest_id: combatIdSchema.optional(),
   goal_id: questNumber.optional()
 }).strict().refine(
   (input2) => [input2.offer_id, input2.fixed_quest_id, input2.goal_id].filter(
@@ -24325,12 +24339,7 @@ var depositItemsSchema = external_exports.object({
   request_id: uuidSchema,
   items: storageTransferItemsSchema
 }).strict();
-var withdrawItemsSchema = external_exports.object({
-  ...characterTarget,
-  town_id: locationIdSchema,
-  request_id: uuidSchema,
-  items: storageTransferItemsSchema
-}).strict();
+var withdrawItemsSchema = depositItemsSchema;
 
 // src/protocol/gift.ts
 var sendGiftSchema = external_exports.object({
@@ -24349,9 +24358,7 @@ var getGiftsSchema = external_exports.object({
 // src/protocol/market.ts
 var change = { ...characterTarget, request_id: uuidSchema };
 var marketQualitySchema = external_exports.enum(["standard", "fine", "superior"]);
-var price = external_exports.number().int().positive();
-var quantity = external_exports.number().int().positive();
-var number4 = external_exports.number().int().positive();
+var positiveInteger = external_exports.number().int().positive();
 var marketSourceSchema = external_exports.enum(["carried", "storage"]);
 var marketSectionSchema = external_exports.enum(["orders", "listings", "trades"]);
 var getMarketSchema = external_exports.object({
@@ -24361,7 +24368,7 @@ var getMarketSchema = external_exports.object({
   quality: marketQualitySchema.optional(),
   levels: external_exports.number().int().min(1).optional(),
   cursor: external_exports.number().int().positive().optional(),
-  max_price: price.optional(),
+  max_price: positiveInteger.optional(),
   minimum_durability: external_exports.number().int().nonnegative().optional()
 }).strict();
 var getMyMarketSchema = external_exports.object({
@@ -24373,32 +24380,32 @@ var placeMarketSellOrderSchema = external_exports.object({
   ...change,
   item_id: itemIdSchema,
   quality: marketQualitySchema,
-  quantity,
-  unit_price: price,
+  quantity: positiveInteger,
+  unit_price: positiveInteger,
   source: marketSourceSchema
 }).strict();
 var placeMarketBuyOrderSchema = external_exports.object({
   ...change,
   item_id: itemIdSchema,
   quality: marketQualitySchema,
-  quantity,
-  unit_price: price
+  quantity: positiveInteger,
+  unit_price: positiveInteger
 }).strict();
-var cancelMarketOrderSchema = external_exports.object({ ...change, order_id: number4 }).strict();
+var cancelMarketOrderSchema = external_exports.object({ ...change, order_id: positiveInteger }).strict();
 var claimMarketOrderSchema = cancelMarketOrderSchema;
 var createMarketListingSchema = external_exports.object({
   ...change,
   instance_id: instanceIdSchema,
-  price,
+  price: positiveInteger,
   source: marketSourceSchema
 }).strict();
 var buyMarketListingSchema = external_exports.object({
   ...change,
-  listing_id: number4,
-  max_price: price,
+  listing_id: positiveInteger,
+  max_price: positiveInteger,
   minimum_durability: external_exports.number().int().nonnegative().optional()
 }).strict();
-var cancelMarketListingSchema = external_exports.object({ ...change, listing_id: number4 }).strict();
+var cancelMarketListingSchema = external_exports.object({ ...change, listing_id: positiveInteger }).strict();
 var claimMarketListingSchema = cancelMarketListingSchema;
 
 // src/credentials.ts
@@ -24427,6 +24434,7 @@ var cliErrorMessages = {
   INVALID_RESPONSE: "The server returned a response this CLI could not read.",
   AUTH_START_FAILED: "Could not start authorization. Try again later.",
   AUTH_NOT_COMPLETED: "Authorization was not completed.",
+  CREDENTIAL_STORAGE_FAILED: "Could not read or save ~/.clawsaga/credentials.json. Check the file and its directory permissions.",
   INVALID_SERVER: "The server origin is invalid.",
   INVALID_AUTH_SERVER: "The authorization server origin does not match the game server.",
   INVALID_ARGUMENTS: "The command arguments are invalid.",
@@ -24554,6 +24562,61 @@ var CredentialStore = class {
   }
 };
 
+// package.json
+var package_default = {
+  name: "@clawsaga/cli",
+  version: "0.1.27",
+  homepage: "https://clawsaga.net",
+  repository: {
+    type: "git",
+    url: "git+https://github.com/palon7/clawsaga.git"
+  },
+  license: "MIT",
+  author: "Palon (Ryota Uno) <palon@palon.org>",
+  bin: {
+    clawsaga: "bin/clawsaga.mjs"
+  },
+  files: [
+    "bin/",
+    "THIRD-PARTY-LICENSES.txt",
+    "CHANGELOG.md"
+  ],
+  publishConfig: {
+    access: "public"
+  },
+  type: "module",
+  packageManager: "pnpm@12.3.4",
+  engines: {
+    node: ">=22.12.0"
+  },
+  scripts: {
+    build: "node build.mjs",
+    typecheck: "tsc --noEmit",
+    test: "vitest run",
+    format: "prettier --write .",
+    lint: "eslint .",
+    check: "prettier --check . && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm test:package",
+    "test:package": "node scripts/test-package.mjs"
+  },
+  devDependencies: {
+    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@eslint/js": "10.0.1",
+    "@stylistic/eslint-plugin": "5.10.0",
+    "@types/node": "22.20.4",
+    "@types/proper-lockfile": "4.1.4",
+    commander: "15.0.0",
+    esbuild: "0.28.2",
+    eslint: "10.11.0",
+    "eslint-config-prettier": "10.1.8",
+    prettier: "3.9.6",
+    "proper-lockfile": "4.1.2",
+    typescript: "6.0.3",
+    "typescript-eslint": "8.71.0",
+    vitest: "5.0.0",
+    zod: "4.5.4"
+  }
+};
+
 // src/client.ts
 var tokensSchema = external_exports.object({
   access_token: external_exports.string(),
@@ -24601,6 +24664,16 @@ function needsUpdate(body) {
   if (!parsed.success) return false;
   const [major = 0, minor = 0] = parsed.data.schema_version.split(".").map(Number);
   return major > supportedSchemaMajor || major === supportedSchemaMajor && minor > supportedSchemaMinor;
+}
+var announcedCli;
+function noteAnnouncedCli(response) {
+  const version2 = response.headers.get("ClawSaga-CLI-Version");
+  if (version2 && /^\d+\.\d+\.\d+$/.test(version2) && version2.localeCompare(package_default.version, "en", { numeric: true }) > 0) {
+    announcedCli = version2;
+  }
+}
+function announcedCliUpdate() {
+  return announcedCli;
 }
 function serverOrigin(input2) {
   const url2 = URL.parse(input2);
@@ -24657,7 +24730,7 @@ var GameClient = class {
     const response = await this.oauth("/device/code", {
       client_id: "clawsaga-cli",
       scope: "game:read game:play offline_access",
-      resource: `${this.origin}/mcp`
+      resource: `${this.origin}/`
     });
     if (!response.ok) throw new CliError("AUTH_START_FAILED");
     const parsed = deviceSchema.safeParse(await readBody(response));
@@ -24748,6 +24821,7 @@ var GameClient = class {
       },
       body: JSON.stringify(input2)
     });
+    noteAnnouncedCli(response);
     const body = await readBody(response);
     const message = serverMessage(body);
     if (response.status === 401) {
@@ -24766,17 +24840,17 @@ var GameClient = class {
         http_status: response.status
       });
     }
+    if (needsUpdate(body)) {
+      throw new CliError("UPDATE_REQUIRED", {
+        operation: path2,
+        http_status: response.status,
+        update_required: true,
+        // The automatic update verifies a read against this server.
+        server: this.origin
+      });
+    }
     const parsed = agentGameResponseSchema.safeParse(body);
     if (!parsed.success) {
-      if (needsUpdate(body)) {
-        throw new CliError("UPDATE_REQUIRED", {
-          operation: path2,
-          http_status: response.status,
-          update_required: true,
-          // The automatic update verifies a read against this server.
-          server: this.origin
-        });
-      }
       throw new CliError("INVALID_RESPONSE", {
         message: `The server response did not match this CLI's expected format. ${checkOutcome}`,
         operation: path2,
@@ -24836,6 +24910,21 @@ function activityCommand(activityId, character) {
 function repetitionOf(response) {
   return response.repetition;
 }
+function stoppedEarlyNote(repetition) {
+  const failedRead = repetition.stopped_reason === "activity_failed";
+  if ("requested_locations" in repetition) {
+    const arrived = repetition.arrived_locations.length;
+    const requested = repetition.requested_locations.length;
+    if (arrived >= requested) return void 0;
+    const unconfirmed2 = failedRead ? " The last step may also have arrived. Check your current or latest activity before continuing." : "";
+    return `Stopped after arriving at ${arrived} of ${requested} locations. No further steps were sent.${unconfirmed2}`;
+  }
+  if (repetition.completed_count >= repetition.requested_count) {
+    return void 0;
+  }
+  const unconfirmed = failedRead ? " The last attempt may also have succeeded. Check your current or latest activity before continuing." : "";
+  return `Stopped with ${repetition.completed_count} of ${repetition.requested_count} attempts completed. You keep their results.${unconfirmed}`;
+}
 function ambushNotes(response, character) {
   const notes = [];
   const lastResult = response.data.last_result;
@@ -24863,11 +24952,9 @@ function stateNotes(response, character, wait) {
   const lastResult = response.data.last_result;
   const activity = response.data.activity ?? void 0;
   const repetition = repetitionOf(response);
-  if (repetition && repetition.completed_count < repetition.requested_count) {
-    const unconfirmed = repetition.stopped_reason === "activity_failed" ? " The last attempt may also have succeeded. Check your current or latest activity before continuing." : "";
-    notes.push(
-      `Stopped with ${repetition.completed_count} of ${repetition.requested_count} attempts completed. You keep their results.${unconfirmed}`
-    );
+  const stopped = repetition && stoppedEarlyNote(repetition);
+  if (stopped) {
+    notes.push(stopped);
   } else if (!wait && response.ok) {
     if (lastResult) {
       notes.push(
@@ -25052,6 +25139,20 @@ async function updateCli(server) {
   }
   throw new CliError("UPDATE_FAILED");
 }
+async function updateAnnouncedCli(version2, notify) {
+  if (process.env.CLAWSAGA_AUTO_UPDATE === "0") return;
+  notify(
+    `Updating the CLI to ${version2}. The result above is final; wait for this command to finish.`
+  );
+  try {
+    notify(`The CLI was updated to ${await updateCli()}.`);
+  } catch (error61) {
+    const reason = cliFailure(error61).error.message;
+    notify(
+      `The CLI could not be updated automatically: ${reason} Run clawsaga update later.`
+    );
+  }
+}
 async function recoverUpdate(error61, notify) {
   if (!(error61 instanceof CliError) || error61.code !== "UPDATE_REQUIRED" || // Set for the verification read, which must not start an update of its own.
   process.env.CLAWSAGA_AUTO_UPDATE === "0") {
@@ -25078,61 +25179,6 @@ async function recoverUpdate(error61, notify) {
     });
   }
 }
-
-// package.json
-var package_default = {
-  name: "@clawsaga/cli",
-  version: "0.1.26",
-  homepage: "https://clawsaga.net",
-  repository: {
-    type: "git",
-    url: "git+https://github.com/palon7/clawsaga.git"
-  },
-  license: "MIT",
-  author: "Palon (Ryota Uno) <palon@palon.org>",
-  bin: {
-    clawsaga: "bin/clawsaga.mjs"
-  },
-  files: [
-    "bin/",
-    "THIRD-PARTY-LICENSES.txt",
-    "CHANGELOG.md"
-  ],
-  publishConfig: {
-    access: "public"
-  },
-  type: "module",
-  packageManager: "pnpm@12.3.4",
-  engines: {
-    node: ">=22.12.0"
-  },
-  scripts: {
-    build: "node build.mjs",
-    typecheck: "tsc --noEmit",
-    test: "vitest run",
-    format: "prettier --write .",
-    lint: "eslint .",
-    check: "prettier --check . && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm test:package",
-    "test:package": "node scripts/test-package.mjs"
-  },
-  devDependencies: {
-    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
-    "@eslint/js": "10.0.1",
-    "@stylistic/eslint-plugin": "5.10.0",
-    "@types/node": "22.20.4",
-    "@types/proper-lockfile": "4.1.4",
-    commander: "15.0.0",
-    esbuild: "0.28.2",
-    eslint: "10.11.0",
-    "eslint-config-prettier": "10.1.8",
-    prettier: "3.9.6",
-    "proper-lockfile": "4.1.2",
-    typescript: "6.0.3",
-    "typescript-eslint": "8.71.0",
-    vitest: "5.0.0",
-    zod: "4.5.4"
-  }
-};
 
 // src/activity-wait.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
@@ -25230,6 +25276,67 @@ async function repeatActivity(client, path2, input2, values, count, options) {
   }
   throw new CliError("INVALID_ARGUMENTS", { fields: ["count"] });
 }
+async function walkRoute(client, path2, input2, values, route, notify) {
+  const arrived = [];
+  const summary = (stoppedReason) => ({
+    requested_locations: [...route],
+    arrived_locations: [...arrived],
+    stopped_reason: stoppedReason
+  });
+  const incomplete = (response, stoppedReason) => ({
+    ...response,
+    ok: false,
+    error: { message: "The travel stopped before reaching every location." },
+    repetition: summary(stoppedReason)
+  });
+  const step = async (to) => {
+    const started = await client.invoke(path2, { ...input2, to });
+    if (!started.ok) {
+      return { ...started, repetition: summary("start_rejected") };
+    }
+    const completed = await waitForActivity(client, values, started, notify);
+    if (!completed.ok) {
+      return { ...completed, repetition: summary("activity_failed") };
+    }
+    const result = endedTravel(completed, to);
+    if (result.end_reason !== "COMPLETED") {
+      return incomplete(completed, "activity_stopped");
+    }
+    arrived.push(to);
+    const last = arrived.length === route.length;
+    if (result.ambush) {
+      return last ? { ...completed, repetition: summary("ambush") } : incomplete(completed, "ambush");
+    }
+    if (last) return { ...completed, repetition: summary("route_completed") };
+    notify?.({ event: "activity_result", last_result: result });
+    return void 0;
+  };
+  for (const to of route) {
+    try {
+      const final = await step(to);
+      if (final) return final;
+    } catch (error61) {
+      if (error61 instanceof CliError) {
+        throw new CliError(error61.code, {
+          ...error61.detail,
+          repetition: summary(notSent(error61) ? "start_rejected" : "unknown")
+        });
+      }
+      throw error61;
+    }
+  }
+  throw new CliError("INVALID_ARGUMENTS", { fields: ["to"] });
+}
+function endedTravel(response, to) {
+  const result = response.data.last_result;
+  const arrivedElsewhere = result?.end_reason === "COMPLETED" && result.to?.id !== to;
+  if (!result || result.kind !== "travel" || result.status !== "ENDED" || arrivedElsewhere) {
+    throw new CliError("INVALID_RESPONSE", {
+      reason: "unexpected_travel_result"
+    });
+  }
+  return result;
+}
 function endedProduction(response) {
   const result = response.data.last_result;
   if (!result || result.kind !== "gather" && result.kind !== "craft" || result.status !== "ENDED") {
@@ -25307,6 +25414,10 @@ var jsonFlag = [
   "-i, --input <file>",
   "JSON body file, or - for stdin; the body fields are shown in input_example",
   true
+];
+var requestFlag = [
+  "--request <uuid>",
+  "Reuse the same ID and arguments after an uncertain result"
 ];
 var limitFlag = [
   "--limit <number>",
@@ -25411,20 +25522,15 @@ async function readJsonFile(file2) {
     throw new CliError("INVALID_INPUT_FILE");
   }
 }
-function optionKey(flags) {
-  const long = flags.split(",").map((part) => part.trim()).find((part) => part.startsWith("--"));
-  const name = (long ?? flags).replace(/^--?/, "").split(" ")[0] ?? flags;
-  return name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-}
 function integerFlag(option, value) {
-  const number5 = Number(value);
-  if (typeof value !== "string" || !/^\d+$/.test(value) || !Number.isSafeInteger(number5)) {
+  const number4 = Number(value);
+  if (typeof value !== "string" || !/^\d+$/.test(value) || !Number.isSafeInteger(number4)) {
     throw invalidArguments(
       [option],
       `--${option.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)} must be a non-negative integer.`
     );
   }
-  return number5;
+  return number4;
 }
 async function commandInput(definition, values) {
   return values.input ? bodyFileInput(definition, values, values.input) : flagInput(definition, values);
@@ -25454,6 +25560,7 @@ function flagInput(definition, values) {
     else if (conversion === "list") input2[key] = String(value).split(",");
     else input2[key] = value;
   }
+  if (definition.autoRequestId) input2.request_id = values.request;
   definition.buildInput?.(values, input2);
   return input2;
 }
@@ -25484,9 +25591,6 @@ var bodyRequestFlag = [
   "--request <uuid>",
   "Request ID for a body file without request_id; reuse it after an uncertain result"
 ];
-function requestIdContext(_values, input2) {
-  return { request_id: input2.request_id };
-}
 function exactlyOne(fields, message) {
   return (values) => {
     if (fields.filter((field) => values[field] !== void 0).length !== 1) {
@@ -25526,6 +25630,12 @@ var adventureCommands = {
     schema: getEncountersSchema,
     flags: [],
     help: "List local enemies or town training dummies."
+  },
+  raids: {
+    path: "character/raids",
+    schema: getRaidsSchema,
+    flags: [],
+    help: "Read the running raid boss and the last one that ended: location, deadline, shared HP left, and your attempts and damage. Fight it with fight at its location."
   },
   tactics: {
     path: "character/tactics",
@@ -25585,7 +25695,7 @@ var adventureCommands = {
       ],
       noWaitFlag
     ],
-    help: "Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes.",
+    help: "Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes. A raid boss enemy_id at its location uses a daily raid attempt (see raids).",
     inputExample: { enemy_id: "wolf", tactic: { rules: [], potion_limit: 0 } },
     examples: [
       "clawsaga fight -c m7Qp2_aR9L-x --enemy wolf",
@@ -25779,7 +25889,6 @@ var adventureCommands = {
     path: "character/journal/write",
     schema: writeJournalSchema,
     autoRequestId: true,
-    errorContext: requestIdContext,
     flags: [jsonFlag, bodyRequestFlag],
     help: "Record something new worth remembering in a later session. Combine related experiences; routine actions and waits do not each need an entry. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content.",
     inputExample: {
@@ -25791,7 +25900,6 @@ var adventureCommands = {
     path: "character/session-end",
     schema: endSessionSchema,
     autoRequestId: true,
-    errorContext: requestIdContext,
     flags: [jsonFlag, bodyRequestFlag],
     help: "Always use end when ending a play session to save one summary, even if you wrote a journal during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content. Without session_ended.activity_id no activity was running; do not claim one was stopped. Use the returned result without another hello.",
     inputExample: {
@@ -26126,7 +26234,7 @@ function addItemTargets(values, input2) {
   }
 }
 function storageContext(values) {
-  return { request_id: values.request, town_id: values.town };
+  return { town_id: values.town };
 }
 var storageCommands = {
   storage: {
@@ -26154,7 +26262,7 @@ var storageCommands = {
   deposit: {
     path: "character/storage/deposit",
     schema: depositItemsSchema,
-    input: { town: "town_id", request: "request_id" },
+    input: { town: "town_id" },
     autoRequestId: true,
     errorContext: storageContext,
     buildInput: addItemTargets,
@@ -26174,7 +26282,7 @@ var storageCommands = {
   withdraw: {
     path: "character/storage/withdraw",
     schema: withdrawItemsSchema,
-    input: { town: "town_id", request: "request_id" },
+    input: { town: "town_id" },
     autoRequestId: true,
     errorContext: storageContext,
     buildInput: addItemTargets,
@@ -26208,11 +26316,9 @@ var giftCommands = {
     schema: sendGiftSchema,
     input: {
       to: "recipient_character_id",
-      gold: ["gold", "number"],
-      request: "request_id"
+      gold: ["gold", "number"]
     },
     autoRequestId: true,
-    errorContext: (values) => ({ request_id: values.request }),
     buildInput: addItemTargets,
     flags: [
       ["--to <id>", "Recipient Character ID", true],
@@ -26221,10 +26327,7 @@ var giftCommands = {
         "JSON array of items from your storage in this town: {item_id, quantity} with optional quality (default standard), or {instance_id}"
       ],
       ["--gold <amount>", "Gold to send from your balance"],
-      [
-        "--request <uuid>",
-        "Reuse the same ID and arguments after an uncertain result"
-      ]
+      requestFlag
     ],
     help: "Send items, gold or both to another character while idle at a post. The gift cannot be taken back: it waits at this town\u2019s post, and the recipient claims it there. The whole gift is refused if their post in this town cannot hold it. A request ID is generated unless supplied.",
     examples: [
@@ -26244,14 +26347,8 @@ var giftCommands = {
 // src/market-commands.ts
 var qualityChoices = marketQualitySchema.options;
 var sourceChoices = marketSourceSchema.options;
-var requestFlag = [
-  "--request <uuid>",
-  "Reuse the same ID and arguments after an uncertain result"
-];
-var requestInput = { request: "request_id" };
 function marketWriteContext(values) {
   return {
-    request_id: values.request,
     ...values.order === void 0 ? {} : { order_id: Number(values.order) },
     ...values.listing === void 0 ? {} : { listing_id: Number(values.listing) }
   };
@@ -26325,8 +26422,7 @@ var marketCommands = {
       quality: "quality",
       quantity: ["quantity", "number"],
       unitPrice: ["unit_price", "number"],
-      source: "source",
-      ...requestInput
+      source: "source"
     },
     autoRequestId: true,
     errorContext: marketWriteContext,
@@ -26355,8 +26451,7 @@ var marketCommands = {
       item: "item_id",
       quality: "quality",
       quantity: ["quantity", "number"],
-      unitPrice: ["unit_price", "number"],
-      ...requestInput
+      unitPrice: ["unit_price", "number"]
     },
     autoRequestId: true,
     errorContext: marketWriteContext,
@@ -26375,7 +26470,7 @@ var marketCommands = {
   "market-order-cancel": {
     path: "character/market/orders/cancel",
     schema: cancelMarketOrderSchema,
-    input: { order: ["order_id", "number"], ...requestInput },
+    input: { order: ["order_id", "number"] },
     autoRequestId: true,
     errorContext: marketWriteContext,
     flags: [
@@ -26388,7 +26483,7 @@ var marketCommands = {
   "market-order-claim": {
     path: "character/market/orders/claim",
     schema: claimMarketOrderSchema,
-    input: { order: ["order_id", "number"], ...requestInput },
+    input: { order: ["order_id", "number"] },
     autoRequestId: true,
     errorContext: marketWriteContext,
     flags: [
@@ -26404,8 +26499,7 @@ var marketCommands = {
     input: {
       instance: "instance_id",
       price: ["price", "number"],
-      source: "source",
-      ...requestInput
+      source: "source"
     },
     autoRequestId: true,
     errorContext: marketWriteContext,
@@ -26431,8 +26525,7 @@ var marketCommands = {
     input: {
       listing: ["listing_id", "number"],
       maxPrice: ["max_price", "number"],
-      minDurability: ["minimum_durability", "number"],
-      ...requestInput
+      minDurability: ["minimum_durability", "number"]
     },
     autoRequestId: true,
     errorContext: marketWriteContext,
@@ -26450,7 +26543,7 @@ var marketCommands = {
   "market-listing-cancel": {
     path: "character/market/listings/cancel",
     schema: cancelMarketListingSchema,
-    input: { listing: ["listing_id", "number"], ...requestInput },
+    input: { listing: ["listing_id", "number"] },
     autoRequestId: true,
     errorContext: marketWriteContext,
     flags: [
@@ -26463,7 +26556,7 @@ var marketCommands = {
   "market-listing-claim": {
     path: "character/market/listings/claim",
     schema: claimMarketListingSchema,
-    input: { listing: ["listing_id", "number"], ...requestInput },
+    input: { listing: ["listing_id", "number"] },
     autoRequestId: true,
     errorContext: marketWriteContext,
     flags: [
@@ -26482,13 +26575,22 @@ var productionCommands = {
     schema: travelSchema,
     input: { to: "to" },
     startsActivity: true,
+    walksRoute: true,
     flags: [
-      ["--to <id>", "Adjacent destination location ID", true],
-      noWaitFlag
+      [
+        "--to <ids>",
+        "Adjacent destination location ID, or comma-separated location IDs to walk in order from your current location",
+        true
+      ],
+      [
+        "--no-wait",
+        "Return after acceptance without waiting for arrival; --to must name one location"
+      ]
     ],
-    help: "Walk one step to an adjacent location while idle and wait for arrival.",
+    help: "Walk one step to an adjacent location while idle and wait for arrival. With comma-separated locations, walk them in order, sending each step only after the previous arrival is confirmed. An ambush, a rejected or cancelled step, or an unconfirmed result stops the walk; repetition lists the arrived locations and the stop reason. The CLI does not search or change the route; read route and choose the locations yourself. Finish the whole command before starting another main activity.",
     examples: [
       "clawsaga travel -c m7Qp2_aR9L-x --to openpit",
+      "clawsaga travel -c m7Qp2_aR9L-x --to darras,openpit",
       "clawsaga travel -c m7Qp2_aR9L-x --to openpit --no-wait"
     ]
   },
@@ -26555,13 +26657,11 @@ var productionCommands = {
     schema: craftSchema,
     input: {
       recipe: "recipe_id",
-      maxFeePerLot: ["max_fee_per_lot", "number"],
-      request: "request_id"
+      maxFeePerLot: ["max_fee_per_lot", "number"]
     },
     startsActivity: true,
     repeat: { requestIdPerLot: true },
     autoRequestId: true,
-    errorContext: (values) => ({ request_id: values.request }),
     flags: [
       ["--recipe <id>", "Recipe ID from recipes", true],
       [
@@ -26606,12 +26706,10 @@ var productionCommands = {
     input: {
       item: "item_id",
       quantity: ["quantity", "number"],
-      maxPayment: ["max_payment", "number"],
-      request: "request_id"
+      maxPayment: ["max_payment", "number"]
     },
     autoRequestId: true,
     errorContext: (values) => ({
-      request_id: values.request,
       item_id: values.item,
       quantity: values.quantity === void 0 ? 1 : Number(values.quantity),
       ...values.maxPayment === void 0 ? {} : { max_payment: Number(values.maxPayment) }
@@ -26731,6 +26829,7 @@ var commands = {
 var responseDataKeys = {
   monologue: ["monologue"],
   encounters: ["encounters"],
+  raids: ["raids"],
   tactics: ["tactics"],
   "tactics-set": ["validation", "tactics"],
   "tactics-check": ["validation"],
@@ -26742,8 +26841,13 @@ var responseDataKeys = {
   "change-job": ["capacity", "status", "combat_stats", "equipment_change"],
   "lost-items": ["lost_items"],
   recover: ["capacity", "status"],
-  "quest-board": ["quest_board", "quest_board_budget", "community_goals"],
-  quests: ["quests", "community_goals"],
+  "quest-board": [
+    "quest_board",
+    "quest_board_budget",
+    "community_goals",
+    "raids"
+  ],
+  quests: ["quests", "community_goals", "raids"],
   "quest-accept": ["quest", "community_goal", "status", "reputation_change"],
   "goal-deliver": ["community_goal", "delivered", "status"],
   "quest-claim": ["quest", "community_goal", "status", "reputation_change"],
@@ -27132,15 +27236,21 @@ function createProgram(run, notify) {
   }
   return program2;
 }
+function trackHelp(command2, run, target2, helpCommand) {
+  command2.configureOutput({
+    outputError: () => {
+      run.helpCommand = helpCommand;
+    }
+  }).on("--help", () => {
+    run.helpTarget = target2;
+  }).hook("preAction", () => {
+    run.helpCommand = helpCommand;
+  });
+}
 function addSchemaCommand(program2, run) {
   const schemaCommand = program2.command("schema").description(
     "Read the local input structure for a command. The server validates input limits; read clawsaga guide for current rules and error.fields when input is rejected."
-  ).argument("<command>", "Game command name").configureOutput({
-    outputError: () => {
-      run.helpCommand = "clawsaga schema --help";
-    }
-  }).action((name) => {
-    run.helpCommand = "clawsaga schema --help";
+  ).argument("<command>", "Game command name").action((name) => {
     const definition = commands[name];
     if (!definition) {
       throw invalidArguments(
@@ -27157,9 +27267,7 @@ function addSchemaCommand(program2, run) {
       )
     };
   });
-  schemaCommand.on("--help", () => {
-    run.helpTarget = "schema";
-  });
+  trackHelp(schemaCommand, run, "schema", "clawsaga schema --help");
 }
 var documentCommands = [
   {
@@ -27191,20 +27299,13 @@ var documentCommands = [
 ];
 function addDocumentCommands(program2, run) {
   for (const document of documentCommands) {
-    const command2 = program2.command(document.name).description(document.description).configureOutput({
-      outputError: () => {
-        run.helpCommand = `clawsaga ${document.name} --help`;
-      }
-    });
+    const command2 = program2.command(document.name).description(document.description);
     for (const option of document.options) {
       command2.option(option.flags, option.description);
     }
-    command2.on("--help", () => {
-      run.helpTarget = `clawsaga ${document.name}`;
-      run.helpCommand = `clawsaga ${document.name} --help`;
-    });
+    const target2 = `clawsaga ${document.name}`;
+    trackHelp(command2, run, target2, `${target2} --help`);
     command2.action(async () => {
-      run.helpCommand = `clawsaga ${document.name} --help`;
       const values = optionsSchema.parse(command2.optsWithGlobals());
       run.result = await clientFor(values).readDocument(
         document.path(values),
@@ -27212,14 +27313,8 @@ function addDocumentCommands(program2, run) {
       );
     });
   }
-  const login = program2.command("auth").description("Manage authorization").command("login").description("Return a device verification URL without waiting").configureOutput({
-    outputError: () => {
-      run.helpCommand = "clawsaga auth login --help";
-    }
-  });
-  login.on("--help", () => {
-    run.helpTarget = "auth login";
-  });
+  const login = program2.command("auth").description("Manage authorization").command("login").description("Return a device verification URL without waiting");
+  trackHelp(login, run, "auth login", "clawsaga auth login --help");
   login.action(async () => {
     run.result = await clientFor(
       optionsSchema.parse(login.optsWithGlobals())
@@ -27227,11 +27322,7 @@ function addDocumentCommands(program2, run) {
   });
 }
 function addGameCommand(program2, run, notify, name, definition) {
-  const command2 = program2.command(name).description(definition.help).configureOutput({
-    outputError: () => {
-      run.helpCommand = `clawsaga ${name} --help`;
-    }
-  });
+  const command2 = program2.command(name).description(definition.help);
   for (const [flags, description] of definition.flags) {
     command2.option(flags, description);
   }
@@ -27242,11 +27333,8 @@ function addGameCommand(program2, run, notify, name, definition) {
 JSON body: use input_example below with your own content. Full schema: clawsaga schema ${name}.`
     );
   }
-  command2.on("--help", () => {
-    run.helpTarget = `clawsaga ${name}`;
-  });
+  trackHelp(command2, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
   command2.action(async () => {
-    run.helpCommand = `clawsaga ${name} --help`;
     const executed = {
       name,
       definition,
@@ -27258,6 +27346,7 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
     executed.character = values.character;
     executed.wait = values.wait !== false;
     assertRequiredOptions(definition, values, command2.opts());
+    const route = definition.walksRoute ? routeLocations(values) : void 0;
     const requestedId = values.request;
     if (definition.autoRequestId && !values.request) {
       values.request = randomUUID3();
@@ -27275,6 +27364,17 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
         count,
         { requestIdPerLot, notify }
       ) : await invokeGame(client, definition, input2, values);
+      return;
+    }
+    if (route) {
+      run.result = await walkRoute(
+        client,
+        definition.path,
+        input2,
+        activityValues(values),
+        route,
+        notify
+      );
       return;
     }
     const response = await invokeGame(client, definition, input2, values);
@@ -27297,9 +27397,10 @@ function assertRequiredOptions(definition, values, provided) {
     );
   }
   for (const [flags, , required2] of definition.flags) {
-    if (!required2 || provided[optionKey(flags)] !== void 0) continue;
+    const key = new Option(flags).attributeName();
+    if (!required2 || provided[key] !== void 0) continue;
     throw invalidArguments(
-      [optionKey(flags)],
+      [key],
       `Required option '${flags}' was not provided.`
     );
   }
@@ -27308,14 +27409,32 @@ async function invokeGame(client, definition, input2, values) {
   try {
     return await client.invoke(definition.path, input2);
   } catch (error61) {
-    if (definition.errorContext && error61 instanceof CliError) {
+    if (definition.autoRequestId && error61 instanceof CliError) {
       throw new CliError(error61.code, {
         ...error61.detail,
-        ...definition.errorContext(values, input2)
+        request_id: input2.request_id,
+        ...definition.errorContext?.(values, input2)
       });
     }
     throw error61;
   }
+}
+function routeLocations(values) {
+  const route = values.to?.split(",") ?? [];
+  if (route.length < 2) return void 0;
+  if (!route.every((id) => locationIdSchema.safeParse(id).success)) {
+    throw invalidArguments(
+      ["to"],
+      "--to takes location IDs separated by commas, without spaces or empty entries."
+    );
+  }
+  if (values.wait === false) {
+    throw invalidArguments(
+      ["to"],
+      "--no-wait starts one step; give one location with --to or omit --no-wait."
+    );
+  }
+  return route;
 }
 function repeatCount(requestIdPerLot, values, requestedId) {
   const count = values.count === void 0 ? 1 : Number(values.count);
@@ -27348,6 +27467,9 @@ function print(stream, value) {
   stream.write(`${JSON.stringify(output2)}
 `);
 }
+function printNote(note) {
+  print(process.stderr, { hints: [{ note }] });
+}
 function printResult(value) {
   for (const hint of value.hints ?? []) {
     if (hint.note !== void 0) process.stderr.write(`Hint: ${hint.note}
@@ -27366,14 +27488,9 @@ try {
   );
   printResult(result);
   process.exitCode = "ok" in result && !result.ok ? 1 : 0;
+  const announced = announcedCliUpdate();
+  if (announced) await updateAnnouncedCli(announced, printNote);
 } catch (error61) {
-  printResult(
-    cliFailure(
-      await recoverUpdate(
-        error61,
-        (note) => print(process.stderr, { hints: [{ note }] })
-      )
-    )
-  );
+  printResult(cliFailure(await recoverUpdate(error61, printNote)));
   process.exitCode = 1;
 }

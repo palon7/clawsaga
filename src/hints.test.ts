@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { GameClient } from './client.js';
+import { stubInvoke } from './test-responses.js';
 import { execute } from './commands.js';
 import { withRenderedHints } from './hints.js';
 import {
@@ -68,9 +68,7 @@ it('renders hints from the result without another request', async () => {
     ],
   };
 
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(serverResponse);
+  const invoke = stubInvoke(serverResponse);
 
   const result = await execute(
     [

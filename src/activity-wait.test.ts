@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
-import { initial } from './test-responses.js';
+import { initial, stubInvoke } from './test-responses.js';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
 import { waitForActivity } from './activity-wait.js';
@@ -35,7 +35,7 @@ it.each(['travel', 'carriage'])(
           status: 'ENDED',
           end_reason: 'COMPLETED',
           ended_at: '2026-09-09T00:00:15.000Z',
-          to: initial.data.activity.to,
+          to: { id: 'openpit', name: 'Open pit', kind: 'field' },
         },
       },
     };
@@ -79,9 +79,7 @@ it.each(['travel', 'carriage'])(
 );
 
 it('returns one acceptance for --no-wait travel and inn without polling or a wait input', async () => {
-  const invoke = vi
-    .spyOn(GameClient.prototype, 'invoke')
-    .mockResolvedValue(initial);
+  const invoke = stubInvoke(initial);
 
   const notify = vi.fn();
 

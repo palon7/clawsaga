@@ -3,7 +3,7 @@ import {
   getGiftsSchema,
   sendGiftSchema,
 } from './protocol.js';
-import type { CommandDefinition } from './command-definition.js';
+import { requestFlag, type CommandDefinition } from './command-definition.js';
 import { addItemTargets } from './storage-commands.js';
 
 export const giftCommands: Record<string, CommandDefinition> = {
@@ -21,10 +21,8 @@ export const giftCommands: Record<string, CommandDefinition> = {
     input: {
       to: 'recipient_character_id',
       gold: ['gold', 'number'],
-      request: 'request_id',
     },
     autoRequestId: true,
-    errorContext: (values) => ({ request_id: values.request }),
     buildInput: addItemTargets,
     flags: [
       ['--to <id>', 'Recipient Character ID', true],
@@ -33,10 +31,7 @@ export const giftCommands: Record<string, CommandDefinition> = {
         'JSON array of items from your storage in this town: {item_id, quantity} with optional quality (default standard), or {instance_id}',
       ],
       ['--gold <amount>', 'Gold to send from your balance'],
-      [
-        '--request <uuid>',
-        'Reuse the same ID and arguments after an uncertain result',
-      ],
+      requestFlag,
     ],
     help: 'Send items, gold or both to another character while idle at a post. The gift cannot be taken back: it waits at this town’s post, and the recipient claims it there. The whole gift is refused if their post in this town cannot hold it. A request ID is generated unless supplied.',
     examples: [

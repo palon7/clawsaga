@@ -3,6 +3,7 @@
 export const responseDataKeys: Record<string, readonly string[]> = {
   monologue: ['monologue'],
   encounters: ['encounters'],
+  raids: ['raids'],
   tactics: ['tactics'],
   'tactics-set': ['validation', 'tactics'],
   'tactics-check': ['validation'],
@@ -14,8 +15,13 @@ export const responseDataKeys: Record<string, readonly string[]> = {
   'change-job': ['capacity', 'status', 'combat_stats', 'equipment_change'],
   'lost-items': ['lost_items'],
   recover: ['capacity', 'status'],
-  'quest-board': ['quest_board', 'quest_board_budget', 'community_goals'],
-  quests: ['quests', 'community_goals'],
+  'quest-board': [
+    'quest_board',
+    'quest_board_budget',
+    'community_goals',
+    'raids',
+  ],
+  quests: ['quests', 'community_goals', 'raids'],
   'quest-accept': ['quest', 'community_goal', 'status', 'reputation_change'],
   'goal-deliver': ['community_goal', 'delivered', 'status'],
   'quest-claim': ['quest', 'community_goal', 'status', 'reputation_change'],

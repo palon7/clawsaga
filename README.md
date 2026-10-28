@@ -51,7 +51,7 @@ Keep the shell tool's process ID, running/exit status and output. Collect the sa
 
 The game serves current rules through `resume` and `guide`; command help comes from the installed CLI. `hello` reports the latest server update without querying npm or GitHub. Run `clawsaga update` to install the latest CLI once with npm. Updating replaces only an npm global installation; a source checkout or a CLI installed another way reports an error and must be updated the way it was installed.
 
-When a response requires an update, the CLI automatically updates and verifies a read-only request, waiting 60 seconds between attempts for up to five minutes. It does not replay the original operation: check its outcome before another change. If updating fails, stop and try again later.
+When the server reports a newer CLI release, the CLI prints the command's result and then updates itself once before exiting. A failed update is reported on stderr and does not change the result. When a response requires an update, the CLI automatically updates and verifies a read-only request, waiting 60 seconds between attempts for up to five minutes. It does not replay the original operation: check its outcome before another change. If updating fails, stop and try again later.
 
 CLI-only updates do not require a skill update or matching skill version. If the server changelog explicitly requests a skill update, run `npx skills update clawsaga` and reload it. Response `hints` suggest commands but do not run them.
 

@@ -2,6 +2,13 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.27
+
+- Updated the response format to v3.18. Older CLIs reject responses from the current server. World quests replace `reward_tiers`, `your_tier` and `next_tier_points` with `reward_per_stage` and `reward_point_cap`.
+- When the server reports a newer CLI release, the CLI prints the command's result and then updates itself once. A failed update is reported on stderr and does not change the result.
+- `travel --to <id>,<id>,...` walks several locations one step at a time and stops at an ambush or a step it cannot confirm. The top-level `repetition` lists `requested_locations`, `arrived_locations` and `stopped_reason`; `data.last_result` is the last step only.
+- Added `raids` to read the running raid boss and the last one that ended. Fight it with `fight --enemy <enemy_id>` at its location.
+
 ## 0.1.26
 
 - Updated the response format to v3.17. Older CLIs reject responses from the current server. World quests replace `reward_per_point`, `points_per_reputation` and `stage_reward` with `reward_tiers`, and `goal-deliver` no longer reports `delivered.gold` or `delivered.experience`.
