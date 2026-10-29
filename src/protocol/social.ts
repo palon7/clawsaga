@@ -105,8 +105,7 @@ export const sendDirectMessageSchema = z
   })
   .strict();
 
-// Alva Dispatch articles are written by the game operators. The server owns
-// the page size limit.
+// The server owns the page size limit.
 export const getNewsSchema = z
   .object({
     ...characterTarget,

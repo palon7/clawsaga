@@ -28,8 +28,10 @@ function renderHint(hint: AgentHint, character?: string): string {
   return render(hint.arguments, character);
 }
 
-// The repetition summary the CLI adds to its own result. It is not part of the
-// server protocol.
+/**
+ * The repetition summary the CLI adds to its own result. It is not part of the
+ * server protocol.
+ */
 export type RepetitionSummary = {
   requested_count: number;
   completed_count: number;
@@ -97,12 +99,10 @@ function ambushNotes(
   // The server always suggests reading the ambush combat. Phrase the read
   // here instead, so it only appears when that combat is not already the
   // response's current activity.
-  if (
-    activity?.kind === 'combat' &&
-    activity.activity_id === ambush.activity_id
-  ) {
-    // The response already shows this combat, so do not tell the agent to
-    // read it again.
+  const ambushIsCurrentActivity =
+    activity?.kind === 'combat' && activity.activity_id === ambush.activity_id;
+
+  if (ambushIsCurrentActivity) {
     notes.push(
       `The ${lastResult.kind} activity is complete. Continue the ambush battle or retreat.`,
     );
@@ -120,9 +120,7 @@ function ambushNotes(
   return { notes, supersededActivityId: ambush.activity_id };
 }
 
-// CLI-only notes: the local wait choice, the repetition summary, and how a
-// confirmed result or ambush relates to the current activity. The server keeps
-// deciding the ordinary operation hints.
+// The server keeps deciding the ordinary operation hints.
 function stateNotes(
   response: AgentGameResponse,
   character: string | undefined,
@@ -190,11 +188,11 @@ export function withRenderedHints(
 
 export type RecoveryContext = {
   character?: string | undefined;
-  // The invoked command starts a main activity (travel, gather, craft, fight, rest).
+  /** The invoked command starts a main activity. */
   activity: boolean;
-  // The invoked command starts a craft.
+  /** The invoked command starts a craft. */
   craft: boolean;
-  // The invoked command uses or discards items. It has no request ID.
+  /** The invoked command uses or discards items and has no request ID. */
   itemChange: boolean;
 };
 

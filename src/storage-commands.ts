@@ -8,8 +8,10 @@ import {
 import type { CommandDefinition } from './command-definition.js';
 import type { Values } from './command-input.js';
 
-// The batch is one JSON array option. The server validates its elements; only
-// unparsable JSON is reported here.
+/**
+ * Copies the JSON in `--items` to `input.items`. Only unparsable JSON is
+ * rejected here; the server validates the elements.
+ */
 export function addItemTargets(values: Values, input: Record<string, unknown>) {
   if (values.items === undefined) return;
   try {

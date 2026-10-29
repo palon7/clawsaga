@@ -11,8 +11,10 @@ type ActivityValues = {
   locale?: 'ja' | 'en' | undefined;
 };
 
-// invoke marks a failure that happened before the game request was sent, so the
-// start cannot have taken effect.
+/**
+ * Whether the failure happened before the game request was sent, so the start
+ * cannot have taken effect.
+ */
 export function notSent(error: CliError) {
   return error.detail.outcome === 'not_sent';
 }
@@ -28,7 +30,6 @@ function acceptedActivityNote(
     activity_id: activity.activity_id,
     kind: activity.kind,
     started_at: activity.started_at,
-    // 出力のJSONでは値のない項目が落ちる。
     completes_at: activity.completes_at,
     arrives_at: activity.arrives_at,
     time_limit_at: activity.time_limit_at,
@@ -69,8 +70,7 @@ export async function repeatActivity(
     repetition: summary(stoppedReason),
   });
 
-  // Returns the command's final response, or undefined to go on to the next lot.
-  const attempt = async (
+  const finalResponseOfLot = async (
     lotInput: Record<string, unknown>,
     requestId: string | undefined,
   ) => {
@@ -138,7 +138,7 @@ export async function repeatActivity(
       requestId === undefined ? input : { ...input, request_id: requestId };
 
     try {
-      const final = await attempt(lotInput, requestId);
+      const final = await finalResponseOfLot(lotInput, requestId);
       if (final) return final;
     } catch (error) {
       if (error instanceof CliError) {
@@ -185,8 +185,7 @@ export async function walkRoute(
     repetition: summary(stoppedReason),
   });
 
-  // Returns the command's final response, or undefined to go on to the next step.
-  const step = async (to: string) => {
+  const finalResponseOfStep = async (to: string) => {
     const started = await client.invoke(path, { ...input, to });
     if (!started.ok) {
       return { ...started, repetition: summary('start_rejected') };
@@ -221,7 +220,7 @@ export async function walkRoute(
 
   for (const to of route) {
     try {
-      const final = await step(to);
+      const final = await finalResponseOfStep(to);
       if (final) return final;
     } catch (error) {
       if (error instanceof CliError) {

@@ -46,7 +46,10 @@ export type CliFailure = {
   error: { message: string } & Record<string, unknown>;
 };
 
-// CLI exit behavior keys off CliError.code; the public failure object is message-first.
+/**
+ * The public failure: `message` first, then the remaining detail. The error
+ * code itself is not part of the output; it only selects the default message.
+ */
 export function cliFailure(error: unknown): CliFailure {
   const failure =
     error instanceof CliError ? error : new CliError('CLIENT_ERROR');

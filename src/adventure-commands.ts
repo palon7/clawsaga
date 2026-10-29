@@ -73,7 +73,6 @@ const bodyRequestFlag = [
   'Request ID for a body file without request_id; reuse it after an uncertain result',
 ] as const;
 
-// Rejects a command line that names none or several of options that exclude each other.
 function exactlyOne(fields: (keyof Values)[], message: string) {
   return (values: Values) => {
     if (fields.filter((field) => values[field] !== undefined).length !== 1) {

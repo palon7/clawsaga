@@ -24565,7 +24565,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.27",
+  version: "0.1.28",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -24640,7 +24640,7 @@ var retryAfterSchema = external_exports.object({
 var schemaVersionSchema = external_exports.object({ schema_version: external_exports.string() });
 var [supportedSchemaMajor = 0, supportedSchemaMinor = 0] = agentSchemaVersion.split(".").map(Number);
 var checkOutcome = "The action may still have been applied; check its outcome before another change.";
-async function readBody(response) {
+async function readJsonOrUndefined(response) {
   return response.json().catch(() => void 0);
 }
 function serverMessage(body) {
@@ -24668,9 +24668,9 @@ function needsUpdate(body) {
 var announcedCli;
 function noteAnnouncedCli(response) {
   const version2 = response.headers.get("ClawSaga-CLI-Version");
-  if (version2 && /^\d+\.\d+\.\d+$/.test(version2) && version2.localeCompare(package_default.version, "en", { numeric: true }) > 0) {
-    announcedCli = version2;
-  }
+  if (!version2 || !/^\d+\.\d+\.\d+$/.test(version2)) return;
+  const announcedIsNewer = version2.localeCompare(package_default.version, "en", { numeric: true }) > 0;
+  if (announcedIsNewer) announcedCli = version2;
 }
 function announcedCliUpdate() {
   return announcedCli;
@@ -24713,13 +24713,13 @@ var GameClient = class {
     });
     if (response.status >= 500) throw new CliError("SERVICE_UNAVAILABLE");
     if (response.status === 429) {
-      throw rateLimited(response, await readBody(response));
+      throw rateLimited(response, await readJsonOrUndefined(response));
     }
     return response;
   }
   async decodeTokens(response) {
     if (!response.ok) throw new CliError("AUTH_REQUIRED");
-    const parsed = tokensSchema.safeParse(await readBody(response));
+    const parsed = tokensSchema.safeParse(await readJsonOrUndefined(response));
     if (!parsed.success) throw new CliError("INVALID_RESPONSE");
     return {
       ...parsed.data,
@@ -24733,7 +24733,7 @@ var GameClient = class {
       resource: `${this.origin}/`
     });
     if (!response.ok) throw new CliError("AUTH_START_FAILED");
-    const parsed = deviceSchema.safeParse(await readBody(response));
+    const parsed = deviceSchema.safeParse(await readJsonOrUndefined(response));
     if (!parsed.success) throw new CliError("INVALID_RESPONSE");
     const device = parsed.data;
     if (new URL(device.verification_uri_complete).origin !== this.origin) {
@@ -24778,7 +24778,9 @@ var GameClient = class {
           entries[this.origin] = credential;
           return credential.access_token;
         }
-        const failure = errorSchema.safeParse(await readBody(polled));
+        const failure = errorSchema.safeParse(
+          await readJsonOrUndefined(polled)
+        );
         if (!failure.success) {
           throw new CliError("AUTH_NOT_COMPLETED", {
             reason: "invalid_response"
@@ -24822,7 +24824,7 @@ var GameClient = class {
       body: JSON.stringify(input2)
     });
     noteAnnouncedCli(response);
-    const body = await readBody(response);
+    const body = await readJsonOrUndefined(response);
     const message = serverMessage(body);
     if (response.status === 401) {
       throw new CliError("AUTH_REQUIRED", {
@@ -24862,10 +24864,13 @@ var GameClient = class {
     }
     return parsed.data;
   }
-  // Public reads stay usable before authorization and are not agent responses.
+  /**
+   * Reads a public document. It works before authorization, and the body is
+   * not an agent game response.
+   */
   async readDocument(path2, schema) {
     const response = await this.send(`/api/v1/${path2}`, { method: "GET" });
-    const body = await readBody(response);
+    const body = await readJsonOrUndefined(response);
     if (response.status === 429) throw rateLimited(response, body);
     if (response.status >= 500) throw new CliError("SERVICE_UNAVAILABLE");
     const parsed = schema.safeParse(body);
@@ -24931,7 +24936,8 @@ function ambushNotes(response, character) {
   const activity = response.data.activity ?? void 0;
   const ambush = lastResult?.ambush;
   if (!lastResult || !ambush) return { notes };
-  if (activity?.kind === "combat" && activity.activity_id === ambush.activity_id) {
+  const ambushIsCurrentActivity = activity?.kind === "combat" && activity.activity_id === ambush.activity_id;
+  if (ambushIsCurrentActivity) {
     notes.push(
       `The ${lastResult.kind} activity is complete. Continue the ambush battle or retreat.`
     );
@@ -25139,8 +25145,11 @@ async function updateCli(server) {
   }
   throw new CliError("UPDATE_FAILED");
 }
+function isVerificationRead() {
+  return process.env.CLAWSAGA_AUTO_UPDATE === "0";
+}
 async function updateAnnouncedCli(version2, notify) {
-  if (process.env.CLAWSAGA_AUTO_UPDATE === "0") return;
+  if (isVerificationRead()) return;
   notify(
     `Updating the CLI to ${version2}. The result above is final; wait for this command to finish.`
   );
@@ -25154,8 +25163,7 @@ async function updateAnnouncedCli(version2, notify) {
   }
 }
 async function recoverUpdate(error61, notify) {
-  if (!(error61 instanceof CliError) || error61.code !== "UPDATE_REQUIRED" || // Set for the verification read, which must not start an update of its own.
-  process.env.CLAWSAGA_AUTO_UPDATE === "0") {
+  if (!(error61 instanceof CliError) || error61.code !== "UPDATE_REQUIRED" || isVerificationRead()) {
     return error61;
   }
   const { server } = error61.detail;
@@ -25192,7 +25200,6 @@ function acceptedActivityNote(activity, nextPollAfterSeconds, requestId) {
     activity_id: activity.activity_id,
     kind: activity.kind,
     started_at: activity.started_at,
-    // 出力のJSONでは値のない項目が落ちる。
     completes_at: activity.completes_at,
     arrives_at: activity.arrives_at,
     time_limit_at: activity.time_limit_at,
@@ -25219,7 +25226,7 @@ async function repeatActivity(client, path2, input2, values, count, options) {
     },
     repetition: summary(stoppedReason)
   });
-  const attempt = async (lotInput, requestId) => {
+  const finalResponseOfLot = async (lotInput, requestId) => {
     const started = await client.invoke(path2, lotInput);
     if (!started.ok) {
       return { ...started, repetition: summary("start_rejected") };
@@ -25260,7 +25267,7 @@ async function repeatActivity(client, path2, input2, values, count, options) {
     lastRequestId = requestId;
     const lotInput = requestId === void 0 ? input2 : { ...input2, request_id: requestId };
     try {
-      const final = await attempt(lotInput, requestId);
+      const final = await finalResponseOfLot(lotInput, requestId);
       if (final) return final;
     } catch (error61) {
       if (error61 instanceof CliError) {
@@ -25289,7 +25296,7 @@ async function walkRoute(client, path2, input2, values, route, notify) {
     error: { message: "The travel stopped before reaching every location." },
     repetition: summary(stoppedReason)
   });
-  const step = async (to) => {
+  const finalResponseOfStep = async (to) => {
     const started = await client.invoke(path2, { ...input2, to });
     if (!started.ok) {
       return { ...started, repetition: summary("start_rejected") };
@@ -25313,7 +25320,7 @@ async function walkRoute(client, path2, input2, values, route, notify) {
   };
   for (const to of route) {
     try {
-      const final = await step(to);
+      const final = await finalResponseOfStep(to);
       if (final) return final;
     } catch (error61) {
       if (error61 instanceof CliError) {
@@ -25505,12 +25512,13 @@ var optionsSchema = external_exports.object({
 function isJsonObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+var maxStdinLength = 128 * 1024;
 async function readStdin() {
   process.stdin.setEncoding("utf8");
   let text2 = "";
   for await (const chunk of process.stdin) {
     text2 += String(chunk);
-    if (text2.length > 128 * 1024) throw new CliError("INVALID_INPUT_FILE");
+    if (text2.length > maxStdinLength) throw new CliError("INVALID_INPUT_FILE");
   }
   return text2;
 }
