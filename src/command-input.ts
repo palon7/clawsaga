@@ -75,13 +75,15 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+// The server checks the body limit; this only bounds what the CLI buffers.
+const maxStdinLength = 128 * 1024;
+
 async function readStdin() {
   process.stdin.setEncoding('utf8');
   let text = '';
   for await (const chunk of process.stdin) {
     text += String(chunk);
-    // 標準入力を無制限に読み込まない。本文の上限はサーバーが検査する。
-    if (text.length > 128 * 1024) throw new CliError('INVALID_INPUT_FILE');
+    if (text.length > maxStdinLength) throw new CliError('INVALID_INPUT_FILE');
   }
 
   return text;

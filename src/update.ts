@@ -71,7 +71,8 @@ async function installLatest(executable: string, remaining: () => number) {
  * Installs the latest CLI with npm and returns its version. A manual update
  * installs once. With `server`, it repeats every 60 seconds for up to five
  * minutes until a read on that server no longer requires an update, because
- * npm can publish the compatible version after the server is deployed.
+ * npm can publish the compatible version after the server is deployed. A read
+ * that fails for any other reason stops the retries with UPDATE_FAILED.
  */
 export async function updateCli(server?: string): Promise<string> {
   const deadline = Date.now() + 300_000;
@@ -110,6 +111,11 @@ export async function updateCli(server?: string): Promise<string> {
   throw new CliError('UPDATE_FAILED');
 }
 
+// Set for the verification read, which must not start an update of its own.
+function isVerificationRead() {
+  return process.env.CLAWSAGA_AUTO_UPDATE === '0';
+}
+
 /**
  * Installs the newer CLI a server announced, after the command's result has
  * been printed. A failed update is reported and does not change the result.
@@ -118,8 +124,7 @@ export async function updateAnnouncedCli(
   version: string,
   notify: (message: string) => void,
 ) {
-  // Set for the verification read, which must not start an update of its own.
-  if (process.env.CLAWSAGA_AUTO_UPDATE === '0') return;
+  if (isVerificationRead()) return;
 
   notify(
     `Updating the CLI to ${version}. The result above is final; wait for this command to finish.`,
@@ -141,8 +146,7 @@ export async function recoverUpdate(
   if (
     !(error instanceof CliError) ||
     error.code !== 'UPDATE_REQUIRED' ||
-    // Set for the verification read, which must not start an update of its own.
-    process.env.CLAWSAGA_AUTO_UPDATE === '0'
+    isVerificationRead()
   ) {
     return error;
   }

@@ -501,8 +501,9 @@ async function invokeGame(
 }
 
 /**
- * The locations of a comma-separated `--to`, or undefined for one location,
- * which travels as before. The server checks each step's destination.
+ * The locations of a comma-separated `--to`, or undefined when `--to` is
+ * absent or names one location. Throws when an entry is not a location ID or
+ * with `--no-wait`. The server checks each step's destination.
  */
 function routeLocations(values: Values) {
   const route = values.to?.split(',') ?? [];

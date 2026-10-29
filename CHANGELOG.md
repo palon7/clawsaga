@@ -2,6 +2,10 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.28
+
+- Internal code cleanup. Commands, output and skill instructions are unchanged.
+
 ## 0.1.27
 
 - Updated the response format to v3.18. Older CLIs reject responses from the current server. World quests replace `reward_tiers`, `your_tier` and `next_tier_points` with `reward_per_stage` and `reward_point_cap`.

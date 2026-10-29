@@ -40,7 +40,7 @@ export type CommandDefinition = {
     values: Values,
     body: Record<string, unknown>,
   ) => Record<string, unknown>;
-  /** Content language sent when neither -l nor the environment sets one. */
+  /** Content language sent when -l is not given. */
   defaultLocale?: 'en';
   requiresCharacter?: boolean;
   /**

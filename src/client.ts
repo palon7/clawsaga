@@ -37,12 +37,10 @@ const [supportedSchemaMajor = 0, supportedSchemaMinor = 0] = agentSchemaVersion
   .split('.')
   .map(Number);
 
-// The server may have applied an action whose response could not be read.
 const checkOutcome =
   'The action may still have been applied; check its outcome before another change.';
 
-// Resolves to undefined when the body is not valid JSON.
-async function readBody(response: Response): Promise<unknown> {
+async function readJsonOrUndefined(response: Response): Promise<unknown> {
   return response.json().catch(() => undefined);
 }
 
@@ -95,16 +93,15 @@ function needsUpdate(body: unknown): boolean {
 let announcedCli: string | undefined;
 
 // The server announces the CLI version it was deployed with, which npm already
-// serves as latest. An older or equal version leaves this CLI as it is.
+// serves as latest.
 function noteAnnouncedCli(response: Response) {
   const version = response.headers.get('ClawSaga-CLI-Version');
-  if (
-    version &&
-    /^\d+\.\d+\.\d+$/.test(version) &&
-    version.localeCompare(metadata.version, 'en', { numeric: true }) > 0
-  ) {
-    announcedCli = version;
-  }
+  if (!version || !/^\d+\.\d+\.\d+$/.test(version)) return;
+
+  const announcedIsNewer =
+    version.localeCompare(metadata.version, 'en', { numeric: true }) > 0;
+
+  if (announcedIsNewer) announcedCli = version;
 }
 
 /** A CLI version newer than this one that a game server announced in this process. */
@@ -133,7 +130,10 @@ export function serverOrigin(input: string) {
   return url.origin;
 }
 
-/** A token that expires in flight fails the request as AUTH_REQUIRED. */
+/**
+ * Treats a token as expired five minutes early, because a token that expires
+ * during a request fails it as AUTH_REQUIRED.
+ */
 function expiringSoon(credential: Credential) {
   return credential.expires_at <= Date.now() + 5 * 60_000;
 }
@@ -166,7 +166,7 @@ export class GameClient {
 
     if (response.status >= 500) throw new CliError('SERVICE_UNAVAILABLE');
     if (response.status === 429) {
-      throw rateLimited(response, await readBody(response));
+      throw rateLimited(response, await readJsonOrUndefined(response));
     }
 
     return response;
@@ -174,7 +174,7 @@ export class GameClient {
 
   private async decodeTokens(response: Response): Promise<Credential> {
     if (!response.ok) throw new CliError('AUTH_REQUIRED');
-    const parsed = tokensSchema.safeParse(await readBody(response));
+    const parsed = tokensSchema.safeParse(await readJsonOrUndefined(response));
 
     if (!parsed.success) throw new CliError('INVALID_RESPONSE');
 
@@ -192,7 +192,7 @@ export class GameClient {
     });
 
     if (!response.ok) throw new CliError('AUTH_START_FAILED');
-    const parsed = deviceSchema.safeParse(await readBody(response));
+    const parsed = deviceSchema.safeParse(await readJsonOrUndefined(response));
 
     if (!parsed.success) throw new CliError('INVALID_RESPONSE');
     const device = parsed.data;
@@ -249,7 +249,9 @@ export class GameClient {
           return credential.access_token;
         }
 
-        const failure = errorSchema.safeParse(await readBody(polled));
+        const failure = errorSchema.safeParse(
+          await readJsonOrUndefined(polled),
+        );
 
         // An unreadable answer does not say the code was refused, so the code
         // stays and the next command asks again until it expires.
@@ -314,7 +316,7 @@ export class GameClient {
     });
 
     noteAnnouncedCli(response);
-    const body = await readBody(response);
+    const body = await readJsonOrUndefined(response);
     const message = serverMessage(body);
     if (response.status === 401) {
       throw new CliError('AUTH_REQUIRED', {
@@ -362,13 +364,16 @@ export class GameClient {
     return parsed.data;
   }
 
-  // Public reads stay usable before authorization and are not agent responses.
+  /**
+   * Reads a public document. It works before authorization, and the body is
+   * not an agent game response.
+   */
   async readDocument<Output>(
     path: string,
     schema: z.ZodType<Output>,
   ): Promise<Output> {
     const response = await this.send(`/api/v1/${path}`, { method: 'GET' });
-    const body = await readBody(response);
+    const body = await readJsonOrUndefined(response);
     if (response.status === 429) throw rateLimited(response, body);
     if (response.status >= 500) throw new CliError('SERVICE_UNAVAILABLE');
 

@@ -2,7 +2,7 @@
 name: clawsaga
 description: Play ClawSaga using the clawsaga CLI. Use when the user asks to create or resume an adventurer, explore, fight, gather, craft or keep adventure records. Do not use for unrelated games or repository development.
 metadata:
-  version: '0.1.27'
+  version: '0.1.28'
 ---
 
 Play through the `clawsaga` command. The first command in a conversation is:

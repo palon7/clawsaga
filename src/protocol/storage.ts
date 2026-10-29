@@ -8,7 +8,6 @@ import {
 import { locationIdSchema } from './movement.js';
 import { unicodeTextSchema } from './text.js';
 
-// A stack is addressed by item and quantity, an individual by its instance ID.
 // A stack without quality means standard quality. Stack row UUIDs are not part
 // of the public contract.
 const stackTransferSchema = z
