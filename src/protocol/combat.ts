@@ -23,6 +23,10 @@ export const combatStatusSchema = z.enum([
   'barrier',
   'battle_song',
   'soothing_song',
+  'vulnerable',
+  'enfeebled',
+  'empowered',
+  'regen',
 ]);
 
 export const tacticConditionSchema = z.discriminatedUnion('kind', [
@@ -89,11 +93,13 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
     ),
   z
     .object({
-      kind: z.literal('enemy_missing_status'),
-      status: z.literal('poison'),
+      kind: z.enum(['enemy_has_status', 'enemy_missing_status']),
+      status: combatStatusSchema,
     })
     .strict()
-    .describe('Matches when the enemy has no remaining poison ticks.'),
+    .describe(
+      'Matches when the named enemy status has more than one tick left, or not; one tick left counts as missing.',
+    ),
 ]);
 
 export const tacticActionSchema = z.discriminatedUnion('kind', [
@@ -109,11 +115,6 @@ export const tacticActionSchema = z.discriminatedUnion('kind', [
     .describe(
       'Uses the ability when it is unlocked, off cooldown, affordable in MP and its effect is currently applicable.',
     ),
-]);
-
-export const combatPotionIdSchema = z.enum([
-  'healing_potion',
-  'manastone_potion',
 ]);
 
 export const tacticSchema = z
@@ -143,7 +144,7 @@ export const tacticSchema = z
         'Most potions one battle may use in total, capped by the bag at start. Each is consumed when used; zero disables potions.',
       ),
     potion_items: z
-      .array(combatPotionIdSchema)
+      .array(itemIdSchema)
       .min(1)
       .refine(
         (itemIds) => new Set(itemIds).size === itemIds.length,
@@ -151,7 +152,7 @@ export const tacticSchema = z
       )
       .optional()
       .describe(
-        'Potions in drinking order. Defaults to healing_potion, then manastone_potion.',
+        'Item IDs of potions in drinking order. When omitted, drinks every potion usable in battle, weakest first.',
       ),
   })
   .strict()

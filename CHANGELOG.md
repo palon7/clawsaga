@@ -2,6 +2,12 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.29
+
+- Supports response format v3.18, unchanged from 0.1.28.
+- Tactics accept the `vulnerable`, `enfeebled`, `empowered` and `regen` statuses, and the `enemy_has_status` and `enemy_missing_status` conditions accept any status.
+- Tactics `potion_items` accepts any potion item ID. When omitted, every potion usable in battle is drunk, weakest first.
+
 ## 0.1.28
 
 - Internal code cleanup. Commands, output and skill instructions are unchanged.

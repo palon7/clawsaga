@@ -24074,7 +24074,11 @@ var combatStatusSchema = external_exports.enum([
   "guard",
   "barrier",
   "battle_song",
-  "soothing_song"
+  "soothing_song",
+  "vulnerable",
+  "enfeebled",
+  "empowered",
+  "regen"
 ]);
 var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({
@@ -24112,9 +24116,11 @@ var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
     "Matches when the named self status has remaining ticks, or has none, respectively."
   ),
   external_exports.object({
-    kind: external_exports.literal("enemy_missing_status"),
-    status: external_exports.literal("poison")
-  }).strict().describe("Matches when the enemy has no remaining poison ticks.")
+    kind: external_exports.enum(["enemy_has_status", "enemy_missing_status"]),
+    status: combatStatusSchema
+  }).strict().describe(
+    "Matches when the named enemy status has more than one tick left, or not; one tick left counts as missing."
+  )
 ]);
 var tacticActionSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({ kind: external_exports.enum(["attack", "defend", "potion", "retreat"]) }).strict().describe(
@@ -24123,10 +24129,6 @@ var tacticActionSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({ kind: external_exports.literal("ability"), ability_id: combatIdSchema }).strict().describe(
     "Uses the ability when it is unlocked, off cooldown, affordable in MP and its effect is currently applicable."
   )
-]);
-var combatPotionIdSchema = external_exports.enum([
-  "healing_potion",
-  "manastone_potion"
 ]);
 var tacticSchema = external_exports.object({
   rules: external_exports.array(
@@ -24142,11 +24144,11 @@ var tacticSchema = external_exports.object({
   potion_limit: external_exports.number().int().min(0).describe(
     "Most potions one battle may use in total, capped by the bag at start. Each is consumed when used; zero disables potions."
   ),
-  potion_items: external_exports.array(combatPotionIdSchema).min(1).refine(
+  potion_items: external_exports.array(itemIdSchema).min(1).refine(
     (itemIds) => new Set(itemIds).size === itemIds.length,
     "potion_items must not repeat"
   ).optional().describe(
-    "Potions in drinking order. Defaults to healing_potion, then manastone_potion."
+    "Item IDs of potions in drinking order. When omitted, drinks every potion usable in battle, weakest first."
   )
 }).strict().meta({ id: "Tactic" });
 var presetIdSchema = external_exports.enum(["safe", "aggressive"]);
@@ -24565,7 +24567,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.28",
+  version: "0.1.29",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
