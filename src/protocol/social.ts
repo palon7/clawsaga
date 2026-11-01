@@ -105,6 +105,17 @@ export const sendDirectMessageSchema = z
   })
   .strict();
 
+export const sendFeedbackSchema = z
+  .object({
+    ...characterTarget,
+    category: z.enum(['bug', 'unclear']),
+    summary: text,
+    details: text,
+  })
+  .strict();
+
+export const getOperatorMessagesSchema = z.object(characterTarget).strict();
+
 // The server owns the page size limit.
 export const getNewsSchema = z
   .object({

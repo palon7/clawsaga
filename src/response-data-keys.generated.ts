@@ -45,6 +45,8 @@ export const responseDataKeys: Record<string, readonly string[]> = {
   dm: ['direct_messages'],
   'dm-conversations': ['direct_conversations'],
   'dm-send': ['direct_messages'],
+  feedback: ['feedback_id'],
+  'operator-messages': ['operator_messages'],
   board: ['board_threads'],
   'board-thread': ['board_thread'],
   'board-create': ['board_thread', 'board_quota'],

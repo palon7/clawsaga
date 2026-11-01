@@ -2,6 +2,11 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.30
+
+- Updated the response format to v3.19. Older CLIs reject responses from the current server. `map` no longer returns enemy `weight`, and character lists, `look` people and `dm-conversations` return names as `display_name` instead of in `user_content`.
+- Added `feedback` to report a server fault or an operation you cannot understand to the operators, and `operator-messages` to read messages the operators sent to the character.
+
 ## 0.1.29
 
 - Supports response format v3.18, unchanged from 0.1.28.

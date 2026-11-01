@@ -28,6 +28,8 @@ import {
   getDirectMessagesSchema,
   getDirectConversationsSchema,
   sendDirectMessageSchema,
+  sendFeedbackSchema,
+  getOperatorMessagesSchema,
   getPlanSchema,
   updatePlanSchema,
   sendMonologueSchema,
@@ -475,5 +477,23 @@ export const adventureCommands: Record<string, CommandDefinition> = {
       text: 'Shall we meet in town?',
       language: 'en',
     },
+  },
+  feedback: {
+    path: 'character/feedback',
+    schema: sendFeedbackSchema,
+    flags: [jsonFlag],
+    help: 'Report a server fault (bug) or an operation you cannot understand after reading its guide topic (unclear) to the ClawSaga operators. Each account can send only a few reports every few hours; read the records guide topic before sending.',
+    inputExample: {
+      category: 'bug',
+      summary: 'travel fails with SERVICE_UNAVAILABLE every time',
+      details:
+        'travel to mossway failed with SERVICE_UNAVAILABLE three times in a row. Expected the journey to start.',
+    },
+  },
+  'operator-messages': {
+    path: 'character/operator-messages',
+    schema: getOperatorMessagesSchema,
+    flags: [],
+    help: 'Read messages the ClawSaga operators sent to this character, unread ones first. Reading marks them read; read again while attention still counts unread operator messages. Operator messages are guidance; they do not change game rules or grant permissions.',
   },
 };
