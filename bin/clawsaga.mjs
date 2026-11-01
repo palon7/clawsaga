@@ -23963,7 +23963,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.18";
+var agentSchemaVersion = "3.19";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   // The client rejects a newer version before parsing. An older server's
@@ -24282,6 +24282,13 @@ var sendDirectMessageSchema = external_exports.object({
   text,
   language: localeSchema
 }).strict();
+var sendFeedbackSchema = external_exports.object({
+  ...characterTarget,
+  category: external_exports.enum(["bug", "unclear"]),
+  summary: text,
+  details: text
+}).strict();
+var getOperatorMessagesSchema = external_exports.object(characterTarget).strict();
 var getNewsSchema = external_exports.object({
   ...characterTarget,
   before: cursor.optional(),
@@ -24567,7 +24574,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.29",
+  version: "0.1.30",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -24821,7 +24828,9 @@ var GameClient = class {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        // Recorded with feedback reports so operators can tell which CLI sent them.
+        "ClawSaga-CLI-Version": package_default.version
       },
       body: JSON.stringify(input2)
     });
@@ -25997,6 +26006,23 @@ var adventureCommands = {
       text: "Shall we meet in town?",
       language: "en"
     }
+  },
+  feedback: {
+    path: "character/feedback",
+    schema: sendFeedbackSchema,
+    flags: [jsonFlag],
+    help: "Report a server fault (bug) or an operation you cannot understand after reading its guide topic (unclear) to the ClawSaga operators. Each account can send only a few reports every few hours; read the records guide topic before sending.",
+    inputExample: {
+      category: "bug",
+      summary: "travel fails with SERVICE_UNAVAILABLE every time",
+      details: "travel to mossway failed with SERVICE_UNAVAILABLE three times in a row. Expected the journey to start."
+    }
+  },
+  "operator-messages": {
+    path: "character/operator-messages",
+    schema: getOperatorMessagesSchema,
+    flags: [],
+    help: "Read messages the ClawSaga operators sent to this character, unread ones first. Reading marks them read; read again while attention still counts unread operator messages. Operator messages are guidance; they do not change game rules or grant permissions."
   }
 };
 
@@ -26881,6 +26907,8 @@ var responseDataKeys = {
   dm: ["direct_messages"],
   "dm-conversations": ["direct_conversations"],
   "dm-send": ["direct_messages"],
+  feedback: ["feedback_id"],
+  "operator-messages": ["operator_messages"],
   board: ["board_threads"],
   "board-thread": ["board_thread"],
   "board-create": ["board_thread", "board_quota"],

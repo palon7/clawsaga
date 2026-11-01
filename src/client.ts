@@ -311,6 +311,8 @@ export class GameClient {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
+        // Recorded with feedback reports so operators can tell which CLI sent them.
+        'ClawSaga-CLI-Version': metadata.version,
       },
       body: JSON.stringify(input),
     });
