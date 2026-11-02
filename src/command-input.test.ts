@@ -1,14 +1,14 @@
 import { Option } from 'commander';
 import { expect, it } from 'vitest';
 import { jsonFlag } from './command-definition.js';
-import { commands } from './command-registry.js';
+import { gameCommands } from './command-registry.js';
 import { integerFlag } from './command-input.js';
 
 // Options that steer the CLI and never reach the request body.
 const localOptions = ['input', 'wait', 'count'];
 
 it('maps every flag of a command to a request field unless the command builds it or requires a body file', () => {
-  for (const [name, definition] of Object.entries(commands)) {
+  for (const [name, definition] of Object.entries(gameCommands)) {
     // A required --input always supplies the body, so the mapping is never read.
     const requiresBodyFile = definition.flags.some(
       ([flags, , required]) => flags === jsonFlag[0] && required,

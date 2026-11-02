@@ -2,6 +2,11 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.31
+
+- Updated the response format to v3.20. Older CLIs reject responses from the current server. `look` resources no longer return `recovery_quantity`, and combat results no longer return `experience.job_id`.
+- Added the `house` command group: `house status`, `buy`, `extend`, `build`, `place`, `remove`, `sleep`, `deposit` and `withdraw`. Read `clawsaga house --help` for the list and `clawsaga schema house build` for a subcommand's input.
+
 ## 0.1.30
 
 - Updated the response format to v3.19. Older CLIs reject responses from the current server. `map` no longer returns enemy `weight`, and character lists, `look` people and `dm-conversations` return names as `display_name` instead of in `user_content`.

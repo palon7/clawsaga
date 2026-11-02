@@ -4,7 +4,7 @@ import { agentSchemaVersion, type AgentGameResponse } from './protocol.js';
 import { initial, stubInvoke } from './test-responses.js';
 import { GameClient } from './client.js';
 import { execute } from './commands.js';
-import { commands } from './command-registry.js';
+import { gameCommands } from './command-registry.js';
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }));
 afterEach(() => {
@@ -212,10 +212,11 @@ it('keeps English help available without authorization and separates content lan
 // The keys are generated from the server's schemas outside this package, so a
 // command added here without regenerating them would show an empty list.
 it('lists the response data keys of every game command in its help', async () => {
-  for (const name of Object.keys(commands)) {
-    const { help } = (await execute([name, '--help'], vi.fn())) as unknown as {
-      help: { data_keys: string[] };
-    };
+  for (const name of Object.keys(gameCommands)) {
+    const { help } = (await execute(
+      [...name.split(' '), '--help'],
+      vi.fn(),
+    )) as unknown as { help: { data_keys: string[] } };
 
     expect(help.data_keys, name).not.toEqual([]);
   }
@@ -282,8 +283,8 @@ it('generates structured help examples from the command definitions without auth
 });
 
 it('emits no upper limit in any command schema', async () => {
-  for (const name of Object.keys(commands)) {
-    const result = await execute(['schema', name], vi.fn());
+  for (const name of Object.keys(gameCommands)) {
+    const result = await execute(['schema', ...name.split(' ')], vi.fn());
     const schema = JSON.stringify(result);
     expect(schema, name).not.toMatch(/"maxLength"|"maxItems"/);
     for (const match of schema.matchAll(/"maximum":(\d+)/g)) {
@@ -318,11 +319,22 @@ it('parses every structured help command example with a fake client', async () =
 
   let checked = 0;
 
-  for (const { name } of program.help.commands) {
+  // A group's help lists its subcommands, which this loop then visits.
+  const listed = [...program.help.commands];
+  for (const { name } of listed) {
     if (special.has(name)) continue;
-    const result = (await execute([name, '--help'], vi.fn())) as unknown as {
-      help: { examples: string[]; input_example?: Record<string, unknown> };
+    const result = (await execute(
+      [...name.split(' '), '--help'],
+      vi.fn(),
+    )) as unknown as {
+      help: {
+        examples: string[];
+        input_example?: Record<string, unknown>;
+        commands?: { name: string }[];
+      };
     };
+
+    listed.push(...(result.help.commands ?? []));
 
     for (const example of result.help.examples) {
       expect(example.startsWith('clawsaga ')).toBe(true);
@@ -342,16 +354,14 @@ it('parses every structured help command example with a fake client', async () =
 });
 
 // Help examples are written to be pasted into a shell, so a quoted argument
-// arrives without its quotes. Strip that one quoting form before running them.
+// arrives as one argument without its quotes. Strip those quoting forms before
+// running them.
 function shellArguments(example: string) {
-  return example
-    .slice('clawsaga '.length)
-    .split(' ')
-    .map((argument) =>
-      argument.startsWith("'") && argument.endsWith("'")
-        ? argument.slice(1, -1)
-        : argument,
-    );
+  const words = example.slice('clawsaga '.length).match(/'[^']*'|"[^"]*"|\S+/g);
+
+  return (words ?? []).map((word) =>
+    /^(['"]).*\1$/.test(word) ? word.slice(1, -1) : word,
+  );
 }
 
 it('passes a Character ID that begins with a dash without treating it as an option', async () => {
@@ -513,16 +523,24 @@ it('sends JSON examples with the character and locale flags added to the body', 
 
   let checked = 0;
 
-  for (const { name } of program.help.commands) {
+  // A group's help lists its subcommands, which this loop then visits.
+  const listed = [...program.help.commands];
+  for (const { name } of listed) {
     if (special.has(name)) continue;
-    const help = (await execute([name, '--help'], vi.fn())) as unknown as {
-      help: { usage: string; input_example?: Record<string, unknown> };
+    const words = name.split(' ');
+    const help = (await execute([...words, '--help'], vi.fn())) as unknown as {
+      help: {
+        usage: string;
+        input_example?: Record<string, unknown>;
+        commands?: { name: string }[];
+      };
     };
 
+    listed.push(...(help.help.commands ?? []));
     const inputExample = help.help.input_example;
     if (!inputExample) continue;
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(inputExample));
-    const args = [name, '-i', 'body.json', '-l', 'ja'];
+    const args = [...words, '-i', 'body.json', '-l', 'ja'];
     if (name === 'fight') args.push('--no-wait');
     if (help.help.usage.includes('-c <id>')) args.push('-c', 'Traveler0000');
     await execute(args, vi.fn());
@@ -534,7 +552,10 @@ it('sends JSON examples with the character and locale flags added to the body', 
         : {}),
     });
 
-    const schema = (await execute(['schema', name], vi.fn())) as unknown as {
+    const schema = (await execute(
+      ['schema', ...words],
+      vi.fn(),
+    )) as unknown as {
       input_kind: string;
       input_schema: { properties: object };
     };

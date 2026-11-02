@@ -2184,12 +2184,12 @@ var Help = class {
         this.formatItemList("Global Options:", globalOptionList, helper)
       );
     }
-    const commandGroups = this.groupItems(
+    const commandGroups2 = this.groupItems(
       cmd.commands,
       helper.visibleCommands(cmd),
       (sub) => sub.helpGroup() || "Commands:"
     );
-    commandGroups.forEach((commands2, group) => {
+    commandGroups2.forEach((commands2, group) => {
       const commandList = commands2.map((sub) => {
         return callFormatItem(
           helper.styleSubcommandTerm(helper.subcommandTerm(sub)),
@@ -23963,7 +23963,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.19";
+var agentSchemaVersion = "3.20";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   // The client rejects a newer version before parsing. An older server's
@@ -24417,6 +24417,37 @@ var buyMarketListingSchema = external_exports.object({
 var cancelMarketListingSchema = external_exports.object({ ...change, listing_id: positiveInteger }).strict();
 var claimMarketListingSchema = cancelMarketListingSchema;
 
+// src/protocol/house.ts
+var getHouseSchema = external_exports.object({ ...characterTarget }).strict();
+var houseNameSchema = external_exports.string().trim().min(1).regex(
+  /^[^\p{Cc}\p{Cs}]*$/u,
+  "Use one line of text without control characters."
+);
+var buyHousePlotSchema = external_exports.object({ ...characterTarget, name: houseNameSchema }).strict();
+var buildHouseSchema = external_exports.object({
+  ...characterTarget,
+  items: external_exports.array(
+    external_exports.object({ item_id: itemIdSchema, quantity: external_exports.number().int().min(1) }).strict()
+  ).min(1)
+}).strict();
+var extendHouseSchema = external_exports.object({ ...characterTarget, room: external_exports.enum(["storage"]) }).strict();
+var houseFurnitureSlotSchema = external_exports.enum([
+  "bed",
+  "chest_1",
+  "chest_2",
+  "chest_3",
+  "chest_4"
+]);
+var placeFurnitureSchema = external_exports.object({
+  ...characterTarget,
+  slot: houseFurnitureSlotSchema,
+  instance_id: instanceIdSchema
+}).strict();
+var removeFurnitureSchema = external_exports.object({ ...characterTarget, slot: houseFurnitureSlotSchema }).strict();
+var sleepSchema = external_exports.object({ ...characterTarget }).strict();
+var depositHouseItemsSchema = external_exports.object({ ...characterTarget, items: storageTransferItemsSchema }).strict();
+var withdrawHouseItemsSchema = depositHouseItemsSchema;
+
 // src/credentials.ts
 var import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
 import {
@@ -24574,7 +24605,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.30",
+  version: "0.1.31",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -24684,9 +24715,10 @@ function noteAnnouncedCli(response) {
 function announcedCliUpdate() {
   return announcedCli;
 }
-function serverOrigin(input2) {
+function serverOrigin(input2, { allowInsecureHttp = false } = {}) {
   const url2 = URL.parse(input2);
-  if (!url2 || url2.username || url2.password || url2.pathname !== "/" || url2.search || url2.hash || url2.protocol !== "https:" && !(url2.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url2.hostname))) {
+  const plainHttpAllowed = url2?.protocol === "http:" && (allowInsecureHttp || ["localhost", "127.0.0.1", "[::1]"].includes(url2.hostname));
+  if (!url2 || url2.username || url2.password || url2.pathname !== "/" || url2.search || url2.hash || url2.protocol !== "https:" && !plainHttpAllowed) {
     throw new CliError("INVALID_SERVER");
   }
   return url2.origin;
@@ -25457,6 +25489,7 @@ function bodySchema(definition) {
 import { readFile as readFile2 } from "node:fs/promises";
 var optionsSchema = external_exports.object({
   server: external_exports.string(),
+  allowInsecureHttp: external_exports.boolean().optional(),
   contentLanguage: external_exports.enum(["ja", "en"]).optional(),
   character: external_exports.string().optional(),
   name: external_exports.string().optional(),
@@ -25506,6 +25539,8 @@ var optionsSchema = external_exports.object({
   participatedBySelf: external_exports.boolean().optional(),
   thread: external_exports.string().optional(),
   town: external_exports.string().optional(),
+  slot: external_exports.string().optional(),
+  room: external_exports.string().optional(),
   items: external_exports.string().optional(),
   gold: external_exports.string().optional(),
   quality: external_exports.string().optional(),
@@ -26380,6 +26415,141 @@ var giftCommands = {
   }
 };
 
+// src/house-commands.ts
+var materialEntry = /^([^:]+):(\d+)$/;
+function addMaterials(values, input2) {
+  if (values.item === void 0) return;
+  input2.items = values.item.split(",").map((entry) => {
+    const match = materialEntry.exec(entry);
+    if (!match?.[1] || !match[2]) {
+      throw invalidArguments(
+        ["item"],
+        "--item takes item_id:quantity pairs separated by commas, such as oak_lumber:20,metal_ingot:10."
+      );
+    }
+    return { item_id: match[1], quantity: Number(match[2]) };
+  });
+}
+var houseCommands = {
+  help: "Own a house in a residential district: read it, buy a plot, extend and build its rooms, furnish them, sleep, and keep items in its storage room.",
+  commands: {
+    status: {
+      path: "character/house",
+      schema: getHouseSchema,
+      flags: [],
+      help: "Read your house from anywhere: its residential district, its rooms, and the materials required and delivered for a room under construction. Without a house, data.house is omitted.",
+      examples: ["clawsaga house status -c m7Qp2_aR9L-x"]
+    },
+    buy: {
+      path: "character/house/buy",
+      schema: buyHousePlotSchema,
+      input: { name: "name" },
+      flags: [["--name <name>", "House name, 1-32 characters", true]],
+      help: "Buy a house plot in the residential district you stand in while idle, and name the house. The name cannot be changed later. The price includes starting the bedroom. Each character can own one house.",
+      examples: ['clawsaga house buy -c m7Qp2_aR9L-x --name "Mossy Cottage"']
+    },
+    extend: {
+      path: "character/house/extend",
+      schema: extendHouseSchema,
+      input: { room: "room" },
+      flags: [
+        [
+          "--room <room>",
+          "Room to add",
+          true,
+          extendHouseSchema.shape.room.options
+        ]
+      ],
+      help: "Pay for a new room and start building it while idle at your house. The bedroom must be built and no other room under construction. Deliver its materials with house build.",
+      examples: ["clawsaga house extend -c m7Qp2_aR9L-x --room storage"]
+    },
+    build: {
+      path: "character/house/build",
+      schema: buildHouseSchema,
+      buildInput: addMaterials,
+      flags: [
+        [
+          "--item <id:qty>",
+          "Comma-separated item_id:quantity pairs of standard-quality materials from your bag",
+          true
+        ]
+      ],
+      help: "Deliver standard-quality materials from your bag to the room under construction while idle at your house. Only the quantity still needed is taken, and nothing is taken if any item is short. The room is built once every material is delivered.",
+      examples: [
+        "clawsaga house build -c m7Qp2_aR9L-x --item oak_lumber:20,metal_ingot:10"
+      ]
+    },
+    place: {
+      path: "character/house/place",
+      schema: placeFurnitureSchema,
+      input: { slot: "slot", instance: "instance_id" },
+      flags: [
+        [
+          "--slot <slot>",
+          "Furniture slot of a built room",
+          true,
+          houseFurnitureSlotSchema.options
+        ],
+        [
+          "--instance <id>",
+          "Furniture instance ID from inventory[].instance_id",
+          true
+        ]
+      ],
+      help: "Place furniture from your bag in a slot of a built room while idle at your house. Furniture already in the slot goes back to your bag. Moving the bed wakes you up.",
+      examples: [
+        "clawsaga house place -c m7Qp2_aR9L-x --slot bed --instance k3v9q2m8x1"
+      ]
+    },
+    remove: {
+      path: "character/house/remove",
+      schema: removeFurnitureSchema,
+      input: { slot: "slot" },
+      flags: [
+        [
+          "--slot <slot>",
+          "Furniture slot to empty",
+          true,
+          houseFurnitureSlotSchema.options
+        ]
+      ],
+      help: "Move the furniture in a slot back to your bag while idle at your house. Removing the bed wakes you up.",
+      examples: ["clawsaga house remove -c m7Qp2_aR9L-x --slot bed"]
+    },
+    sleep: {
+      path: "character/house/sleep",
+      schema: sleepSchema,
+      flags: [],
+      help: "Sleep in your bed while idle at your house to recover HP and MP fully and build up a sleep bonus for later experience. Starting any activity wakes you up.",
+      examples: ["clawsaga house sleep -c m7Qp2_aR9L-x"]
+    },
+    deposit: {
+      path: "character/house/deposit",
+      schema: depositHouseItemsSchema,
+      buildInput: addItemTargets,
+      flags: [
+        ["--items <json>", "JSON array of stack and individual targets", true]
+      ],
+      help: "Deposit items from your bag in the storage room of your house while idle there. The chests placed in the room set its capacity. Each --items entry is {item_id, quantity} with optional quality (default standard), or {instance_id}. The entire array succeeds or fails together.",
+      examples: [
+        `clawsaga house deposit -c m7Qp2_aR9L-x --items '[{"item_id":"ore","quantity":10}]'`
+      ]
+    },
+    withdraw: {
+      path: "character/house/withdraw",
+      schema: withdrawHouseItemsSchema,
+      buildInput: addItemTargets,
+      flags: [
+        ["--items <json>", "JSON array of stack and individual targets", true]
+      ],
+      help: "Withdraw items from the storage room of your house into your bag while idle there. Each --items entry is {item_id, quantity} with optional quality (default standard), or {instance_id}. The entire array succeeds or fails together.",
+      examples: [
+        `clawsaga house withdraw -c m7Qp2_aR9L-x --items '[{"instance_id":"k3v9q2m7xa"}]'`
+      ]
+    }
+  }
+};
+
 // src/market-commands.ts
 var qualityChoices = marketQualitySchema.options;
 var sourceChoices = marketSourceSchema.options;
@@ -26860,6 +27030,20 @@ var commands = {
   ...storageCommands,
   ...giftCommands
 };
+var commandGroups = {
+  house: houseCommands
+};
+var gameCommands = {
+  ...commands,
+  ...Object.fromEntries(
+    Object.entries(commandGroups).flatMap(
+      ([group, { commands: members2 }]) => Object.entries(members2).map(([name, definition]) => [
+        `${group} ${name}`,
+        definition
+      ])
+    )
+  )
+};
 
 // src/response-data-keys.generated.ts
 var responseDataKeys = {
@@ -26886,7 +27070,13 @@ var responseDataKeys = {
   quests: ["quests", "community_goals", "raids"],
   "quest-accept": ["quest", "community_goal", "status", "reputation_change"],
   "goal-deliver": ["community_goal", "delivered", "status"],
-  "quest-claim": ["quest", "community_goal", "status", "reputation_change"],
+  "quest-claim": [
+    "quest",
+    "community_goal",
+    "status",
+    "reputation_change",
+    "sleep_bonus_experience"
+  ],
   "quest-discard": ["quest", "status", "reputation_change"],
   journal: ["journal", "journals"],
   "journal-write": ["journal"],
@@ -26936,7 +27126,8 @@ var responseDataKeys = {
     "scenery",
     "last_result",
     "changelog",
-    "announcement"
+    "announcement",
+    "house_at"
   ],
   characters: ["characters"],
   "search-characters": ["search_results"],
@@ -26995,7 +27186,16 @@ var responseDataKeys = {
   withdraw: ["capacity", "transfer", "status"],
   gifts: ["gifts"],
   "gift-send": ["status"],
-  "gift-claim": ["gifts", "status"]
+  "gift-claim": ["gifts", "status"],
+  "house status": ["house"],
+  "house buy": ["house", "status"],
+  "house extend": ["house", "status"],
+  "house build": ["house"],
+  "house place": ["house", "capacity"],
+  "house remove": ["house", "capacity"],
+  "house sleep": ["status", "sleeping_since", "sleep_bonus"],
+  "house deposit": ["house", "capacity"],
+  "house withdraw": ["house", "capacity"]
 };
 
 // src/help.ts
@@ -27074,6 +27274,10 @@ function programHelp() {
         name,
         description: firstSentence(definition.help)
       })),
+      ...Object.entries(commandGroups).map(([name, group]) => ({
+        name,
+        description: firstSentence(group.help)
+      })),
       {
         name: "guide [--topic <topic>] [--query <text>]",
         description: "Read the game guide. Without --topic or --query, list the topics."
@@ -27092,6 +27296,19 @@ function programHelp() {
         description: "Authorize this CLI with the server."
       }
     ]
+  };
+}
+function groupHelp(name, group) {
+  return {
+    command: `clawsaga ${name}`,
+    description: `${group.help} Read \`${name} <command> --help\` for its rules, options and examples before using it.`,
+    usage: `clawsaga ${name} <command> [options]`,
+    options: globalOptions.map((option) => helpOption(option, false)),
+    examples: [],
+    commands: Object.entries(group.commands).map(([command2, definition]) => ({
+      name: `${name} ${command2}`,
+      description: firstSentence(definition.help)
+    }))
   };
 }
 function guideHelp() {
@@ -27126,7 +27343,11 @@ function schemaHelp() {
     description: "Read the local input structure for a command. The server validates input limits; read clawsaga guide for current rules and error.fields when input is rejected.",
     usage: "clawsaga schema <command>",
     options: globalOptions.map((option) => helpOption(option, false)),
-    examples: ["clawsaga schema create", "clawsaga schema gather"]
+    examples: [
+      "clawsaga schema create",
+      "clawsaga schema gather",
+      "clawsaga schema house build"
+    ]
   };
 }
 function structuredHelp(target2) {
@@ -27144,7 +27365,9 @@ function structuredHelp(target2) {
   if (target2 === "auth login") return authLoginHelp();
   if (target2 === "schema") return schemaHelp();
   const name = target2.startsWith("clawsaga ") ? target2.slice("clawsaga ".length) : target2;
-  const definition = commands[name];
+  const group = commandGroups[name];
+  if (group) return groupHelp(name, group);
+  const definition = gameCommands[name];
   return definition ? commandHelp(name, definition) : programHelp();
 }
 
@@ -27170,7 +27393,11 @@ ${cliOutputInstructions}`
 
 // src/commands.ts
 function clientFor(values) {
-  return new GameClient(serverOrigin(values.server));
+  return new GameClient(
+    serverOrigin(values.server, {
+      allowInsecureHttp: values.allowInsecureHttp === true
+    })
+  );
 }
 async function execute(args, notify) {
   const run = { helpTarget: "clawsaga", helpCommand: "clawsaga --help" };
@@ -27250,7 +27477,9 @@ function createProgram(run, notify) {
       "-l, --content-language <language>",
       "Game content language for this call"
     ).choices(localeSchema.options)
-  ).addOption(new Option("-c, --character <id>", "Character ID")).exitOverride().configureHelp({
+  ).addOption(new Option("-c, --character <id>", "Character ID")).addOption(
+    new Option("--allow-insecure-http", "Allow plain HTTP to any host").env("CLAWSAGA_ALLOW_INSECURE_HTTP").hideHelp()
+  ).exitOverride().configureHelp({
     showGlobalOptions: true,
     optionTerm: (option) => `${option.flags}${option.mandatory ? " (required)" : ""}`
   }).configureOutput({
@@ -27272,6 +27501,20 @@ function createProgram(run, notify) {
   for (const [name, definition] of Object.entries(commands)) {
     addGameCommand(program2, run, notify, name, definition);
   }
+  for (const [name, group] of Object.entries(commandGroups)) {
+    const groupCommand = program2.command(name).description(group.help);
+    trackHelp(groupCommand, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
+    groupCommand.action(() => groupCommand.help());
+    for (const [command2, definition] of Object.entries(group.commands)) {
+      addGameCommand(
+        groupCommand,
+        run,
+        notify,
+        `${name} ${command2}`,
+        definition
+      );
+    }
+  }
   return program2;
 }
 function trackHelp(command2, run, target2, helpCommand) {
@@ -27288,8 +27531,11 @@ function trackHelp(command2, run, target2, helpCommand) {
 function addSchemaCommand(program2, run) {
   const schemaCommand = program2.command("schema").description(
     "Read the local input structure for a command. The server validates input limits; read clawsaga guide for current rules and error.fields when input is rejected."
-  ).argument("<command>", "Game command name").action((name) => {
-    const definition = commands[name];
+  ).argument(
+    "<command...>",
+    "Game command name, such as gather or house build"
+  ).action((words) => {
+    const definition = gameCommands[words.join(" ")];
     if (!definition) {
       throw invalidArguments(
         ["command"],
@@ -27359,8 +27605,8 @@ function addDocumentCommands(program2, run) {
     ).login();
   });
 }
-function addGameCommand(program2, run, notify, name, definition) {
-  const command2 = program2.command(name).description(definition.help);
+function addGameCommand(parent, run, notify, name, definition) {
+  const command2 = parent.command(name.slice(name.lastIndexOf(" ") + 1)).description(definition.help);
   for (const [flags, description] of definition.flags) {
     command2.option(flags, description);
   }

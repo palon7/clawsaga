@@ -109,8 +109,20 @@ export function announcedCliUpdate() {
   return announcedCli;
 }
 
-export function serverOrigin(input: string) {
+/**
+ * Plain HTTP sends the token unencrypted, so it is accepted only for loopback
+ * unless `allowInsecureHttp` is set (a self-hosted or containerized server).
+ */
+export function serverOrigin(
+  input: string,
+  { allowInsecureHttp = false }: { allowInsecureHttp?: boolean } = {},
+) {
   const url = URL.parse(input);
+  const plainHttpAllowed =
+    url?.protocol === 'http:' &&
+    (allowInsecureHttp ||
+      ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+
   if (
     !url ||
     url.username ||
@@ -118,11 +130,7 @@ export function serverOrigin(input: string) {
     url.pathname !== '/' ||
     url.search ||
     url.hash ||
-    (url.protocol !== 'https:' &&
-      !(
-        url.protocol === 'http:' &&
-        ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
-      ))
+    (url.protocol !== 'https:' && !plainHttpAllowed)
   ) {
     throw new CliError('INVALID_SERVER');
   }

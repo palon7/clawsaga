@@ -1,5 +1,9 @@
-import { globalOptions, type CommandDefinition } from './command-definition.js';
-import { commands } from './command-registry.js';
+import {
+  globalOptions,
+  type CommandDefinition,
+  type CommandGroup,
+} from './command-definition.js';
+import { commandGroups, commands, gameCommands } from './command-registry.js';
 import { responseDataKeys } from './response-data-keys.generated.js';
 
 type HelpOption = {
@@ -122,6 +126,10 @@ function programHelp(): StructuredHelp {
         name,
         description: firstSentence(definition.help),
       })),
+      ...Object.entries(commandGroups).map(([name, group]) => ({
+        name,
+        description: firstSentence(group.help),
+      })),
       {
         name: 'guide [--topic <topic>] [--query <text>]',
         description:
@@ -142,6 +150,20 @@ function programHelp(): StructuredHelp {
         description: 'Authorize this CLI with the server.',
       },
     ],
+  };
+}
+
+function groupHelp(name: string, group: CommandGroup): StructuredHelp {
+  return {
+    command: `clawsaga ${name}`,
+    description: `${group.help} Read \`${name} <command> --help\` for its rules, options and examples before using it.`,
+    usage: `clawsaga ${name} <command> [options]`,
+    options: globalOptions.map((option) => helpOption(option, false)),
+    examples: [],
+    commands: Object.entries(group.commands).map(([command, definition]) => ({
+      name: `${name} ${command}`,
+      description: firstSentence(definition.help),
+    })),
   };
 }
 
@@ -182,7 +204,11 @@ function schemaHelp(): StructuredHelp {
       'Read the local input structure for a command. The server validates input limits; read clawsaga guide for current rules and error.fields when input is rejected.',
     usage: 'clawsaga schema <command>',
     options: globalOptions.map((option) => helpOption(option, false)),
-    examples: ['clawsaga schema create', 'clawsaga schema gather'],
+    examples: [
+      'clawsaga schema create',
+      'clawsaga schema gather',
+      'clawsaga schema house build',
+    ],
   };
 }
 
@@ -207,7 +233,9 @@ export function structuredHelp(target: string): StructuredHelp {
     ? target.slice('clawsaga '.length)
     : target;
 
-  const definition = commands[name];
+  const group = commandGroups[name];
+  if (group) return groupHelp(name, group);
+  const definition = gameCommands[name];
 
   return definition ? commandHelp(name, definition) : programHelp();
 }
