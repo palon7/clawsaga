@@ -5,6 +5,7 @@ import type { CommandDefinition } from './command-definition.js';
 
 export const optionsSchema = z.object({
   server: z.string(),
+  allowInsecureHttp: z.boolean().optional(),
   contentLanguage: z.enum(['ja', 'en']).optional(),
   character: z.string().optional(),
   name: z.string().optional(),
@@ -54,6 +55,8 @@ export const optionsSchema = z.object({
   participatedBySelf: z.boolean().optional(),
   thread: z.string().optional(),
   town: z.string().optional(),
+  slot: z.string().optional(),
+  room: z.string().optional(),
   items: z.string().optional(),
   gold: z.string().optional(),
   quality: z.string().optional(),

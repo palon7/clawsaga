@@ -30,7 +30,7 @@ import {
   type CommandDefinition,
 } from './command-definition.js';
 import { commandInput, optionsSchema, type Values } from './command-input.js';
-import { commands } from './command-registry.js';
+import { commandGroups, commands, gameCommands } from './command-registry.js';
 import { guideQueryOption, guideTopicOption, structuredHelp } from './help.js';
 import { withCliResumeInstructions } from './resume.js';
 
@@ -69,7 +69,11 @@ type Run = {
 };
 
 function clientFor(values: Values) {
-  return new GameClient(serverOrigin(values.server));
+  return new GameClient(
+    serverOrigin(values.server, {
+      allowInsecureHttp: values.allowInsecureHttp === true,
+    }),
+  );
 }
 
 export async function execute(args: string[], notify: Notify) {
@@ -195,6 +199,12 @@ function createProgram(run: Run, notify: Notify) {
       ).choices(localeSchema.options),
     )
     .addOption(new Option('-c, --character <id>', 'Character ID'))
+    // Left out of the agents' help: only a person running their own server sets it.
+    .addOption(
+      new Option('--allow-insecure-http', 'Allow plain HTTP to any host')
+        .env('CLAWSAGA_ALLOW_INSECURE_HTTP')
+        .hideHelp(),
+    )
     .exitOverride()
     .configureHelp({
       showGlobalOptions: true,
@@ -226,6 +236,22 @@ function createProgram(run: Run, notify: Notify) {
   addDocumentCommands(program, run);
   for (const [name, definition] of Object.entries(commands)) {
     addGameCommand(program, run, notify, name, definition);
+  }
+
+  for (const [name, group] of Object.entries(commandGroups)) {
+    const groupCommand = program.command(name).description(group.help);
+    trackHelp(groupCommand, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
+    // Without a subcommand, the group only shows its structured help.
+    groupCommand.action(() => groupCommand.help());
+    for (const [command, definition] of Object.entries(group.commands)) {
+      addGameCommand(
+        groupCommand,
+        run,
+        notify,
+        `${name} ${command}`,
+        definition,
+      );
+    }
   }
 
   return program;
@@ -261,9 +287,12 @@ function addSchemaCommand(program: Command, run: Run) {
     .description(
       'Read the local input structure for a command. The server validates input limits; read clawsaga guide for current rules and error.fields when input is rejected.',
     )
-    .argument('<command>', 'Game command name')
-    .action((name: string) => {
-      const definition = commands[name];
+    .argument(
+      '<command...>',
+      'Game command name, such as gather or house build',
+    )
+    .action((words: string[]) => {
+      const definition = gameCommands[words.join(' ')];
       if (!definition) {
         throw invalidArguments(
           ['command'],
@@ -363,14 +392,17 @@ function addDocumentCommands(program: Command, run: Run) {
   });
 }
 
+/** `name` is the full name from `gameCommands`; `parent` runs its last word. */
 function addGameCommand(
-  program: Command,
+  parent: Command,
   run: Run,
   notify: Notify,
   name: string,
   definition: CommandDefinition,
 ) {
-  const command = program.command(name).description(definition.help);
+  const command = parent
+    .command(name.slice(name.lastIndexOf(' ') + 1))
+    .description(definition.help);
 
   for (const [flags, description] of definition.flags) {
     command.option(flags, description);

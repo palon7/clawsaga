@@ -72,6 +72,12 @@ export type CommandDefinition = {
   inputExample?: Record<string, unknown>;
 };
 
+/** Subcommands run as `clawsaga <group> <command>`. */
+export type CommandGroup = {
+  help: string;
+  commands: Record<string, CommandDefinition>;
+};
+
 export const globalOptions: readonly GlobalOption[] = [
   {
     flags: '-c, --character <id>',

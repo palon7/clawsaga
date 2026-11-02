@@ -59,6 +59,9 @@ it('chooses the home directory and rejects unsafe servers', () => {
   }
 
   expect(serverOrigin('http://localhost:3000')).toBe('http://localhost:3000');
+  expect(
+    serverOrigin('http://172.17.0.1:3201', { allowInsecureHttp: true }),
+  ).toBe('http://172.17.0.1:3201');
 });
 
 it('keeps storage and locks inside the home directory and excludes them from Git', async () => {
