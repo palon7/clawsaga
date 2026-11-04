@@ -36,7 +36,7 @@ export const changelogResponseSchema = z.looseObject({
 
 export type ChangelogResponse = z.infer<typeof changelogResponseSchema>;
 
-export const agentSchemaVersion = '3.20';
+export const agentSchemaVersion = '3.21';
 
 export const agentGameResponseSchema = z
   .looseObject({

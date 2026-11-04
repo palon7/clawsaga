@@ -380,7 +380,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     schema: writeJournalSchema,
     autoRequestId: true,
     flags: [jsonFlag, bodyRequestFlag],
-    help: 'Record something new worth remembering in a later session. Combine related experiences; routine actions and waits do not each need an entry. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content.',
+    help: 'Record a distinct experience during play worth remembering in a later session. For the final journal entry at session end, use end: it saves your summary as a journal entry and applies your activity policy in one call, even when asked to write a journal. Do not save that summary here too. Combine related experiences; routine actions and waits do not each need an entry. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content.',
     inputExample: {
       text: 'After the ambush, I abandoned the shortcut. I now understand why the caravan warned me about that road.',
       language: 'en',
@@ -391,7 +391,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     schema: endSessionSchema,
     autoRequestId: true,
     flags: [jsonFlag, bodyRequestFlag],
-    help: 'Always use end when ending a play session to save one summary, even if you wrote a journal during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content. Without session_ended.activity_id no activity was running; do not claim one was stopped. Use the returned result without another hello.',
+    help: 'Save the final session summary as a journal entry and apply your activity policy in one call. Always use end for the final journal entry, even when asked to write a journal or when you wrote a distinct entry during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content. Without session_ended.activity_id no activity was running; do not claim one was stopped. Use the returned result without another hello.',
     inputExample: {
       text: 'I rested after returning from the forest.',
       language: 'en',

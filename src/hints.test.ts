@@ -25,6 +25,7 @@ it('renders server hints with CLI command syntax, adds the invoked character and
       operation: 'equip_item',
       arguments: { instance_id: 'k3v9q2m7xa' },
     },
+    { operation: 'claim_quest', arguments: { quest_number: '26' } },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ];
 
@@ -34,6 +35,7 @@ it('renders server hints with CLI command syntax, adds the invoked character and
     {
       note: 'Run `equip --instance k3v9q2m7xa`.',
     },
+    { note: 'Run `quest-claim --quest 26`.' },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
   expect(
@@ -44,17 +46,29 @@ it('renders server hints with CLI command syntax, adds the invoked character and
     {
       note: 'Run `equip --instance k3v9q2m7xa -c HintHero0000`.',
     },
+    { note: 'Run `quest-claim --quest 26 -c HintHero0000`.' },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
 });
 
-it('names an operation it cannot render instead of guessing one', () => {
+it('directs an unfamiliar operation to an update without inventing a command', () => {
   expect(
     withRenderedHints({
       ...response,
       hints: [{ operation: 'some_future_operation' }],
     }).hints,
-  ).toEqual([{ note: 'Use the some_future_operation operation.' }]);
+  ).toEqual([
+    { note: 'Run `clawsaga update` to get the commands for this hint.' },
+  ]);
+});
+
+it('uses the generated command name for operations without a custom renderer', () => {
+  expect(
+    withRenderedHints({
+      ...response,
+      hints: [{ operation: 'get_quests' }],
+    }).hints,
+  ).toEqual([{ note: 'Run `quests --help` for command usage.' }]);
 });
 
 it('renders hints from the result without another request', async () => {

@@ -506,6 +506,42 @@ it('returns the parser reason and command-specific help without sending a reques
   expect(invoke).not.toHaveBeenCalled();
 });
 
+it.each([
+  [['claim-quest', '--help'], 'claim-quest', 'clawsaga --help'],
+  [['item', '--help'], 'item', 'clawsaga --help'],
+  [['house', 'unknown', '--help'], 'unknown', 'clawsaga house --help'],
+  [['auth', 'unknown', '--help'], 'unknown', 'clawsaga auth --help'],
+  [
+    ['-c', 'Traveler0000', 'claim-quest', '--help'],
+    'claim-quest',
+    'clawsaga --help',
+  ],
+] as const)(
+  'rejects unknown commands with help: %j',
+  async (args, name, help) => {
+    const invoke = vi.spyOn(GameClient.prototype, 'invoke');
+
+    await expect(execute([...args], vi.fn())).rejects.toMatchObject({
+      code: 'INVALID_COMMAND',
+      detail: { message: `Unknown command '${name}'.`, help_command: help },
+    });
+    expect(invoke).not.toHaveBeenCalled();
+  },
+);
+
+it.each([
+  [[], 'clawsaga'],
+  [['--help'], 'clawsaga'],
+  [['house', '--help'], 'clawsaga house'],
+  [['auth', '--help'], 'clawsaga auth'],
+  [['quest-claim', '--help'], 'clawsaga quest-claim'],
+] as const)('preserves valid help: %j', async (args, command) => {
+  await expect(execute([...args], vi.fn())).resolves.toMatchObject({
+    ok: true,
+    help: { command },
+  });
+});
+
 it('sends JSON examples with the character and locale flags added to the body', async () => {
   const invoke = stubInvoke(initial);
 

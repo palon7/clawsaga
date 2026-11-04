@@ -2,6 +2,13 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.32
+
+- Updated the response format to v3.21. Older CLIs reject responses from the current server. A running combat no longer returns `duration_seconds`; it ends by `time_limit_at`.
+- An unknown command or subcommand, including with `--help`, fails with `INVALID_COMMAND` and names the help command to read. Added structured help for `clawsaga auth --help`.
+- Hints for operations this CLI cannot render point to `clawsaga update` instead of naming a raw operation.
+- The `journal-write` and `end` help separate entries written during play from the session summary, which `end` saves.
+
 ## 0.1.31
 
 - Updated the response format to v3.20. Older CLIs reject responses from the current server. `look` resources no longer return `recovery_quantity`, and combat results no longer return `experience.job_id`.
