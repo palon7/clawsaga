@@ -31,7 +31,13 @@ import {
 } from './command-definition.js';
 import { commandInput, optionsSchema, type Values } from './command-input.js';
 import { commandGroups, commands, gameCommands } from './command-registry.js';
-import { guideQueryOption, guideTopicOption, structuredHelp } from './help.js';
+import {
+  assertKnownSubcommand,
+  guideQueryOption,
+  guideTopicOption,
+  structuredHelp,
+  trackHelp,
+} from './help.js';
 import { withCliResumeInstructions } from './resume.js';
 
 type Notify = (value: unknown) => void;
@@ -219,6 +225,7 @@ function createProgram(run: Run, notify: Notify) {
 
   program.action(() => program.help());
   program.on('--help', () => {
+    assertKnownSubcommand(program, 'clawsaga --help');
     run.helpTarget = 'clawsaga';
   });
 
@@ -255,30 +262,6 @@ function createProgram(run: Run, notify: Notify) {
   }
 
   return program;
-}
-
-/**
- * Points a failure of this command, from commander or its action, at
- * `helpCommand`, and `--help` at the structured help of `target`.
- */
-function trackHelp(
-  command: Command,
-  run: Run,
-  target: string,
-  helpCommand: string,
-) {
-  command
-    .configureOutput({
-      outputError: () => {
-        run.helpCommand = helpCommand;
-      },
-    })
-    .on('--help', () => {
-      run.helpTarget = target;
-    })
-    .hook('preAction', () => {
-      run.helpCommand = helpCommand;
-    });
 }
 
 function addSchemaCommand(program: Command, run: Run) {
@@ -378,9 +361,9 @@ function addDocumentCommands(program: Command, run: Run) {
     });
   }
 
-  const login = program
-    .command('auth')
-    .description('Manage authorization')
+  const auth = program.command('auth').description('Manage authorization');
+  trackHelp(auth, run, 'auth', 'clawsaga auth --help');
+  const login = auth
     .command('login')
     .description('Return a device verification URL without waiting');
 

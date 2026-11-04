@@ -3,29 +3,37 @@ import type {
   AgentHint,
   AgentRunningActivity,
 } from './protocol.js';
+import { commandByOperation } from './response-data-keys.generated.js';
 
 // The server decides which suggestion a result earns; the CLI renders it with
 // its own command names and flags. Rendered text keeps the contract's note
 // form so the printed response still validates against the shared schema.
-const command: Record<
+const argumentFlags: Record<
   string,
-  (args: Record<string, string>, character?: string) => string
+  (args: Record<string, string>) => string[]
 > = {
-  hello: (args) => `Run \`hello -c ${args.character_id}\`.`,
-  get_activity: (args, character) =>
-    `Run \`activity -a ${args.activity_id}${character ? ` -c ${character}` : ''}\`.`,
-  equip_item: (args, character) =>
-    `Run \`equip --instance ${args.instance_id}${character ? ` -c ${character}` : ''}\`.`,
+  hello: () => [],
+  get_activity: (args) => [`-a ${args.activity_id}`],
+  equip_item: (args) => [`--instance ${args.instance_id}`],
+  claim_quest: (args) => [`--quest ${args.quest_number}`],
+  get_operator_messages: () => [],
 };
 
 function renderHint(hint: AgentHint, character?: string): string {
   if (hint.note !== undefined) return hint.note;
-  const render =
-    hint.operation === undefined ? undefined : command[hint.operation];
+  const name = hint.operation && commandByOperation[hint.operation];
+  if (!name) return 'Run `clawsaga update` to get the commands for this hint.';
 
-  if (!render || !hint.arguments) return `Use the ${hint.operation} operation.`;
+  const flags = hint.operation && argumentFlags[hint.operation];
+  if (!flags || !hint.arguments) {
+    return `Run \`${name} --help\` for command usage.`;
+  }
 
-  return render(hint.arguments, character);
+  const parts = [name, ...flags(hint.arguments)];
+  const target = hint.arguments.character_id ?? character;
+  if (target) parts.push('-c', target);
+
+  return `Run \`${parts.join(' ')}\`.`;
 }
 
 /**

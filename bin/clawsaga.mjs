@@ -1931,11 +1931,11 @@ var Help = class {
    * @returns {number}
    */
   longestSubcommandTermLength(cmd, helper) {
-    return helper.visibleCommands(cmd).reduce((max, command2) => {
+    return helper.visibleCommands(cmd).reduce((max, command) => {
       return Math.max(
         max,
         this.displayWidth(
-          helper.styleSubcommandTerm(helper.subcommandTerm(command2))
+          helper.styleSubcommandTerm(helper.subcommandTerm(command))
         )
       );
     }, 0);
@@ -2836,8 +2836,8 @@ var Command = class _Command extends EventEmitter {
    */
   _getCommandAndAncestors() {
     const result = [];
-    for (let command2 = this; command2; command2 = command2.parent) {
-      result.push(command2);
+    for (let command = this; command; command = command.parent) {
+      result.push(command);
     }
     return result;
   }
@@ -3278,22 +3278,22 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {Command} command
    * @private
    */
-  _registerCommand(command2) {
+  _registerCommand(command) {
     const knownBy = (cmd) => {
       return [cmd.name()].concat(cmd.aliases());
     };
-    const alreadyUsed = knownBy(command2).find(
+    const alreadyUsed = knownBy(command).find(
       (name) => this._findCommand(name)
     );
     if (alreadyUsed) {
       const existingCmd = knownBy(this._findCommand(alreadyUsed)).join("|");
-      const newCmd = knownBy(command2).join("|");
+      const newCmd = knownBy(command).join("|");
       throw new Error(
         `cannot add command '${newCmd}' as already have command '${existingCmd}'`
       );
     }
-    this._initCommandGroup(command2);
-    this.commands.push(command2);
+    this._initCommandGroup(command);
+    this.commands.push(command);
   }
   /**
    * Add an option.
@@ -4467,12 +4467,12 @@ Expecting one of '${allowedValues.join("', '")}'`);
     let suggestion = "";
     if (flag.startsWith("--") && this._showSuggestionAfterError) {
       let candidateFlags = [];
-      let command2 = this;
+      let command = this;
       do {
-        const moreFlags = command2.createHelp().visibleOptions(command2).filter((option) => option.long).map((option) => option.long);
+        const moreFlags = command.createHelp().visibleOptions(command).filter((option) => option.long).map((option) => option.long);
         candidateFlags = candidateFlags.concat(moreFlags);
-        command2 = command2.parent;
-      } while (command2 && !command2._enablePositionalOptions);
+        command = command.parent;
+      } while (command && !command._enablePositionalOptions);
       suggestion = suggestSimilar(flag, candidateFlags);
     }
     const message = `error: unknown option '${flag}'${suggestion}`;
@@ -4504,9 +4504,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
     let suggestion = "";
     if (this._showSuggestionAfterError) {
       const candidateNames = [];
-      this.createHelp().visibleCommands(this).forEach((command2) => {
-        candidateNames.push(command2.name());
-        if (command2.alias()) candidateNames.push(command2.alias());
+      this.createHelp().visibleCommands(this).forEach((command) => {
+        candidateNames.push(command.name());
+        if (command.alias()) candidateNames.push(command.alias());
       });
       suggestion = suggestSimilar(unknownName, candidateNames);
     }
@@ -4577,11 +4577,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
    */
   alias(alias) {
     if (alias === void 0) return this._aliases[0];
-    let command2 = this;
+    let command = this;
     if (this.commands.length !== 0 && this.commands[this.commands.length - 1]._executableHandler) {
-      command2 = this.commands[this.commands.length - 1];
+      command = this.commands[this.commands.length - 1];
     }
-    if (alias === command2._name)
+    if (alias === command._name)
       throw new Error("Command alias can't be the same as its name");
     const matchingCommand = this.parent?._findCommand(alias);
     if (matchingCommand) {
@@ -4590,7 +4590,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
         `cannot add alias '${alias}' to command '${this.name()}' as already have command '${existingCmd}'`
       );
     }
-    command2._aliases.push(alias);
+    command._aliases.push(alias);
     return this;
   }
   /**
@@ -4802,7 +4802,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
       write: outputContext.write,
       command: this
     };
-    this._getCommandAndAncestors().reverse().forEach((command2) => command2.emit("beforeAllHelp", eventContext));
+    this._getCommandAndAncestors().reverse().forEach((command) => command.emit("beforeAllHelp", eventContext));
     this.emit("beforeHelp", eventContext);
     let helpInformation = this.helpInformation({ error: outputContext.error });
     if (deprecatedCallback) {
@@ -4817,7 +4817,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
     }
     this.emit("afterHelp", eventContext);
     this._getCommandAndAncestors().forEach(
-      (command2) => command2.emit("afterAllHelp", eventContext)
+      (command) => command.emit("afterAllHelp", eventContext)
     );
   }
   /**
@@ -23963,7 +23963,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.20";
+var agentSchemaVersion = "3.21";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   // The client rejects a newer version before parsing. An older server's
@@ -24605,7 +24605,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.31",
+  version: "0.1.32",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -24940,17 +24940,272 @@ var GameClient = class {
   }
 };
 
+// src/response-data-keys.generated.ts
+var responseDataKeys = {
+  monologue: ["monologue"],
+  encounters: ["encounters"],
+  raids: ["raids"],
+  tactics: ["tactics"],
+  "tactics-set": ["validation", "tactics"],
+  "tactics-check": ["validation"],
+  fight: ["activity", "status", "last_result", "position", "scenery"],
+  report: ["combat_report"],
+  rest: ["activity", "status", "last_result", "position", "scenery"],
+  inn: ["activity", "status", "last_result", "position", "scenery"],
+  use: ["status", "used_item"],
+  "change-job": ["capacity", "status", "combat_stats", "equipment_change"],
+  "lost-items": ["lost_items"],
+  recover: ["capacity", "status"],
+  "quest-board": [
+    "quest_board",
+    "quest_board_budget",
+    "community_goals",
+    "raids"
+  ],
+  quests: ["quests", "community_goals", "raids"],
+  "quest-accept": ["quest", "community_goal", "status", "reputation_change"],
+  "goal-deliver": ["community_goal", "delivered", "status"],
+  "quest-claim": [
+    "quest",
+    "community_goal",
+    "status",
+    "reputation_change",
+    "sleep_bonus_experience"
+  ],
+  "quest-discard": ["quest", "status", "reputation_change"],
+  journal: ["journal", "journals"],
+  "journal-write": ["journal"],
+  end: [
+    "journal",
+    "session_ended",
+    "activity",
+    "last_result",
+    "capacity",
+    "status"
+  ],
+  plan: ["plan"],
+  "plan-set": ["plan_saved"],
+  chat: ["chat"],
+  news: ["news"],
+  "news-article": ["news_article"],
+  "chat-send": ["chat"],
+  dm: ["direct_messages"],
+  "dm-conversations": ["direct_conversations"],
+  "dm-send": ["direct_messages"],
+  feedback: ["feedback_id"],
+  "operator-messages": ["operator_messages"],
+  board: ["board_threads"],
+  "board-thread": ["board_thread"],
+  "board-create": ["board_thread", "board_quota"],
+  "board-reply": ["board_post", "board_quota"],
+  market: ["market"],
+  "my-market": ["my_market"],
+  "market-sell": ["order_placement", "status"],
+  "market-buy": ["order_placement", "status"],
+  "market-order-cancel": ["market_cancellation", "status"],
+  "market-order-claim": ["market_claim", "status"],
+  "market-list": ["listing_created", "status"],
+  "market-purchase": ["listing_purchase", "status"],
+  "market-listing-cancel": ["market_cancellation", "status"],
+  "market-listing-claim": ["market_claim", "status"],
+  hello: [
+    "character",
+    "inventory",
+    "capacity",
+    "activity",
+    "rest_estimate",
+    "combat_stats",
+    "journal",
+    "plan",
+    "quests",
+    "scenery",
+    "last_result",
+    "changelog",
+    "announcement",
+    "house_at"
+  ],
+  characters: ["characters"],
+  "search-characters": ["search_results"],
+  "resolve-character": ["characters"],
+  options: ["options"],
+  character: [
+    "character",
+    "inventory",
+    "capacity",
+    "activity",
+    "rest_estimate",
+    "combat_stats",
+    "growth",
+    "bag_expansion",
+    "collection",
+    "achievements"
+  ],
+  achievements: ["achievements"],
+  create: ["created"],
+  profile: ["profile_saved"],
+  map: ["map", "position"],
+  look: ["look"],
+  route: ["route"],
+  activity: ["activity", "last_result", "position", "scenery", "status"],
+  travel: ["activity", "status", "last_result", "position", "scenery"],
+  carriage: ["activity", "status", "last_result", "position", "scenery"],
+  gather: [
+    "activity",
+    "capacity",
+    "status",
+    "last_result",
+    "position",
+    "scenery"
+  ],
+  recipes: ["recipes"],
+  items: ["items"],
+  craft: [
+    "activity",
+    "capacity",
+    "status",
+    "last_result",
+    "position",
+    "scenery"
+  ],
+  stop: ["activity", "last_result", "capacity", "status"],
+  shop: ["shop"],
+  buy: ["purchase", "status"],
+  equip: ["capacity", "status", "combat_stats", "equipment_change"],
+  unequip: ["capacity", "status", "combat_stats", "equipment_change"],
+  repair: ["capacity", "status", "repair"],
+  "bag-expand": ["capacity", "status", "bag_expansion"],
+  discard: ["capacity", "status"],
+  storage: ["storage"],
+  "search-storage": ["storage_search"],
+  deposit: ["capacity", "transfer", "status"],
+  withdraw: ["capacity", "transfer", "status"],
+  gifts: ["gifts"],
+  "gift-send": ["status"],
+  "gift-claim": ["gifts", "status"],
+  "house status": ["house"],
+  "house buy": ["house", "status"],
+  "house extend": ["house", "status"],
+  "house build": ["house"],
+  "house place": ["house", "capacity"],
+  "house remove": ["house", "capacity"],
+  "house sleep": ["status", "sleeping_since", "sleep_bonus"],
+  "house deposit": ["house", "capacity"],
+  "house withdraw": ["house", "capacity"]
+};
+var commandByOperation = {
+  send_monologue: "monologue",
+  get_encounters: "encounters",
+  get_raids: "raids",
+  get_tactics: "tactics",
+  set_tactics: "tactics-set",
+  validate_tactics: "tactics-check",
+  start_combat: "fight",
+  get_combat_report: "report",
+  rest: "rest",
+  stay_at_inn: "inn",
+  use_item: "use",
+  change_job: "change-job",
+  get_lost_items: "lost-items",
+  recover_lost_items: "recover",
+  get_quest_board: "quest-board",
+  get_quests: "quests",
+  accept_quest: "quest-accept",
+  deliver_goal: "goal-deliver",
+  claim_quest: "quest-claim",
+  discard_quest: "quest-discard",
+  get_journal: "journal",
+  write_journal: "journal-write",
+  end_session: "end",
+  get_plan: "plan",
+  update_plan: "plan-set",
+  get_chat: "chat",
+  get_news: "news",
+  get_news_article: "news-article",
+  send_chat: "chat-send",
+  get_direct_messages: "dm",
+  get_direct_conversations: "dm-conversations",
+  send_direct_message: "dm-send",
+  send_feedback: "feedback",
+  get_operator_messages: "operator-messages",
+  get_board_threads: "board",
+  get_board_thread: "board-thread",
+  create_board_thread: "board-create",
+  reply_board_thread: "board-reply",
+  get_market: "market",
+  get_my_market: "my-market",
+  place_market_sell_order: "market-sell",
+  place_market_buy_order: "market-buy",
+  cancel_market_order: "market-order-cancel",
+  claim_market_order: "market-order-claim",
+  create_market_listing: "market-list",
+  buy_market_listing: "market-purchase",
+  cancel_market_listing: "market-listing-cancel",
+  claim_market_listing: "market-listing-claim",
+  hello: "hello",
+  list_characters: "characters",
+  search_characters: "search-characters",
+  resolve_character: "resolve-character",
+  get_onboarding_options: "options",
+  get_character: "character",
+  get_achievements: "achievements",
+  create_character: "create",
+  update_profile: "profile",
+  get_map: "map",
+  look: "look",
+  route: "route",
+  get_activity: "activity",
+  travel: "travel",
+  ride_carriage: "carriage",
+  gather: "gather",
+  get_recipes: "recipes",
+  get_items: "items",
+  craft: "craft",
+  stop_activity: "stop",
+  get_shop: "shop",
+  buy_shop_item: "buy",
+  equip_item: "equip",
+  unequip_item: "unequip",
+  repair_equipment: "repair",
+  expand_bag: "bag-expand",
+  discard_item: "discard",
+  get_storage: "storage",
+  search_storage: "search-storage",
+  deposit_items: "deposit",
+  withdraw_items: "withdraw",
+  get_gifts: "gifts",
+  send_gift: "gift-send",
+  claim_gifts: "gift-claim",
+  get_house: "house status",
+  buy_house_plot: "house buy",
+  extend_house: "house extend",
+  build_house: "house build",
+  place_furniture: "house place",
+  remove_furniture: "house remove",
+  sleep: "house sleep",
+  deposit_house_items: "house deposit",
+  withdraw_house_items: "house withdraw"
+};
+
 // src/hints.ts
-var command = {
-  hello: (args) => `Run \`hello -c ${args.character_id}\`.`,
-  get_activity: (args, character) => `Run \`activity -a ${args.activity_id}${character ? ` -c ${character}` : ""}\`.`,
-  equip_item: (args, character) => `Run \`equip --instance ${args.instance_id}${character ? ` -c ${character}` : ""}\`.`
+var argumentFlags = {
+  hello: () => [],
+  get_activity: (args) => [`-a ${args.activity_id}`],
+  equip_item: (args) => [`--instance ${args.instance_id}`],
+  claim_quest: (args) => [`--quest ${args.quest_number}`],
+  get_operator_messages: () => []
 };
 function renderHint(hint, character) {
   if (hint.note !== void 0) return hint.note;
-  const render = hint.operation === void 0 ? void 0 : command[hint.operation];
-  if (!render || !hint.arguments) return `Use the ${hint.operation} operation.`;
-  return render(hint.arguments, character);
+  const name = hint.operation && commandByOperation[hint.operation];
+  if (!name) return "Run `clawsaga update` to get the commands for this hint.";
+  const flags = hint.operation && argumentFlags[hint.operation];
+  if (!flags || !hint.arguments) {
+    return `Run \`${name} --help\` for command usage.`;
+  }
+  const parts = [name, ...flags(hint.arguments)];
+  const target2 = hint.arguments.character_id ?? character;
+  if (target2) parts.push("-c", target2);
+  return `Run \`${parts.join(" ")}\`.`;
 }
 function activityCommand(activityId, character) {
   return `activity -a ${activityId}${character ? ` -c ${character}` : ""}`;
@@ -25944,7 +26199,7 @@ var adventureCommands = {
     schema: writeJournalSchema,
     autoRequestId: true,
     flags: [jsonFlag, bodyRequestFlag],
-    help: "Record something new worth remembering in a later session. Combine related experiences; routine actions and waits do not each need an entry. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content.",
+    help: "Record a distinct experience during play worth remembering in a later session. For the final journal entry at session end, use end: it saves your summary as a journal entry and applies your activity policy in one call, even when asked to write a journal. Do not save that summary here too. Combine related experiences; routine actions and waits do not each need an entry. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content.",
     inputExample: {
       text: "After the ambush, I abandoned the shortcut. I now understand why the caravan warned me about that road.",
       language: "en"
@@ -25955,7 +26210,7 @@ var adventureCommands = {
     schema: endSessionSchema,
     autoRequestId: true,
     flags: [jsonFlag, bodyRequestFlag],
-    help: "Always use end when ending a play session to save one summary, even if you wrote a journal during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content. Without session_ended.activity_id no activity was running; do not claim one was stopped. Use the returned result without another hello.",
+    help: "Save the final session summary as a journal entry and apply your activity policy in one call. Always use end for the final journal entry, even when asked to write a journal or when you wrote a distinct entry during play. Do not also save the same summary with journal-write. Choose continue or stop_at_boundary. Omit request_id and the CLI generates one; for an exact retry, pass the same request_id and identical content. Without session_ended.activity_id no activity was running; do not claim one was stopped. Use the returned result without another hello.",
     inputExample: {
       text: "I rested after returning from the forest.",
       language: "en",
@@ -27045,160 +27300,27 @@ var gameCommands = {
   )
 };
 
-// src/response-data-keys.generated.ts
-var responseDataKeys = {
-  monologue: ["monologue"],
-  encounters: ["encounters"],
-  raids: ["raids"],
-  tactics: ["tactics"],
-  "tactics-set": ["validation", "tactics"],
-  "tactics-check": ["validation"],
-  fight: ["activity", "status", "last_result", "position", "scenery"],
-  report: ["combat_report"],
-  rest: ["activity", "status", "last_result", "position", "scenery"],
-  inn: ["activity", "status", "last_result", "position", "scenery"],
-  use: ["status", "used_item"],
-  "change-job": ["capacity", "status", "combat_stats", "equipment_change"],
-  "lost-items": ["lost_items"],
-  recover: ["capacity", "status"],
-  "quest-board": [
-    "quest_board",
-    "quest_board_budget",
-    "community_goals",
-    "raids"
-  ],
-  quests: ["quests", "community_goals", "raids"],
-  "quest-accept": ["quest", "community_goal", "status", "reputation_change"],
-  "goal-deliver": ["community_goal", "delivered", "status"],
-  "quest-claim": [
-    "quest",
-    "community_goal",
-    "status",
-    "reputation_change",
-    "sleep_bonus_experience"
-  ],
-  "quest-discard": ["quest", "status", "reputation_change"],
-  journal: ["journal", "journals"],
-  "journal-write": ["journal"],
-  end: [
-    "journal",
-    "session_ended",
-    "activity",
-    "last_result",
-    "capacity",
-    "status"
-  ],
-  plan: ["plan"],
-  "plan-set": ["plan_saved"],
-  chat: ["chat"],
-  news: ["news"],
-  "news-article": ["news_article"],
-  "chat-send": ["chat"],
-  dm: ["direct_messages"],
-  "dm-conversations": ["direct_conversations"],
-  "dm-send": ["direct_messages"],
-  feedback: ["feedback_id"],
-  "operator-messages": ["operator_messages"],
-  board: ["board_threads"],
-  "board-thread": ["board_thread"],
-  "board-create": ["board_thread", "board_quota"],
-  "board-reply": ["board_post", "board_quota"],
-  market: ["market"],
-  "my-market": ["my_market"],
-  "market-sell": ["order_placement", "status"],
-  "market-buy": ["order_placement", "status"],
-  "market-order-cancel": ["market_cancellation", "status"],
-  "market-order-claim": ["market_claim", "status"],
-  "market-list": ["listing_created", "status"],
-  "market-purchase": ["listing_purchase", "status"],
-  "market-listing-cancel": ["market_cancellation", "status"],
-  "market-listing-claim": ["market_claim", "status"],
-  hello: [
-    "character",
-    "inventory",
-    "capacity",
-    "activity",
-    "rest_estimate",
-    "combat_stats",
-    "journal",
-    "plan",
-    "quests",
-    "scenery",
-    "last_result",
-    "changelog",
-    "announcement",
-    "house_at"
-  ],
-  characters: ["characters"],
-  "search-characters": ["search_results"],
-  "resolve-character": ["characters"],
-  options: ["options"],
-  character: [
-    "character",
-    "inventory",
-    "capacity",
-    "activity",
-    "rest_estimate",
-    "combat_stats",
-    "growth",
-    "bag_expansion",
-    "collection",
-    "achievements"
-  ],
-  achievements: ["achievements"],
-  create: ["created"],
-  profile: ["profile_saved"],
-  map: ["map", "position"],
-  look: ["look"],
-  route: ["route"],
-  activity: ["activity", "last_result", "position", "scenery", "status"],
-  travel: ["activity", "status", "last_result", "position", "scenery"],
-  carriage: ["activity", "status", "last_result", "position", "scenery"],
-  gather: [
-    "activity",
-    "capacity",
-    "status",
-    "last_result",
-    "position",
-    "scenery"
-  ],
-  recipes: ["recipes"],
-  items: ["items"],
-  craft: [
-    "activity",
-    "capacity",
-    "status",
-    "last_result",
-    "position",
-    "scenery"
-  ],
-  stop: ["activity", "last_result", "capacity", "status"],
-  shop: ["shop"],
-  buy: ["purchase", "status"],
-  equip: ["capacity", "status", "combat_stats", "equipment_change"],
-  unequip: ["capacity", "status", "combat_stats", "equipment_change"],
-  repair: ["capacity", "status", "repair"],
-  "bag-expand": ["capacity", "status", "bag_expansion"],
-  discard: ["capacity", "status"],
-  storage: ["storage"],
-  "search-storage": ["storage_search"],
-  deposit: ["capacity", "transfer", "status"],
-  withdraw: ["capacity", "transfer", "status"],
-  gifts: ["gifts"],
-  "gift-send": ["status"],
-  "gift-claim": ["gifts", "status"],
-  "house status": ["house"],
-  "house buy": ["house", "status"],
-  "house extend": ["house", "status"],
-  "house build": ["house"],
-  "house place": ["house", "capacity"],
-  "house remove": ["house", "capacity"],
-  "house sleep": ["status", "sleeping_since", "sleep_bonus"],
-  "house deposit": ["house", "capacity"],
-  "house withdraw": ["house", "capacity"]
-};
-
 // src/help.ts
+function trackHelp(command, run, target2, helpCommand) {
+  command.configureOutput({
+    outputError: () => {
+      run.helpCommand = helpCommand;
+    }
+  }).on("--help", () => {
+    assertKnownSubcommand(command, helpCommand);
+    run.helpTarget = target2;
+  }).hook("preAction", () => {
+    run.helpCommand = helpCommand;
+  });
+}
+function assertKnownSubcommand(command, helpCommand) {
+  const name = command.args.find((arg) => !arg.startsWith("-"));
+  if (command.commands.length === 0 || !name) return;
+  throw new CliError("INVALID_COMMAND", {
+    message: `Unknown command '${name}'.`,
+    help_command: helpCommand
+  });
+}
 var guideTopicOption = {
   flags: "--topic <topic>",
   description: "Return one topic body at guide.section.body"
@@ -27305,8 +27427,8 @@ function groupHelp(name, group) {
     usage: `clawsaga ${name} <command> [options]`,
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: [],
-    commands: Object.entries(group.commands).map(([command2, definition]) => ({
-      name: `${name} ${command2}`,
+    commands: Object.entries(group.commands).map(([command, definition]) => ({
+      name: `${name} ${command}`,
       description: firstSentence(definition.help)
     }))
   };
@@ -27362,6 +27484,21 @@ function structuredHelp(target2) {
   }
   if (target2 === "clawsaga") return programHelp();
   if (target2 === "clawsaga guide") return guideHelp();
+  if (target2 === "auth") {
+    return {
+      command: "clawsaga auth",
+      description: "Manage authorization.",
+      usage: "clawsaga auth <command> [options]",
+      options: globalOptions.map((option) => helpOption(option, false)),
+      examples: ["clawsaga auth login"],
+      commands: [
+        {
+          name: "auth login",
+          description: "Authorize this CLI with the server."
+        }
+      ]
+    };
+  }
   if (target2 === "auth login") return authLoginHelp();
   if (target2 === "schema") return schemaHelp();
   const name = target2.startsWith("clawsaga ") ? target2.slice("clawsaga ".length) : target2;
@@ -27489,6 +27626,7 @@ function createProgram(run, notify) {
   });
   program2.action(() => program2.help());
   program2.on("--help", () => {
+    assertKnownSubcommand(program2, "clawsaga --help");
     run.helpTarget = "clawsaga";
   });
   program2.command("update").description("Install the latest CLI with npm").on("--help", () => {
@@ -27505,28 +27643,17 @@ function createProgram(run, notify) {
     const groupCommand = program2.command(name).description(group.help);
     trackHelp(groupCommand, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
     groupCommand.action(() => groupCommand.help());
-    for (const [command2, definition] of Object.entries(group.commands)) {
+    for (const [command, definition] of Object.entries(group.commands)) {
       addGameCommand(
         groupCommand,
         run,
         notify,
-        `${name} ${command2}`,
+        `${name} ${command}`,
         definition
       );
     }
   }
   return program2;
-}
-function trackHelp(command2, run, target2, helpCommand) {
-  command2.configureOutput({
-    outputError: () => {
-      run.helpCommand = helpCommand;
-    }
-  }).on("--help", () => {
-    run.helpTarget = target2;
-  }).hook("preAction", () => {
-    run.helpCommand = helpCommand;
-  });
 }
 function addSchemaCommand(program2, run) {
   const schemaCommand = program2.command("schema").description(
@@ -27583,21 +27710,23 @@ var documentCommands = [
 ];
 function addDocumentCommands(program2, run) {
   for (const document of documentCommands) {
-    const command2 = program2.command(document.name).description(document.description);
+    const command = program2.command(document.name).description(document.description);
     for (const option of document.options) {
-      command2.option(option.flags, option.description);
+      command.option(option.flags, option.description);
     }
     const target2 = `clawsaga ${document.name}`;
-    trackHelp(command2, run, target2, `${target2} --help`);
-    command2.action(async () => {
-      const values = optionsSchema.parse(command2.optsWithGlobals());
+    trackHelp(command, run, target2, `${target2} --help`);
+    command.action(async () => {
+      const values = optionsSchema.parse(command.optsWithGlobals());
       run.result = await clientFor(values).readDocument(
         document.path(values),
         document.schema
       );
     });
   }
-  const login = program2.command("auth").description("Manage authorization").command("login").description("Return a device verification URL without waiting");
+  const auth = program2.command("auth").description("Manage authorization");
+  trackHelp(auth, run, "auth", "clawsaga auth --help");
+  const login = auth.command("login").description("Return a device verification URL without waiting");
   trackHelp(login, run, "auth login", "clawsaga auth login --help");
   login.action(async () => {
     run.result = await clientFor(
@@ -27606,19 +27735,19 @@ function addDocumentCommands(program2, run) {
   });
 }
 function addGameCommand(parent, run, notify, name, definition) {
-  const command2 = parent.command(name.slice(name.lastIndexOf(" ") + 1)).description(definition.help);
+  const command = parent.command(name.slice(name.lastIndexOf(" ") + 1)).description(definition.help);
   for (const [flags, description] of definition.flags) {
-    command2.option(flags, description);
+    command.option(flags, description);
   }
   if (definition.inputExample) {
-    command2.addHelpText(
+    command.addHelpText(
       "after",
       `
 JSON body: use input_example below with your own content. Full schema: clawsaga schema ${name}.`
     );
   }
-  trackHelp(command2, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
-  command2.action(async () => {
+  trackHelp(command, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
+  command.action(async () => {
     const executed = {
       name,
       definition,
@@ -27626,10 +27755,10 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
       wait: true
     };
     run.executed = executed;
-    const values = optionsSchema.parse(command2.optsWithGlobals());
+    const values = optionsSchema.parse(command.optsWithGlobals());
     executed.character = values.character;
     executed.wait = values.wait !== false;
-    assertRequiredOptions(definition, values, command2.opts());
+    assertRequiredOptions(definition, values, command.opts());
     const route = definition.walksRoute ? routeLocations(values) : void 0;
     const requestedId = values.request;
     if (definition.autoRequestId && !values.request) {

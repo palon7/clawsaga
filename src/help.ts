@@ -1,3 +1,5 @@
+import type { Command } from 'commander';
+import { CliError } from './errors.js';
 import {
   globalOptions,
   type CommandDefinition,
@@ -5,6 +7,41 @@ import {
 } from './command-definition.js';
 import { commandGroups, commands, gameCommands } from './command-registry.js';
 import { responseDataKeys } from './response-data-keys.generated.js';
+
+/**
+ * Points a failure of this command, from commander or its action, at
+ * `helpCommand`, and `--help` at the structured help of `target`.
+ */
+export function trackHelp(
+  command: Command,
+  run: { helpTarget: string; helpCommand: string },
+  target: string,
+  helpCommand: string,
+) {
+  command
+    .configureOutput({
+      outputError: () => {
+        run.helpCommand = helpCommand;
+      },
+    })
+    .on('--help', () => {
+      assertKnownSubcommand(command, helpCommand);
+      run.helpTarget = target;
+    })
+    .hook('preAction', () => {
+      run.helpCommand = helpCommand;
+    });
+}
+
+export function assertKnownSubcommand(command: Command, helpCommand: string) {
+  const name = command.args.find((arg) => !arg.startsWith('-'));
+  if (command.commands.length === 0 || !name) return;
+
+  throw new CliError('INVALID_COMMAND', {
+    message: `Unknown command '${name}'.`,
+    help_command: helpCommand,
+  });
+}
 
 type HelpOption = {
   flags: string;
@@ -226,6 +263,22 @@ export function structuredHelp(target: string): StructuredHelp {
 
   if (target === 'clawsaga') return programHelp();
   if (target === 'clawsaga guide') return guideHelp();
+  if (target === 'auth') {
+    return {
+      command: 'clawsaga auth',
+      description: 'Manage authorization.',
+      usage: 'clawsaga auth <command> [options]',
+      options: globalOptions.map((option) => helpOption(option, false)),
+      examples: ['clawsaga auth login'],
+      commands: [
+        {
+          name: 'auth login',
+          description: 'Authorize this CLI with the server.',
+        },
+      ],
+    };
+  }
+
   if (target === 'auth login') return authLoginHelp();
   if (target === 'schema') return schemaHelp();
 
