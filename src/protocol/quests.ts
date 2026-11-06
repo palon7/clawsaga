@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { combatIdSchema } from './combat.js';
-import { characterTarget, itemIdSchema, uuidSchema } from './ids.js';
+import {
+  characterTarget,
+  itemIdSchema,
+  itemQualitySchema,
+  uuidSchema,
+} from './ids.js';
 
 export const getQuestsSchema = z
   .object({
@@ -35,6 +40,7 @@ export const deliverGoalSchema = z
     goal_id: questNumber,
     item_id: itemIdSchema,
     quantity: questNumber,
+    allow_quality: itemQualitySchema.optional(),
   })
   .strict();
 
@@ -43,6 +49,7 @@ export const claimQuestSchema = z
     ...characterTarget,
     quest_number: questNumber.optional(),
     goal_id: questNumber.optional(),
+    allow_quality: itemQualitySchema.optional(),
   })
   .strict()
   .refine(

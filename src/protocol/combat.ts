@@ -29,10 +29,34 @@ export const combatStatusSchema = z.enum([
   'regen',
 ]);
 
+const combatActionKindSchema = z.enum([
+  'attack',
+  'heavy_attack',
+  'defend',
+  'ability',
+  'potion',
+  'cure',
+  'none',
+]);
+
+const heavyPowerAtLeastSchema = z
+  .number()
+  .int()
+  .min(1)
+  .optional()
+  .describe(
+    'Match only a heavy attack of at least this power percent, as shown by next_heavy.power_percent.',
+  );
+
 export const tacticConditionSchema = z.discriminatedUnion('kind', [
   z
     .object({
-      kind: z.enum(['hp_below', 'mp_below', 'enemy_hp_below']),
+      kind: z.enum([
+        'hp_below',
+        'mp_below',
+        'enemy_hp_below',
+        'enemy_mp_below',
+      ]),
       percent: z.number().int().min(1),
     })
     .strict()
@@ -40,13 +64,35 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
       'Matches when the named current percentage is strictly below percent. HP percentages use current / maximum HP; MP uses its 0–100 value.',
     ),
   z
-    .object({ kind: z.literal('enemy_winding_up') })
+    .object({
+      kind: z.literal('gauge_at_least'),
+      value: z.number().int().min(1),
+    })
+    .strict()
+    .describe('Matches when your gauge is at least value.'),
+  z
+    .object({
+      kind: z.literal('enemy_last_action'),
+      action: combatActionKindSchema,
+    })
+    .strict()
+    .describe(
+      'Matches when the enemy took this kind of action on the previous tick. A heavy attack is a charged ability released; an interrupted one counts as attack. Doing nothing, charging without acting and retreating count as none.',
+    ),
+  z
+    .object({
+      kind: z.literal('enemy_winding_up'),
+      power_at_least: heavyPowerAtLeastSchema,
+    })
     .strict()
     .describe(
       'Matches when the enemy heavy attack is at most two ticks away, including the tick it occurs.',
     ),
   z
-    .object({ kind: z.literal('enemy_attacking_heavy') })
+    .object({
+      kind: z.literal('enemy_attacking_heavy'),
+      power_at_least: heavyPowerAtLeastSchema,
+    })
     .strict()
     .describe('Matches on the tick when the enemy heavy attack occurs.'),
   z
@@ -66,7 +112,7 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
     })
     .strict()
     .describe(
-      'Matches when usable potions remaining in this battle are strictly below count.',
+      'Matches when the potions you can still drink in this battle, left in your bag and under potion_limit, are strictly below count.',
     ),
   z
     .object({ kind: z.literal('enemy_weak_to'), damage_type: damageTypeSchema })
@@ -102,12 +148,38 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
     ),
 ]);
 
+const battleItemIdsSchema = z
+  .array(itemIdSchema)
+  .min(1)
+  .refine(
+    (itemIds) => new Set(itemIds).size === itemIds.length,
+    'item_ids must not repeat',
+  )
+  .optional();
+
 export const tacticActionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.enum(['attack', 'defend', 'retreat']) }).strict(),
   z
-    .object({ kind: z.enum(['attack', 'defend', 'potion', 'retreat']) })
+    .object({
+      kind: z.literal('potion'),
+      item_ids: battleItemIdsSchema.describe(
+        'Potions this rule may drink. When omitted, any potion usable in battle.',
+      ),
+    })
     .strict()
     .describe(
-      'A potion action is usable only with a remaining potion and missing HP.',
+      'Drinks a potion from your bag when one remains and HP is missing: the weakest that fills the missing HP, or the strongest when none does.',
+    ),
+  z
+    .object({
+      kind: z.literal('cure'),
+      item_ids: battleItemIdsSchema.describe(
+        'Cure items this rule may use. When omitted, any cure item usable in battle.',
+      ),
+    })
+    .strict()
+    .describe(
+      'Uses a cure item from your bag when it removes a status on you: the one that removes the most of them, then the one that removes the fewest kinds of status.',
     ),
   z
     .object({ kind: z.literal('ability'), ability_id: combatIdSchema })
@@ -141,18 +213,7 @@ export const tacticSchema = z
       .int()
       .min(0)
       .describe(
-        'Most potions one battle may use in total, capped by the bag at start. Each is consumed when used; zero disables potions.',
-      ),
-    potion_items: z
-      .array(itemIdSchema)
-      .min(1)
-      .refine(
-        (itemIds) => new Set(itemIds).size === itemIds.length,
-        'potion_items must not repeat',
-      )
-      .optional()
-      .describe(
-        'Item IDs of potions in drinking order. When omitted, drinks every potion usable in battle, weakest first.',
+        'Most potions and cure items one battle may use in total, taken from your bag as they are used. Unused items stay in the bag; zero disables both.',
       ),
   })
   .strict()

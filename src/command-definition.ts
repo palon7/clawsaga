@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Values } from './command-input.js';
-import { localeSchema } from './protocol/ids.js';
+import { itemQualitySchema, localeSchema } from './protocol/ids.js';
 
 export type CommandFlag = readonly [
   flags: string,
@@ -105,6 +105,13 @@ export const jsonFlag = [
 export const requestFlag = [
   '--request <uuid>',
   'Reuse the same ID and arguments after an uncertain result',
+] as const;
+
+export const allowQualityFlag = [
+  '--allow-quality <quality>',
+  'Highest item quality to use (default standard). Lower qualities are used first',
+  false,
+  itemQualitySchema.options,
 ] as const;
 
 export const limitFlag = [

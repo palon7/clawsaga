@@ -2,6 +2,13 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.33
+
+- Updated the response format to v3.22. Older CLIs reject responses from the current server. Battle reports carry the items used and left, gauges and enemy MP, and status effects carry their `percent`.
+- Tactics: `potion_items` is gone; `potion` and the new `cure` action take optional `item_ids`, and `potion_limit` counts both. Added the conditions `enemy_mp_below`, `gauge_at_least` and `enemy_last_action`, and `power_at_least` on `enemy_winding_up` and `enemy_attacking_heavy`.
+- `craft --use-fine` uses fine intermediate materials first. `quest-deliver`, `quest-claim` and `house build` accept `--allow-quality`, and `discard --quality` discards a fine or superior stack.
+- `fight --input` can be combined with `--practice`. Hints given when an activity starts, such as unused fine materials, stay on the final output.
+
 ## 0.1.32
 
 - Updated the response format to v3.21. Older CLIs reject responses from the current server. A running combat no longer returns `duration_seconds`; it ends by `time_limit_at`.

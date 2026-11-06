@@ -2,7 +2,7 @@
 /** The `data` keys each command's response can carry, by command name. */
 export const responseDataKeys: Record<string, readonly string[]> = {
   monologue: ['monologue'],
-  encounters: ['encounters'],
+  encounters: ['encounters', 'hunting_ground_thinned'],
   raids: ['raids'],
   tactics: ['tactics'],
   'tactics-set': ['validation', 'tactics'],
@@ -113,6 +113,7 @@ export const responseDataKeys: Record<string, readonly string[]> = {
     'capacity',
     'status',
     'last_result',
+    'fine_materials_unused',
     'position',
     'scenery',
   ],
@@ -123,6 +124,7 @@ export const responseDataKeys: Record<string, readonly string[]> = {
     'capacity',
     'status',
     'last_result',
+    'fine_materials_unused',
     'position',
     'scenery',
   ],

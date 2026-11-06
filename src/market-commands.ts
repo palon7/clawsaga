@@ -9,14 +9,14 @@ import {
   buyMarketListingSchema,
   cancelMarketListingSchema,
   claimMarketListingSchema,
-  marketQualitySchema,
   marketSectionSchema,
   marketSourceSchema,
 } from './protocol.js';
+import { itemQualitySchema } from './protocol/ids.js';
 import { requestFlag, type CommandDefinition } from './command-definition.js';
 import type { Values } from './command-input.js';
 
-const qualityChoices = marketQualitySchema.options;
+const qualityChoices = itemQualitySchema.options;
 const sourceChoices = marketSourceSchema.options;
 
 function marketWriteContext(values: Values) {

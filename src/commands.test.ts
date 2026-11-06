@@ -78,7 +78,7 @@ it('uses one selected origin for authorization and game commands, with explicit 
   expect(origins).toHaveLength(4);
 });
 
-it('accepts a reusable one-battle tactic file and rejects fight inputs the CLI cannot build', async () => {
+it('accepts a reusable one-battle tactic file with --enemy and --practice, and rejects fight inputs the CLI cannot build', async () => {
   const invoke = stubInvoke(initial);
 
   const tactic = {
@@ -126,20 +126,49 @@ it('accepts a reusable one-battle tactic file and rejects fight inputs the CLI c
     tactic,
   });
 
-  for (const flags of [['--preset', 'safe'], ['--practice']]) {
-    await expect(
-      execute(
-        ['fight', '-c', 'Traveler0000', '--input', 'fight.json', ...flags],
-        vi.fn(),
-      ),
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  }
+  await execute(
+    [
+      'fight',
+      '-c',
+      'Traveler0000',
+      '--input',
+      'fight.json',
+      '--enemy',
+      'training_dummy',
+      '--practice',
+      '--no-wait',
+    ],
+    vi.fn(),
+  );
 
-  vi.mocked(readFile).mockResolvedValue(JSON.stringify({ tactic }));
+  expect(invoke).toHaveBeenLastCalledWith('character/combat/start', {
+    character_id: 'Traveler0000',
+    enemy_id: 'training_dummy',
+    tactic,
+    practice: true,
+  });
+
+  await expect(
+    execute(
+      [
+        'fight',
+        '-c',
+        'Traveler0000',
+        '--input',
+        'fight.json',
+        '--enemy',
+        'boar',
+        '--preset',
+        'safe',
+      ],
+      vi.fn(),
+    ),
+  ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
+
   await expect(
     execute(['fight', '-c', 'Traveler0000', '--input', 'fight.json'], vi.fn()),
   ).rejects.toMatchObject({ code: 'INVALID_ARGUMENTS' });
-  expect(invoke).toHaveBeenCalledTimes(2);
+  expect(invoke).toHaveBeenCalledTimes(3);
 });
 
 it('resolves a named character to a Character ID without -c or a JSON body', async () => {

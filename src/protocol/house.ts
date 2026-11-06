@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { characterTarget, instanceIdSchema, itemIdSchema } from './ids.js';
+import {
+  characterTarget,
+  instanceIdSchema,
+  itemIdSchema,
+  itemQualitySchema,
+} from './ids.js';
 import { storageTransferItemsSchema } from './storage.js';
 
 export const getHouseSchema = z.object({ ...characterTarget }).strict();
@@ -28,6 +33,7 @@ export const buildHouseSchema = z
           .strict(),
       )
       .min(1),
+    allow_quality: itemQualitySchema.optional(),
   })
   .strict();
 

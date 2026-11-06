@@ -5,6 +5,7 @@ import {
   skillIdSchema,
   activityIdSchema,
   instanceIdSchema,
+  itemQualitySchema,
 } from './ids.js';
 import { locationIdSchema } from './movement.js';
 
@@ -34,6 +35,7 @@ export const craftSchema = z
     ...characterTarget,
     recipe_id: z.string().min(1),
     max_fee_per_lot: z.number().int().min(0).optional(),
+    use_fine_materials: z.boolean().optional(),
     request_id: z.uuid(),
   })
   .strict();
@@ -81,6 +83,7 @@ export const discardItemSchema = z
           kind: z.literal('stack'),
           item_id: itemId,
           quantity: z.number().int().positive(),
+          quality: itemQualitySchema.optional(),
         })
         .strict(),
       z

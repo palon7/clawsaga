@@ -14,7 +14,7 @@ import {
   expandBagSchema,
   repairMethodSchema,
 } from './protocol.js';
-import { skillIdSchema } from './protocol/ids.js';
+import { itemQualitySchema, skillIdSchema } from './protocol/ids.js';
 import { noWaitFlag, type CommandDefinition } from './command-definition.js';
 import { integerFlag } from './command-input.js';
 
@@ -107,12 +107,17 @@ export const productionCommands: Record<string, CommandDefinition> = {
     input: {
       recipe: 'recipe_id',
       maxFeePerLot: ['max_fee_per_lot', 'number'],
+      useFine: 'use_fine_materials',
     },
     startsActivity: true,
     repeat: { requestIdPerLot: true },
     autoRequestId: true,
     flags: [
       ['--recipe <id>', 'Recipe ID from recipes', true],
+      [
+        '--use-fine',
+        'Use fine intermediate materials first, then standard ones. They raise the chance of a fine or superior result for equipment and furniture',
+      ],
       [
         '--max-fee-per-lot <gold>',
         'Refuse a lot whose gold fee is above this. Omit it to accept the fee the recipe lists',
@@ -124,7 +129,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
       ],
       noWaitFlag,
     ],
-    help: 'Craft goods from standard-quality materials while idle; wait for each lot. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.',
+    help: 'Craft goods while idle; wait for each lot. Only standard materials are used unless --use-fine is given. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.',
     examples: [
       'clawsaga craft -c m7Qp2_aR9L-x --recipe wolf_jerky --count 3',
       'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 10 --no-wait',
@@ -222,7 +227,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
         true,
       ],
     ],
-    help: 'Choose kit or npc repair explicitly at a town smithy while idle. Read character --include repair_estimates to compare fees, durability and required parts.',
+    help: 'Choose kit or npc repair explicitly at a town smithy while idle. Read character --include repair_estimates; each equipment row in data.inventory carries repair_estimate.kit and repair_estimate.npc with fees, durability and required kits.',
   },
   'bag-expand': {
     path: 'character/bag/expand',
@@ -254,15 +259,24 @@ export const productionCommands: Record<string, CommandDefinition> = {
               values.quantity === undefined
                 ? undefined
                 : integerFlag('quantity', values.quantity),
+            ...(values.quality === undefined
+              ? {}
+              : { quality: values.quality }),
           }
         : { kind: 'individual', instance_id: values.instance };
     },
     flags: [
       ['--item <id>', 'Stack item ID from inventory'],
       ['--quantity <number>', 'Stack quantity to discard'],
+      [
+        '--quality <quality>',
+        'Stack quality (default standard)',
+        false,
+        itemQualitySchema.options,
+      ],
       ['--instance <id>', 'Item instance ID from inventory'],
     ],
-    help: 'Permanently discard a standard-quality stack quantity or one item instance while idle.',
+    help: 'Permanently discard a stack quantity (standard unless --quality is given) or one item instance while idle.',
     examples: [
       'clawsaga discard -c m7Qp2_aR9L-x --item wolf_meat --quantity 10',
       'clawsaga discard -c m7Qp2_aR9L-x --instance k3v9q2m7xa',

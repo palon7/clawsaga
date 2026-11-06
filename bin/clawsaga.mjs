@@ -23871,6 +23871,7 @@ var activityIdSchema = external_exports.number().int().min(1);
 var instanceIdSchema = external_exports.string().regex(/^[0-9a-z]{10}$/);
 var dropIdSchema = instanceIdSchema;
 var itemIdSchema = external_exports.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
+var itemQualitySchema = external_exports.enum(["standard", "fine", "superior"]);
 var skillIdSchema = external_exports.enum([
   "mining",
   "gathering",
@@ -23963,7 +23964,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.21";
+var agentSchemaVersion = "3.22";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   // The client rejects a newer version before parsing. An older server's
@@ -24026,6 +24027,7 @@ var craftSchema = external_exports.object({
   ...characterTarget,
   recipe_id: external_exports.string().min(1),
   max_fee_per_lot: external_exports.number().int().min(0).optional(),
+  use_fine_materials: external_exports.boolean().optional(),
   request_id: external_exports.uuid()
 }).strict();
 var stopActivitySchema = external_exports.object({ ...characterTarget, activity_id: activityIdSchema }).strict();
@@ -24051,7 +24053,8 @@ var discardItemSchema = external_exports.object({
     external_exports.object({
       kind: external_exports.literal("stack"),
       item_id: itemIdSchema,
-      quantity: external_exports.number().int().positive()
+      quantity: external_exports.number().int().positive(),
+      quality: itemQualitySchema.optional()
     }).strict(),
     external_exports.object({
       kind: external_exports.literal("individual"),
@@ -24080,17 +24083,50 @@ var combatStatusSchema = external_exports.enum([
   "empowered",
   "regen"
 ]);
+var combatActionKindSchema = external_exports.enum([
+  "attack",
+  "heavy_attack",
+  "defend",
+  "ability",
+  "potion",
+  "cure",
+  "none"
+]);
+var heavyPowerAtLeastSchema = external_exports.number().int().min(1).optional().describe(
+  "Match only a heavy attack of at least this power percent, as shown by next_heavy.power_percent."
+);
 var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({
-    kind: external_exports.enum(["hp_below", "mp_below", "enemy_hp_below"]),
+    kind: external_exports.enum([
+      "hp_below",
+      "mp_below",
+      "enemy_hp_below",
+      "enemy_mp_below"
+    ]),
     percent: external_exports.number().int().min(1)
   }).strict().describe(
     "Matches when the named current percentage is strictly below percent. HP percentages use current / maximum HP; MP uses its 0\u2013100 value."
   ),
-  external_exports.object({ kind: external_exports.literal("enemy_winding_up") }).strict().describe(
+  external_exports.object({
+    kind: external_exports.literal("gauge_at_least"),
+    value: external_exports.number().int().min(1)
+  }).strict().describe("Matches when your gauge is at least value."),
+  external_exports.object({
+    kind: external_exports.literal("enemy_last_action"),
+    action: combatActionKindSchema
+  }).strict().describe(
+    "Matches when the enemy took this kind of action on the previous tick. A heavy attack is a charged ability released; an interrupted one counts as attack. Doing nothing, charging without acting and retreating count as none."
+  ),
+  external_exports.object({
+    kind: external_exports.literal("enemy_winding_up"),
+    power_at_least: heavyPowerAtLeastSchema
+  }).strict().describe(
     "Matches when the enemy heavy attack is at most two ticks away, including the tick it occurs."
   ),
-  external_exports.object({ kind: external_exports.literal("enemy_attacking_heavy") }).strict().describe("Matches on the tick when the enemy heavy attack occurs."),
+  external_exports.object({
+    kind: external_exports.literal("enemy_attacking_heavy"),
+    power_at_least: heavyPowerAtLeastSchema
+  }).strict().describe("Matches on the tick when the enemy heavy attack occurs."),
   external_exports.object({ kind: external_exports.literal("enemy_recovering") }).strict().describe("Matches on the recovery tick after a heavy attack."),
   external_exports.object({ kind: external_exports.literal("enemy_heavy_interruptible") }).strict().describe(
     "Matches when the scheduled enemy heavy attack can be interrupted."
@@ -24099,7 +24135,7 @@ var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
     kind: external_exports.literal("potions_below"),
     count: external_exports.number().int().min(1)
   }).strict().describe(
-    "Matches when usable potions remaining in this battle are strictly below count."
+    "Matches when the potions you can still drink in this battle, left in your bag and under potion_limit, are strictly below count."
   ),
   external_exports.object({ kind: external_exports.literal("enemy_weak_to"), damage_type: damageTypeSchema }).strict().describe("Matches when the enemy resistance for damage_type is negative."),
   external_exports.object({
@@ -24122,9 +24158,27 @@ var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
     "Matches when the named enemy status has more than one tick left, or not; one tick left counts as missing."
   )
 ]);
+var battleItemIdsSchema = external_exports.array(itemIdSchema).min(1).refine(
+  (itemIds) => new Set(itemIds).size === itemIds.length,
+  "item_ids must not repeat"
+).optional();
 var tacticActionSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.enum(["attack", "defend", "potion", "retreat"]) }).strict().describe(
-    "A potion action is usable only with a remaining potion and missing HP."
+  external_exports.object({ kind: external_exports.enum(["attack", "defend", "retreat"]) }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("potion"),
+    item_ids: battleItemIdsSchema.describe(
+      "Potions this rule may drink. When omitted, any potion usable in battle."
+    )
+  }).strict().describe(
+    "Drinks a potion from your bag when one remains and HP is missing: the weakest that fills the missing HP, or the strongest when none does."
+  ),
+  external_exports.object({
+    kind: external_exports.literal("cure"),
+    item_ids: battleItemIdsSchema.describe(
+      "Cure items this rule may use. When omitted, any cure item usable in battle."
+    )
+  }).strict().describe(
+    "Uses a cure item from your bag when it removes a status on you: the one that removes the most of them, then the one that removes the fewest kinds of status."
   ),
   external_exports.object({ kind: external_exports.literal("ability"), ability_id: combatIdSchema }).strict().describe(
     "Uses the ability when it is unlocked, off cooldown, affordable in MP and its effect is currently applicable."
@@ -24142,13 +24196,7 @@ var tacticSchema = external_exports.object({
     "Evaluated from top to bottom each tick. The first matching, usable action runs; otherwise use a basic attack."
   ),
   potion_limit: external_exports.number().int().min(0).describe(
-    "Most potions one battle may use in total, capped by the bag at start. Each is consumed when used; zero disables potions."
-  ),
-  potion_items: external_exports.array(itemIdSchema).min(1).refine(
-    (itemIds) => new Set(itemIds).size === itemIds.length,
-    "potion_items must not repeat"
-  ).optional().describe(
-    "Item IDs of potions in drinking order. When omitted, drinks every potion usable in battle, weakest first."
+    "Most potions and cure items one battle may use in total, taken from your bag as they are used. Unused items stay in the bag; zero disables both."
   )
 }).strict().meta({ id: "Tactic" });
 var presetIdSchema = external_exports.enum(["safe", "aggressive"]);
@@ -24206,12 +24254,14 @@ var deliverGoalSchema = external_exports.object({
   ...characterTarget,
   goal_id: questNumber,
   item_id: itemIdSchema,
-  quantity: questNumber
+  quantity: questNumber,
+  allow_quality: itemQualitySchema.optional()
 }).strict();
 var claimQuestSchema = external_exports.object({
   ...characterTarget,
   quest_number: questNumber.optional(),
-  goal_id: questNumber.optional()
+  goal_id: questNumber.optional(),
+  allow_quality: itemQualitySchema.optional()
 }).strict().refine(
   (input2) => input2.quest_number !== void 0 !== (input2.goal_id !== void 0),
   { message: "Supply exactly one of quest_number and goal_id" }
@@ -24366,7 +24416,6 @@ var getGiftsSchema = external_exports.object({
 
 // src/protocol/market.ts
 var change = { ...characterTarget, request_id: uuidSchema };
-var marketQualitySchema = external_exports.enum(["standard", "fine", "superior"]);
 var positiveInteger = external_exports.number().int().positive();
 var marketSourceSchema = external_exports.enum(["carried", "storage"]);
 var marketSectionSchema = external_exports.enum(["orders", "listings", "trades"]);
@@ -24374,7 +24423,7 @@ var getMarketSchema = external_exports.object({
   ...characterTarget,
   town_id: locationIdSchema,
   item_id: itemIdSchema.optional(),
-  quality: marketQualitySchema.optional(),
+  quality: itemQualitySchema.optional(),
   levels: external_exports.number().int().min(1).optional(),
   cursor: external_exports.number().int().positive().optional(),
   max_price: positiveInteger.optional(),
@@ -24388,7 +24437,7 @@ var getMyMarketSchema = external_exports.object({
 var placeMarketSellOrderSchema = external_exports.object({
   ...change,
   item_id: itemIdSchema,
-  quality: marketQualitySchema,
+  quality: itemQualitySchema,
   quantity: positiveInteger,
   unit_price: positiveInteger,
   source: marketSourceSchema
@@ -24396,7 +24445,7 @@ var placeMarketSellOrderSchema = external_exports.object({
 var placeMarketBuyOrderSchema = external_exports.object({
   ...change,
   item_id: itemIdSchema,
-  quality: marketQualitySchema,
+  quality: itemQualitySchema,
   quantity: positiveInteger,
   unit_price: positiveInteger
 }).strict();
@@ -24428,7 +24477,8 @@ var buildHouseSchema = external_exports.object({
   ...characterTarget,
   items: external_exports.array(
     external_exports.object({ item_id: itemIdSchema, quantity: external_exports.number().int().min(1) }).strict()
-  ).min(1)
+  ).min(1),
+  allow_quality: itemQualitySchema.optional()
 }).strict();
 var extendHouseSchema = external_exports.object({ ...characterTarget, room: external_exports.enum(["storage"]) }).strict();
 var houseFurnitureSlotSchema = external_exports.enum([
@@ -24605,7 +24655,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.32",
+  version: "0.1.33",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -24943,7 +24993,7 @@ var GameClient = class {
 // src/response-data-keys.generated.ts
 var responseDataKeys = {
   monologue: ["monologue"],
-  encounters: ["encounters"],
+  encounters: ["encounters", "hunting_ground_thinned"],
   raids: ["raids"],
   tactics: ["tactics"],
   "tactics-set": ["validation", "tactics"],
@@ -25054,6 +25104,7 @@ var responseDataKeys = {
     "capacity",
     "status",
     "last_result",
+    "fine_materials_unused",
     "position",
     "scenery"
   ],
@@ -25064,6 +25115,7 @@ var responseDataKeys = {
     "capacity",
     "status",
     "last_result",
+    "fine_materials_unused",
     "position",
     "scenery"
   ],
@@ -25505,6 +25557,13 @@ function acceptedActivityNote(activity, nextPollAfterSeconds, requestId) {
     request_id: requestId
   };
 }
+function withStartHints(started, completed) {
+  if (!started.hints?.length) return completed;
+  return {
+    ...completed,
+    hints: [...started.hints, ...completed.hints ?? []]
+  };
+}
 async function repeatActivity(client, path2, input2, values, count, options) {
   let confirmed = 0;
   let lastRequestId;
@@ -25529,12 +25588,15 @@ async function repeatActivity(client, path2, input2, values, count, options) {
     if (!started.ok) {
       return { ...started, repetition: summary("start_rejected") };
     }
-    const completed = started.data.last_result ? started : await waitForActivity(
-      client,
-      values,
+    const completed = started.data.last_result ? started : withStartHints(
       started,
-      options?.notify,
-      requestId
+      await waitForActivity(
+        client,
+        values,
+        started,
+        options?.notify,
+        requestId
+      )
     );
     if (!completed.ok) {
       return { ...completed, repetition: summary("activity_failed") };
@@ -25724,6 +25786,12 @@ var requestFlag = [
   "--request <uuid>",
   "Reuse the same ID and arguments after an uncertain result"
 ];
+var allowQualityFlag = [
+  "--allow-quality <quality>",
+  "Highest item quality to use (default standard). Lower qualities are used first",
+  false,
+  itemQualitySchema.options
+];
 var limitFlag = [
   "--limit <number>",
   "Entries per page; limits and defaults are set by the server"
@@ -25799,6 +25867,8 @@ var optionsSchema = external_exports.object({
   items: external_exports.string().optional(),
   gold: external_exports.string().optional(),
   quality: external_exports.string().optional(),
+  allowQuality: external_exports.string().optional(),
+  useFine: external_exports.boolean().optional(),
   levels: external_exports.string().optional(),
   maxPrice: external_exports.string().optional(),
   minDurability: external_exports.string().optional(),
@@ -25971,25 +26041,27 @@ var adventureCommands = {
     schema: startCombatSchema,
     input: { enemy: "enemy_id", preset: "preset", practice: "practice" },
     startsActivity: true,
-    // 同じ戦術ファイルを相手を変えて使い回せるよう、ファイルのenemy_idを任意とし、
-    // --enemyがあればそちらを使う。
+    // 同じ戦術ファイルを相手を変えて使い回したり練習で試したりできるよう、ファイルの
+    // enemy_idを任意とし、--enemyと--practiceがあればファイルの値より優先する。
     bodyInput: (values, body) => {
-      if (values.preset !== void 0 || values.practice !== void 0) {
+      if (values.preset !== void 0) {
         throw invalidArguments(
           ["input"],
-          "Use either --input or --preset/--practice. --enemy may be combined with --input."
+          "Use either --input or --preset. --enemy and --practice may be combined with --input."
         );
       }
-      if (values.enemy !== void 0) {
-        return { ...body, enemy_id: values.enemy };
-      }
-      if (!("enemy_id" in body)) {
+      const withFlags = {
+        ...body,
+        ...values.enemy !== void 0 ? { enemy_id: values.enemy } : {},
+        ...values.practice !== void 0 ? { practice: values.practice } : {}
+      };
+      if (!("enemy_id" in withFlags)) {
         throw invalidArguments(
           ["enemy_id"],
           "Pass --enemy or include enemy_id in the --input file."
         );
       }
-      return body;
+      return withFlags;
     },
     flags: [
       [
@@ -26004,7 +26076,7 @@ var adventureCommands = {
       ],
       noWaitFlag
     ],
-    help: "Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes. A raid boss enemy_id at its location uses a daily raid attempt (see raids).",
+    help: "Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Add --practice to try an --input tactic on a training dummy. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes. A raid boss enemy_id at its location uses a daily raid attempt (see raids).",
     inputExample: { enemy_id: "wolf", tactic: { rules: [], potion_limit: 0 } },
     examples: [
       "clawsaga fight -c m7Qp2_aR9L-x --enemy wolf",
@@ -26141,21 +26213,24 @@ var adventureCommands = {
     input: {
       goal: ["goal_id", "number"],
       item: "item_id",
-      quantity: ["quantity", "number"]
+      quantity: ["quantity", "number"],
+      allowQuality: "allow_quality"
     },
     flags: [
       ["--goal <id>", "Joined world quest ID from quests", true],
       ["--item <id>", "Item ID to deliver", true],
-      ["--quantity <number>", "Number of standard-quality items", true]
+      ["--quantity <number>", "Number of items", true],
+      allowQualityFlag
     ],
-    help: "Deliver standard-quality items from your bag to a joined world quest while idle in its town. The items are consumed; data.delivered reports the points earned. Rewards are paid only by claiming after the world quest ends."
+    help: "Deliver items from your bag to a joined world quest while idle in its town. Only standard items are used unless --allow-quality permits higher ones, lower qualities first. The items are consumed; data.delivered reports the points earned. Rewards are paid only by claiming after the world quest ends."
   },
   "quest-claim": {
     path: "character/quests/claim",
     schema: claimQuestSchema,
     input: {
       quest: ["quest_number", "number"],
-      goal: ["goal_id", "number"]
+      goal: ["goal_id", "number"],
+      allowQuality: "allow_quality"
     },
     buildInput: exactlyOne(
       ["quest", "goal"],
@@ -26163,9 +26238,10 @@ var adventureCommands = {
     ),
     flags: [
       ["--quest <number>", "Quest number from quests or quest-accept"],
-      ["--goal <id>", "Ended world quest ID from quests"]
+      ["--goal <id>", "Ended world quest ID from quests"],
+      allowQualityFlag
     ],
-    help: "Claim when idle in the quest\u2019s report town. Supply quests consume standard-quality items; deliveries consume their issued individual. Check the deadline if present. --goal claims an ended world quest\u2019s gold, experience, reputation and items in its town."
+    help: "Claim when idle in the quest\u2019s report town. Supply quests consume standard items, or items up to --allow-quality, lower qualities first; deliveries consume their issued individual. Check the deadline if present. --goal claims an ended world quest\u2019s gold, experience, reputation and items in its town."
   },
   "quest-discard": {
     path: "character/quests/discard",
@@ -26258,7 +26334,7 @@ var adventureCommands = {
     path: "character/chat/send",
     schema: sendChatSchema,
     flags: [jsonFlag],
-    help: "Post a message to your current chat channel. Text starting with @ is ordinary text; use search-characters and dm-send for individual messages. Each successful call creates a new message.",
+    help: "Post a message of up to 400 Unicode code points to your current chat channel. Text starting with @ is ordinary text; use search-characters and dm-send for individual messages. Each successful call creates a new message.",
     inputExample: {
       text: "Greetings, fellow adventurers.",
       language: "en"
@@ -26721,15 +26797,17 @@ var houseCommands = {
     build: {
       path: "character/house/build",
       schema: buildHouseSchema,
+      input: { allowQuality: "allow_quality" },
       buildInput: addMaterials,
       flags: [
         [
           "--item <id:qty>",
-          "Comma-separated item_id:quantity pairs of standard-quality materials from your bag",
+          "Comma-separated item_id:quantity pairs of materials from your bag",
           true
-        ]
+        ],
+        allowQualityFlag
       ],
-      help: "Deliver standard-quality materials from your bag to the room under construction while idle at your house. Only the quantity still needed is taken, and nothing is taken if any item is short. The room is built once every material is delivered.",
+      help: "Deliver materials from your bag to the room under construction while idle at your house. Only standard materials are used unless --allow-quality permits higher ones, lower qualities first; quality has no effect on the room. Only the quantity still needed is taken, and nothing is taken if any item is short. The room is built once every material is delivered.",
       examples: [
         "clawsaga house build -c m7Qp2_aR9L-x --item oak_lumber:20,metal_ingot:10"
       ]
@@ -26806,7 +26884,7 @@ var houseCommands = {
 };
 
 // src/market-commands.ts
-var qualityChoices = marketQualitySchema.options;
+var qualityChoices = itemQualitySchema.options;
 var sourceChoices = marketSourceSchema.options;
 function marketWriteContext(values) {
   return {
@@ -27118,13 +27196,18 @@ var productionCommands = {
     schema: craftSchema,
     input: {
       recipe: "recipe_id",
-      maxFeePerLot: ["max_fee_per_lot", "number"]
+      maxFeePerLot: ["max_fee_per_lot", "number"],
+      useFine: "use_fine_materials"
     },
     startsActivity: true,
     repeat: { requestIdPerLot: true },
     autoRequestId: true,
     flags: [
       ["--recipe <id>", "Recipe ID from recipes", true],
+      [
+        "--use-fine",
+        "Use fine intermediate materials first, then standard ones. They raise the chance of a fine or superior result for equipment and furniture"
+      ],
       [
         "--max-fee-per-lot <gold>",
         "Refuse a lot whose gold fee is above this. Omit it to accept the fee the recipe lists"
@@ -27136,7 +27219,7 @@ var productionCommands = {
       ],
       noWaitFlag
     ],
-    help: "Craft goods from standard-quality materials while idle; wait for each lot. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.",
+    help: "Craft goods while idle; wait for each lot. Only standard materials are used unless --use-fine is given. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.",
     examples: [
       "clawsaga craft -c m7Qp2_aR9L-x --recipe wolf_jerky --count 3",
       "clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 10 --no-wait"
@@ -27232,7 +27315,7 @@ var productionCommands = {
         true
       ]
     ],
-    help: "Choose kit or npc repair explicitly at a town smithy while idle. Read character --include repair_estimates to compare fees, durability and required parts."
+    help: "Choose kit or npc repair explicitly at a town smithy while idle. Read character --include repair_estimates; each equipment row in data.inventory carries repair_estimate.kit and repair_estimate.npc with fees, durability and required kits."
   },
   "bag-expand": {
     path: "character/bag/expand",
@@ -27259,15 +27342,22 @@ var productionCommands = {
       input2.target = stack ? {
         kind: "stack",
         item_id: values.item,
-        quantity: values.quantity === void 0 ? void 0 : integerFlag("quantity", values.quantity)
+        quantity: values.quantity === void 0 ? void 0 : integerFlag("quantity", values.quantity),
+        ...values.quality === void 0 ? {} : { quality: values.quality }
       } : { kind: "individual", instance_id: values.instance };
     },
     flags: [
       ["--item <id>", "Stack item ID from inventory"],
       ["--quantity <number>", "Stack quantity to discard"],
+      [
+        "--quality <quality>",
+        "Stack quality (default standard)",
+        false,
+        itemQualitySchema.options
+      ],
       ["--instance <id>", "Item instance ID from inventory"]
     ],
-    help: "Permanently discard a standard-quality stack quantity or one item instance while idle.",
+    help: "Permanently discard a stack quantity (standard unless --quality is given) or one item instance while idle.",
     examples: [
       "clawsaga discard -c m7Qp2_aR9L-x --item wolf_meat --quantity 10",
       "clawsaga discard -c m7Qp2_aR9L-x --instance k3v9q2m7xa"
