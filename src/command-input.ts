@@ -60,6 +60,8 @@ export const optionsSchema = z.object({
   items: z.string().optional(),
   gold: z.string().optional(),
   quality: z.string().optional(),
+  allowQuality: z.string().optional(),
+  useFine: z.boolean().optional(),
   levels: z.string().optional(),
   maxPrice: z.string().optional(),
   minDurability: z.string().optional(),

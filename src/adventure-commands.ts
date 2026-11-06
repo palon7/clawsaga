@@ -40,6 +40,7 @@ import { jobSchema } from './protocol/ids.js';
 import { invalidArguments } from './errors.js';
 import type { Values } from './command-input.js';
 import {
+  allowQualityFlag,
   jsonFlag,
   limitFlag,
   noWaitFlag,
@@ -149,28 +150,30 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     schema: startCombatSchema,
     input: { enemy: 'enemy_id', preset: 'preset', practice: 'practice' },
     startsActivity: true,
-    // 同じ戦術ファイルを相手を変えて使い回せるよう、ファイルのenemy_idを任意とし、
-    // --enemyがあればそちらを使う。
+    // 同じ戦術ファイルを相手を変えて使い回したり練習で試したりできるよう、ファイルの
+    // enemy_idを任意とし、--enemyと--practiceがあればファイルの値より優先する。
     bodyInput: (values, body) => {
-      if (values.preset !== undefined || values.practice !== undefined) {
+      if (values.preset !== undefined) {
         throw invalidArguments(
           ['input'],
-          'Use either --input or --preset/--practice. --enemy may be combined with --input.',
+          'Use either --input or --preset. --enemy and --practice may be combined with --input.',
         );
       }
 
-      if (values.enemy !== undefined) {
-        return { ...body, enemy_id: values.enemy };
-      }
+      const withFlags = {
+        ...body,
+        ...(values.enemy !== undefined ? { enemy_id: values.enemy } : {}),
+        ...(values.practice !== undefined ? { practice: values.practice } : {}),
+      };
 
-      if (!('enemy_id' in body)) {
+      if (!('enemy_id' in withFlags)) {
         throw invalidArguments(
           ['enemy_id'],
           'Pass --enemy or include enemy_id in the --input file.',
         );
       }
 
-      return body;
+      return withFlags;
     },
     flags: [
       [
@@ -185,7 +188,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
       ],
       noWaitFlag,
     ],
-    help: 'Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes. A raid boss enemy_id at its location uses a daily raid attempt (see raids).',
+    help: 'Start one battle while idle and wait for its outcome. Use flags, or --input with an optional one-battle tactic. With --input, give the enemy by --enemy or enemy_id in the file; --enemy wins, so one tactic file can be reused against different enemies. Add --practice to try an --input tactic on a training dummy. Do not combine tactic with preset. Inline tactics do not change the saved tactic used for ambushes. A raid boss enemy_id at its location uses a daily raid attempt (see raids).',
     inputExample: { enemy_id: 'wolf', tactic: { rules: [], potion_limit: 0 } },
     examples: [
       'clawsaga fight -c m7Qp2_aR9L-x --enemy wolf',
@@ -323,13 +326,15 @@ export const adventureCommands: Record<string, CommandDefinition> = {
       goal: ['goal_id', 'number'],
       item: 'item_id',
       quantity: ['quantity', 'number'],
+      allowQuality: 'allow_quality',
     },
     flags: [
       ['--goal <id>', 'Joined world quest ID from quests', true],
       ['--item <id>', 'Item ID to deliver', true],
-      ['--quantity <number>', 'Number of standard-quality items', true],
+      ['--quantity <number>', 'Number of items', true],
+      allowQualityFlag,
     ],
-    help: 'Deliver standard-quality items from your bag to a joined world quest while idle in its town. The items are consumed; data.delivered reports the points earned. Rewards are paid only by claiming after the world quest ends.',
+    help: 'Deliver items from your bag to a joined world quest while idle in its town. Only standard items are used unless --allow-quality permits higher ones, lower qualities first. The items are consumed; data.delivered reports the points earned. Rewards are paid only by claiming after the world quest ends.',
   },
   'quest-claim': {
     path: 'character/quests/claim',
@@ -337,6 +342,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     input: {
       quest: ['quest_number', 'number'],
       goal: ['goal_id', 'number'],
+      allowQuality: 'allow_quality',
     },
     buildInput: exactlyOne(
       ['quest', 'goal'],
@@ -345,8 +351,9 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     flags: [
       ['--quest <number>', 'Quest number from quests or quest-accept'],
       ['--goal <id>', 'Ended world quest ID from quests'],
+      allowQualityFlag,
     ],
-    help: 'Claim when idle in the quest’s report town. Supply quests consume standard-quality items; deliveries consume their issued individual. Check the deadline if present. --goal claims an ended world quest’s gold, experience, reputation and items in its town.',
+    help: 'Claim when idle in the quest’s report town. Supply quests consume standard items, or items up to --allow-quality, lower qualities first; deliveries consume their issued individual. Check the deadline if present. --goal claims an ended world quest’s gold, experience, reputation and items in its town.',
   },
   'quest-discard': {
     path: 'character/quests/discard',
@@ -439,7 +446,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/chat/send',
     schema: sendChatSchema,
     flags: [jsonFlag],
-    help: 'Post a message to your current chat channel. Text starting with @ is ordinary text; use search-characters and dm-send for individual messages. Each successful call creates a new message.',
+    help: 'Post a message of up to 400 Unicode code points to your current chat channel. Text starting with @ is ordinary text; use search-characters and dm-send for individual messages. Each successful call creates a new message.',
     inputExample: {
       text: 'Greetings, fellow adventurers.',
       language: 'en',

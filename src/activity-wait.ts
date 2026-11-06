@@ -38,6 +38,20 @@ function acceptedActivityNote(
   };
 }
 
+// The server gives hints about how a lot was started (such as unused fine
+// materials) only on the start response, so keep them on the final one.
+function withStartHints(
+  started: AgentGameResponse,
+  completed: AgentGameResponse,
+): AgentGameResponse {
+  if (!started.hints?.length) return completed;
+
+  return {
+    ...completed,
+    hints: [...started.hints, ...(completed.hints ?? [])],
+  };
+}
+
 export async function repeatActivity(
   client: GameClient,
   path: string,
@@ -83,12 +97,15 @@ export async function repeatActivity(
     // its stored result, even while a newer activity is running.
     const completed = started.data.last_result
       ? started
-      : await waitForActivity(
-          client,
-          values,
+      : withStartHints(
           started,
-          options?.notify,
-          requestId,
+          await waitForActivity(
+            client,
+            values,
+            started,
+            options?.notify,
+            requestId,
+          ),
         );
 
     if (!completed.ok) {

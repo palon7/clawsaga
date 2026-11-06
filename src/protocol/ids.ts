@@ -15,6 +15,7 @@ export const activityIdSchema = z.number().int().min(1);
 export const instanceIdSchema = z.string().regex(/^[0-9a-z]{10}$/);
 export const dropIdSchema = instanceIdSchema;
 export const itemIdSchema = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
+export const itemQualitySchema = z.enum(['standard', 'fine', 'superior']);
 
 export const skillIdSchema = z.enum([
   'mining',

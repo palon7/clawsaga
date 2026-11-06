@@ -10,7 +10,7 @@ import {
   sleepSchema,
   withdrawHouseItemsSchema,
 } from './protocol.js';
-import type { CommandGroup } from './command-definition.js';
+import { allowQualityFlag, type CommandGroup } from './command-definition.js';
 import type { Values } from './command-input.js';
 import { invalidArguments } from './errors.js';
 import { addItemTargets } from './storage-commands.js';
@@ -72,15 +72,17 @@ export const houseCommands: CommandGroup = {
     build: {
       path: 'character/house/build',
       schema: buildHouseSchema,
+      input: { allowQuality: 'allow_quality' },
       buildInput: addMaterials,
       flags: [
         [
           '--item <id:qty>',
-          'Comma-separated item_id:quantity pairs of standard-quality materials from your bag',
+          'Comma-separated item_id:quantity pairs of materials from your bag',
           true,
         ],
+        allowQualityFlag,
       ],
-      help: 'Deliver standard-quality materials from your bag to the room under construction while idle at your house. Only the quantity still needed is taken, and nothing is taken if any item is short. The room is built once every material is delivered.',
+      help: 'Deliver materials from your bag to the room under construction while idle at your house. Only standard materials are used unless --allow-quality permits higher ones, lower qualities first; quality has no effect on the room. Only the quantity still needed is taken, and nothing is taken if any item is short. The room is built once every material is delivered.',
       examples: [
         'clawsaga house build -c m7Qp2_aR9L-x --item oak_lumber:20,metal_ingot:10',
       ],

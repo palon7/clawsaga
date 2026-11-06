@@ -2,13 +2,13 @@ import { z } from 'zod';
 import {
   characterTarget,
   itemIdSchema as itemId,
+  itemQualitySchema,
   uuidSchema,
   instanceIdSchema,
 } from './ids.js';
 import { locationIdSchema } from './movement.js';
 
 const change = { ...characterTarget, request_id: uuidSchema };
-export const marketQualitySchema = z.enum(['standard', 'fine', 'superior']);
 const positiveInteger = z.number().int().positive();
 export const marketSourceSchema = z.enum(['carried', 'storage']);
 export const marketSectionSchema = z.enum(['orders', 'listings', 'trades']);
@@ -18,7 +18,7 @@ export const getMarketSchema = z
     ...characterTarget,
     town_id: locationIdSchema,
     item_id: itemId.optional(),
-    quality: marketQualitySchema.optional(),
+    quality: itemQualitySchema.optional(),
     levels: z.number().int().min(1).optional(),
     cursor: z.number().int().positive().optional(),
     max_price: positiveInteger.optional(),
@@ -38,7 +38,7 @@ export const placeMarketSellOrderSchema = z
   .object({
     ...change,
     item_id: itemId,
-    quality: marketQualitySchema,
+    quality: itemQualitySchema,
     quantity: positiveInteger,
     unit_price: positiveInteger,
     source: marketSourceSchema,
@@ -49,7 +49,7 @@ export const placeMarketBuyOrderSchema = z
   .object({
     ...change,
     item_id: itemId,
-    quality: marketQualitySchema,
+    quality: itemQualitySchema,
     quantity: positiveInteger,
     unit_price: positiveInteger,
   })
