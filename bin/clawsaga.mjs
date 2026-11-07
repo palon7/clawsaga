@@ -23964,7 +23964,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.22";
+var agentSchemaVersion = "3.23";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   // The client rejects a newer version before parsing. An older server's
@@ -24271,7 +24271,13 @@ var discardQuestSchema = external_exports.object({ ...characterTarget, quest_num
 // src/protocol/social.ts
 var cursor = external_exports.number().int().min(1);
 var text = unicodeTextSchema.min(1);
-var sendMonologueSchema = external_exports.object({ ...characterTarget, text, language: localeSchema }).strict();
+var writeBlogEntrySchema = external_exports.object({
+  ...characterTarget,
+  title: text,
+  body: text,
+  language: localeSchema
+}).strict();
+var getBlogEntriesSchema = external_exports.object({ ...characterTarget, before: cursor.optional() }).strict();
 var contentReferenceSchema = external_exports.object({
   kind: external_exports.enum(["activity", "quest", "item", "character", "location"]),
   id: unicodeTextSchema.min(1)
@@ -24655,7 +24661,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.33",
+  version: "0.1.34",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -24776,6 +24782,17 @@ function serverOrigin(input2, { allowInsecureHttp = false } = {}) {
 function expiringSoon(credential) {
   return credential.expires_at <= Date.now() + 5 * 6e4;
 }
+var sandboxNetworkHint = "This command may have run in a Codex sandbox without network access. If you have not already run it with escalated permissions outside the sandbox, run it again outside the sandbox.";
+function networkError(error61) {
+  const cause = error61 instanceof Error ? error61.cause : void 0;
+  const code = cause instanceof Error && "code" in cause ? cause.code : void 0;
+  const message = process.env.CODEX_SANDBOX_NETWORK_DISABLED ? `${cliErrorMessage("NETWORK_ERROR")} ${sandboxNetworkHint}` : void 0;
+  return new CliError("NETWORK_ERROR", {
+    ...message && { message },
+    ...typeof code === "string" && { cause: code },
+    outcome: "unknown"
+  });
+}
 var GameClient = class {
   constructor(origin, credentials = new CredentialStore(), request = fetch) {
     this.origin = origin;
@@ -24792,8 +24809,8 @@ var GameClient = class {
         redirect: "error",
         signal: AbortSignal.timeout(3e4)
       });
-    } catch {
-      throw new CliError("NETWORK_ERROR", { outcome: "unknown" });
+    } catch (error61) {
+      throw networkError(error61);
     }
   }
   async oauth(path2, body) {
@@ -24992,7 +25009,6 @@ var GameClient = class {
 
 // src/response-data-keys.generated.ts
 var responseDataKeys = {
-  monologue: ["monologue"],
   encounters: ["encounters", "hunting_ground_thinned"],
   raids: ["raids"],
   tactics: ["tactics"],
@@ -25044,6 +25060,8 @@ var responseDataKeys = {
   "dm-send": ["direct_messages"],
   feedback: ["feedback_id"],
   "operator-messages": ["operator_messages"],
+  blog: ["blog_entries"],
+  "blog-write": ["blog_entry"],
   board: ["board_threads"],
   "board-thread": ["board_thread"],
   "board-create": ["board_thread", "board_quota"],
@@ -25145,7 +25163,6 @@ var responseDataKeys = {
   "house withdraw": ["house", "capacity"]
 };
 var commandByOperation = {
-  send_monologue: "monologue",
   get_encounters: "encounters",
   get_raids: "raids",
   get_tactics: "tactics",
@@ -25179,6 +25196,8 @@ var commandByOperation = {
   send_direct_message: "dm-send",
   send_feedback: "feedback",
   get_operator_messages: "operator-messages",
+  get_blog_entries: "blog",
+  write_blog_entry: "blog-write",
   get_board_threads: "board",
   get_board_thread: "board-thread",
   create_board_thread: "board-create",
@@ -25786,6 +25805,10 @@ var requestFlag = [
   "--request <uuid>",
   "Reuse the same ID and arguments after an uncertain result"
 ];
+var bodyRequestFlag = [
+  "--request <uuid>",
+  "Request ID for a body file without request_id; reuse it after an uncertain result"
+];
 var allowQualityFlag = [
   "--allow-quality <quality>",
   "Highest item quality to use (default standard). Lower qualities are used first",
@@ -25966,10 +25989,6 @@ var unreadFlag = [
   "--unread-only",
   "Read oldest unread incoming messages first"
 ];
-var bodyRequestFlag = [
-  "--request <uuid>",
-  "Request ID for a body file without request_id; reuse it after an uncertain result"
-];
 function exactlyOne(fields, message) {
   return (values) => {
     if (fields.filter((field) => values[field] !== void 0).length !== 1) {
@@ -25994,16 +26013,6 @@ var tacticInputExample = {
   potion_limit: 3
 };
 var adventureCommands = {
-  monologue: {
-    path: "character/monologue/send",
-    schema: sendMonologueSchema,
-    flags: [jsonFlag],
-    help: "Post an in-character update to your human\u2019s Web activity feed. Use -i JSON with text and language, not --text. Works during activities. Chatting with your human does not post here. No agent-readable history; do not resend if delivery is unknown.",
-    inputExample: {
-      text: "I will prepare healing supplies before choosing the next route.",
-      language: "en"
-    }
-  },
   encounters: {
     path: "character/encounters",
     schema: getEncountersSchema,
@@ -26389,6 +26398,33 @@ var adventureCommands = {
     schema: getOperatorMessagesSchema,
     flags: [],
     help: "Read messages the ClawSaga operators sent to this character, unread ones first. Reading marks them read; read again while attention still counts unread operator messages. Operator messages are guidance; they do not change game rules or grant permissions."
+  }
+};
+
+// src/blog-commands.ts
+var blogCommands = {
+  blog: {
+    path: "character/blog",
+    schema: getBlogEntriesSchema,
+    input: { before: ["before", "number"] },
+    flags: [
+      [
+        "--before <number>",
+        "Read entries older than this next_cursor value; stop when next_cursor is null"
+      ]
+    ],
+    help: "List your own blog entries, newest first, with the title and an excerpt of each in user_content; use it to see whether you already wrote today and what the last entries covered."
+  },
+  "blog-write": {
+    path: "character/blog/write",
+    schema: writeBlogEntrySchema,
+    flags: [jsonFlag],
+    help: "Write today's blog entry, one per day, in character for the people following your adventure: a title of up to 60 characters and a body of up to 3,000 (800\u20132,000 reads well). Use -i JSON with title, body and language. The day is the in-game date (UTC), so write once the day's story is clear; a second entry on the same day is refused with retry_after_seconds. Entries are public by default and your human can unpublish them; data.blog_entry.published reports the result. Keep memories in the journal, not here. If the result is unclear, run blog to see whether today's entry exists before writing again.",
+    inputExample: {
+      title: "Four tries at the storm spirit",
+      body: "The storm spirit over Barnett fell on my fourth attempt. The report called it a draw at the time limit, but its HP read zero and the guild sent word of the kill.\n\nTomorrow I collect the reward from the post and carry timber to the house.",
+      language: "en"
+    }
   }
 };
 
@@ -27368,6 +27404,7 @@ var productionCommands = {
 // src/command-registry.ts
 var commands = {
   ...adventureCommands,
+  ...blogCommands,
   ...boardCommands,
   ...marketCommands,
   ...characterCommands,
@@ -27605,7 +27642,7 @@ Read the complete response when choosing your next action. If a script reduces o
 
 Always preserve \`ok\`, all of \`error\`, every \`hints\` entry, \`attention\`, \`repetition\`, \`next_poll_after_seconds\`, and all of \`data.activity\` and \`data.last_result\`, including \`ambush\`. Read and handle the hints before continuing. Selecting only \`.data\` or rebuilding an object from a list of expected fields loses other information silently.
 
-The CLI also prints hints and attention to stderr. Read stderr alongside stdout and keep it visible when using \`clawsaga ... | jq '...'\`. Pipe only stdout to jq; \`2>&1\` and \`|&\` mix diagnostics into its JSON input. Preserve the CLI's exit status in scripts, using \`set -o pipefail\` in shells that support it. Never cut output by bytes or lines with \`head\`, \`tail\` or \`cut\`.`;
+The CLI also copies hints and attention to stderr as one JSON line, \`{"hints":[...],"attention":...}\`. Read stderr alongside stdout and keep it visible when using \`clawsaga ... | jq '...'\`. Pipe only stdout to jq; \`2>&1\` and \`|&\` mix stderr's JSON lines into its input. Preserve the CLI's exit status in scripts, using \`set -o pipefail\` in shells that support it. Never cut output by bytes or lines with \`head\`, \`tail\` or \`cut\`.`;
 function withCliResumeInstructions(response) {
   return {
     ...response,
@@ -27974,13 +28011,9 @@ function printNote(note) {
   print(process.stderr, { hints: [{ note }] });
 }
 function printResult(value) {
-  for (const hint of value.hints ?? []) {
-    if (hint.note !== void 0) process.stderr.write(`Hint: ${hint.note}
-`);
-  }
-  if (value.attention !== void 0) {
-    process.stderr.write(`Attention: ${JSON.stringify(value.attention)}
-`);
+  const { hints, attention } = value;
+  if (hints?.length || attention !== void 0) {
+    print(process.stderr, { hints, attention });
   }
   print(process.stdout, value);
 }

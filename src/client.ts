@@ -146,6 +146,31 @@ function expiringSoon(credential: Credential) {
   return credential.expires_at <= Date.now() + 5 * 60_000;
 }
 
+const sandboxNetworkHint =
+  'This command may have run in a Codex sandbox without network access. If you have not already run it with escalated permissions outside the sandbox, run it again outside the sandbox.';
+
+/**
+ * Keeps the system error code, such as ENOTFOUND or EPERM, so the agent can
+ * tell a blocked sandbox from an unreachable server. Codex sets
+ * CODEX_SANDBOX_NETWORK_DISABLED in a network-less sandbox and keeps it after
+ * escalation, so it only adds a conditional hint.
+ */
+function networkError(error: unknown) {
+  const cause = error instanceof Error ? error.cause : undefined;
+  const code =
+    cause instanceof Error && 'code' in cause ? cause.code : undefined;
+
+  const message = process.env.CODEX_SANDBOX_NETWORK_DISABLED
+    ? `${cliErrorMessage('NETWORK_ERROR')} ${sandboxNetworkHint}`
+    : undefined;
+
+  return new CliError('NETWORK_ERROR', {
+    ...(message && { message }),
+    ...(typeof code === 'string' && { cause: code }),
+    outcome: 'unknown',
+  });
+}
+
 export class GameClient {
   constructor(
     readonly origin: string,
@@ -160,8 +185,8 @@ export class GameClient {
         redirect: 'error',
         signal: AbortSignal.timeout(30_000),
       });
-    } catch {
-      throw new CliError('NETWORK_ERROR', { outcome: 'unknown' });
+    } catch (error) {
+      throw networkError(error);
     }
   }
 

@@ -24,6 +24,7 @@ const directories: string[] = [];
 const origin = 'https://clawsaga.example';
 afterEach(async () => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   for (const directory of directories.splice(0)) {
     await rm(directory, { recursive: true, force: true });
   }
@@ -232,6 +233,35 @@ it('does not replay a game mutation after a 401 or network failure', async () =>
     );
     expect(request).toHaveBeenCalledTimes(1);
   }
+});
+
+it('keeps the system error code and hints at a Codex sandbox without network', async () => {
+  const { store } = await fixture();
+  await store.update((entries) => {
+    entries[origin]!.expires_at = Date.now() + 3600_000;
+  });
+  const blocked = new TypeError('fetch failed', {
+    cause: Object.assign(new Error('getaddrinfo'), { code: 'EAI_AGAIN' }),
+  });
+
+  const client = new GameClient(
+    origin,
+    store,
+    vi.fn<typeof fetch>().mockRejectedValue(blocked),
+  );
+
+  vi.stubEnv('CODEX_SANDBOX_NETWORK_DISABLED', undefined);
+  await expect(client.invoke('character/travel', {})).rejects.toMatchObject({
+    detail: { cause: 'EAI_AGAIN', outcome: 'unknown' },
+  });
+  await expect(
+    client.invoke('character/travel', {}),
+  ).rejects.not.toHaveProperty('detail.message');
+
+  vi.stubEnv('CODEX_SANDBOX_NETWORK_DISABLED', '1');
+  await expect(client.invoke('character/travel', {})).rejects.toMatchObject({
+    detail: { message: expect.stringContaining('outside the sandbox') },
+  });
 });
 
 it('reports 5xx and unreadable responses without exposing response contents', async () => {

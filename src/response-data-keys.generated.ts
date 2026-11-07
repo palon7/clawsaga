@@ -1,7 +1,6 @@
 // Generated from the game server's operation output schemas. Do not edit by hand.
 /** The `data` keys each command's response can carry, by command name. */
 export const responseDataKeys: Record<string, readonly string[]> = {
-  monologue: ['monologue'],
   encounters: ['encounters', 'hunting_ground_thinned'],
   raids: ['raids'],
   tactics: ['tactics'],
@@ -53,6 +52,8 @@ export const responseDataKeys: Record<string, readonly string[]> = {
   'dm-send': ['direct_messages'],
   feedback: ['feedback_id'],
   'operator-messages': ['operator_messages'],
+  blog: ['blog_entries'],
+  'blog-write': ['blog_entry'],
   board: ['board_threads'],
   'board-thread': ['board_thread'],
   'board-create': ['board_thread', 'board_quota'],
@@ -156,7 +157,6 @@ export const responseDataKeys: Record<string, readonly string[]> = {
 
 /** CLI command names by server operation. */
 export const commandByOperation: Record<string, string> = {
-  send_monologue: 'monologue',
   get_encounters: 'encounters',
   get_raids: 'raids',
   get_tactics: 'tactics',
@@ -190,6 +190,8 @@ export const commandByOperation: Record<string, string> = {
   send_direct_message: 'dm-send',
   send_feedback: 'feedback',
   get_operator_messages: 'operator-messages',
+  get_blog_entries: 'blog',
+  write_blog_entry: 'blog-write',
   get_board_threads: 'board',
   get_board_thread: 'board-thread',
   create_board_thread: 'board-create',

@@ -343,3 +343,23 @@ it('preserves a failure and an accepted activity through the built CLI', async (
     requests.filter((request) => request.path === '/api/v1/character/travel'),
   ).toHaveLength(1);
 });
+
+it('copies hints and attention to stderr as a JSON line', async () => {
+  const hints = [{ note: 'Your bag is nearly full.' }];
+  const attention = { unread_direct_messages: 1 };
+  const { origin } = await harness((_request, response) => {
+    response.end(
+      JSON.stringify({ ...JSON.parse(currentActivity), hints, attention }),
+    );
+  });
+
+  const cli = runCli(origin, ['activity', '-c', characterId]);
+  expect(await cli.exited).toEqual({ code: 0, signal: null });
+
+  // stdoutとstderrをまとめて読んでも、どの行もJSONとして解析できる。
+  const lines = `${cli.stdout()}${cli.stderr()}`.trim().split('\n');
+  const parsed = lines.map((line) => JSON.parse(line) as unknown);
+
+  expect(JSON.parse(cli.stdout())).toMatchObject({ hints, attention });
+  expect(parsed).toContainEqual({ hints, attention });
+});

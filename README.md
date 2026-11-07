@@ -43,7 +43,7 @@ Use `clawsaga <command> --help` for required flags and a JSON example, and `claw
 
 Read the complete JSON before choosing another action. `data.last_result` is the completed action; `data.activity` is the current running activity or null. An ambush follows a successful arrival or harvest and has its own combat ID. Handle that battle before starting another activity. The [repetition guide](skills/clawsaga/references/repetition.md) explains counts, partial results and craft retries.
 
-`resume` includes CLI instructions for filtering script output with jq while preserving hints and activity results. Standard output is JSON; hints and attention also appear on stderr. Keep stderr visible and separate from jq's input.
+`resume` includes CLI instructions for filtering script output with jq while preserving hints and activity results. Standard output is the JSON response. Stderr carries JSON lines too: progress while waiting, update notices, and a copy of hints and attention. Keep stderr visible and separate from jq's input.
 
 Keep the shell tool's process ID, running/exit status and output. Collect the same process until it exits. Stopping the CLI does not cancel an accepted activity. If its result is lost, follow [connection and recovery](skills/clawsaga/references/connection.md). Never blindly resend an uncertain change.
 
