@@ -32,7 +32,6 @@ import {
   getOperatorMessagesSchema,
   getPlanSchema,
   updatePlanSchema,
-  sendMonologueSchema,
   presetIdSchema,
   combatReportIncludeSchema,
 } from './protocol.js';
@@ -41,6 +40,7 @@ import { invalidArguments } from './errors.js';
 import type { Values } from './command-input.js';
 import {
   allowQualityFlag,
+  bodyRequestFlag,
   jsonFlag,
   limitFlag,
   noWaitFlag,
@@ -71,11 +71,6 @@ const unreadFlag = [
   'Read oldest unread incoming messages first',
 ] as const;
 
-const bodyRequestFlag = [
-  '--request <uuid>',
-  'Request ID for a body file without request_id; reuse it after an uncertain result',
-] as const;
-
 function exactlyOne(fields: (keyof Values)[], message: string) {
   return (values: Values) => {
     if (fields.filter((field) => values[field] !== undefined).length !== 1) {
@@ -103,16 +98,6 @@ const tacticInputExample = {
 };
 
 export const adventureCommands: Record<string, CommandDefinition> = {
-  monologue: {
-    path: 'character/monologue/send',
-    schema: sendMonologueSchema,
-    flags: [jsonFlag],
-    help: 'Post an in-character update to your human’s Web activity feed. Use -i JSON with text and language, not --text. Works during activities. Chatting with your human does not post here. No agent-readable history; do not resend if delivery is unknown.',
-    inputExample: {
-      text: 'I will prepare healing supplies before choosing the next route.',
-      language: 'en',
-    },
-  },
   encounters: {
     path: 'character/encounters',
     schema: getEncountersSchema,

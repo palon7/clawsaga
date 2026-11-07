@@ -1,4 +1,5 @@
 import { adventureCommands } from './adventure-commands.js';
+import { blogCommands } from './blog-commands.js';
 import { boardCommands } from './board-commands.js';
 import { characterCommands } from './character-commands.js';
 import type { CommandDefinition, CommandGroup } from './command-definition.js';
@@ -11,6 +12,7 @@ import { storageCommands } from './storage-commands.js';
 /** Game commands run as `clawsaga <command>`. */
 export const commands: Record<string, CommandDefinition> = {
   ...adventureCommands,
+  ...blogCommands,
   ...boardCommands,
   ...marketCommands,
   ...characterCommands,

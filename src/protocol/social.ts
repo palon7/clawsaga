@@ -10,8 +10,17 @@ import {
 const cursor = z.number().int().min(1);
 const text = unicodeTextSchema.min(1);
 
-export const sendMonologueSchema = z
-  .object({ ...characterTarget, text, language: localeSchema })
+export const writeBlogEntrySchema = z
+  .object({
+    ...characterTarget,
+    title: text,
+    body: text,
+    language: localeSchema,
+  })
+  .strict();
+
+export const getBlogEntriesSchema = z
+  .object({ ...characterTarget, before: cursor.optional() })
   .strict();
 
 export const contentReferenceSchema = z

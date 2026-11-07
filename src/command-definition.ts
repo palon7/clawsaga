@@ -107,6 +107,11 @@ export const requestFlag = [
   'Reuse the same ID and arguments after an uncertain result',
 ] as const;
 
+export const bodyRequestFlag = [
+  '--request <uuid>',
+  'Request ID for a body file without request_id; reuse it after an uncertain result',
+] as const;
+
 export const allowQualityFlag = [
   '--allow-quality <quality>',
   'Highest item quality to use (default standard). Lower qualities are used first',

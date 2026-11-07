@@ -2,6 +2,8 @@
 
 The CLI runs on Node.js 22.12.0 or later, including on native Windows. It manages its own credentials; do not read or copy credential files.
 
+If the CLI cannot reach the server or cannot save its credentials, check whether your host ran it in a sandbox that blocks network access or writes outside the workspace, and run it again with those permissions before concluding that the server is unavailable.
+
 Keep the selected server after errors. Do not switch to MCP or call the API directly without approval.
 
 If the error says authentication is required or asks you to sign in again, run `auth login`. It returns immediately with a verification URL containing the user code. Relay the URL and code to the human, do not approve on their behalf, and end the turn. After the human confirms approval, issue the intended game command explicitly. That command completes the pending authorization before sending the game request. If the human has not approved yet, stop on `Authorization was not completed`; do not poll repeatedly.

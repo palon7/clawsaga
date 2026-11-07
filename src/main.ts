@@ -25,12 +25,10 @@ function printNote(note: string) {
 function printResult(
   value: object & { hints?: AgentHint[] | undefined; attention?: unknown },
 ) {
-  for (const hint of value.hints ?? []) {
-    if (hint.note !== undefined) process.stderr.write(`Hint: ${hint.note}\n`);
-  }
-
-  if (value.attention !== undefined) {
-    process.stderr.write(`Attention: ${JSON.stringify(value.attention)}\n`);
+  // jqでstdoutだけを絞っても残るよう、stderrにも複写する。
+  const { hints, attention } = value;
+  if (hints?.length || attention !== undefined) {
+    print(process.stderr, { hints, attention });
   }
 
   print(process.stdout, value);
