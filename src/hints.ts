@@ -17,6 +17,11 @@ const argumentFlags: Record<
   equip_item: (args) => [`--instance ${args.instance_id}`],
   claim_quest: (args) => [`--quest ${args.quest_number}`],
   get_operator_messages: () => [],
+  craft: (args) => [
+    `--recipe ${args.recipe_id}`,
+    `--max-fee-per-lot ${args.max_fee_per_lot}`,
+  ],
+  sleep: (args) => [`--max-price ${args.max_price}`],
 };
 
 function renderHint(hint: AgentHint, character?: string): string {

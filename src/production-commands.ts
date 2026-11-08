@@ -120,7 +120,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
       ],
       [
         '--max-fee-per-lot <gold>',
-        'Refuse a lot whose gold fee is above this. Omit it to accept the fee the recipe lists',
+        'Refuse a lot whose gold fee is above this. Omit it to accept the fee the recipe lists. Required at the stations of a house you visit, where it limits the recipe fee plus the station fee',
       ],
       ['--count <number>', 'Lots, one at a time (default 1)'],
       [
@@ -129,7 +129,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
       ],
       noWaitFlag,
     ],
-    help: 'Craft goods while idle; wait for each lot. Only standard materials are used unless --use-fine is given. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.',
+    help: "Craft goods while idle; wait for each lot. A recipe with a facility needs that facility in town, a matching station in your house's workshop, or a rented one in the workshop of a house you visit. Only standard materials are used unless --use-fine is given. Each lot gets a new request ID. To retry one uncertain lot, keep its recipe and fee limit and use --request with --count 1. Wait for the whole command before starting another activity.",
     examples: [
       'clawsaga craft -c m7Qp2_aR9L-x --recipe wolf_jerky --count 3',
       'clawsaga craft -c m7Qp2_aR9L-x --recipe metal_ingot --max-fee-per-lot 10 --no-wait',

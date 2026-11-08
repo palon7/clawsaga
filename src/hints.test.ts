@@ -26,6 +26,14 @@ it('renders server hints with CLI command syntax, adds the invoked character and
       arguments: { instance_id: 'k3v9q2m7xa' },
     },
     { operation: 'claim_quest', arguments: { quest_number: '26' } },
+    {
+      operation: 'craft',
+      arguments: {
+        recipe_id: '<recipe_id>',
+        max_fee_per_lot: '<recipe fee + 30>',
+      },
+    },
+    { operation: 'sleep', arguments: { max_price: '120' } },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ];
 
@@ -36,6 +44,10 @@ it('renders server hints with CLI command syntax, adds the invoked character and
       note: 'Run `equip --instance k3v9q2m7xa`.',
     },
     { note: 'Run `quest-claim --quest 26`.' },
+    {
+      note: 'Run `craft --recipe <recipe_id> --max-fee-per-lot <recipe fee + 30>`.',
+    },
+    { note: 'Run `house sleep --max-price 120`.' },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
   expect(
@@ -47,6 +59,10 @@ it('renders server hints with CLI command syntax, adds the invoked character and
       note: 'Run `equip --instance k3v9q2m7xa -c HintHero0000`.',
     },
     { note: 'Run `quest-claim --quest 26 -c HintHero0000`.' },
+    {
+      note: 'Run `craft --recipe <recipe_id> --max-fee-per-lot <recipe fee + 30> -c HintHero0000`.',
+    },
+    { note: 'Run `house sleep --max-price 120 -c HintHero0000`.' },
     { note: 'Changing job puts your previous weapon in the bag.' },
   ]);
 });
