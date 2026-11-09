@@ -29,6 +29,7 @@ export const responseDataKeys: Record<string, readonly string[]> = {
     'status',
     'reputation_change',
     'sleep_bonus_experience',
+    'level_up',
   ],
   'quest-discard': ['quest', 'status', 'reputation_change'],
   journal: ['journal', 'journals'],

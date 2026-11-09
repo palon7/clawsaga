@@ -128,7 +128,7 @@ export const limitFlag = [
 // request body, so it stays out of every input schema.
 export const noWaitFlag = [
   '--no-wait',
-  'Return after acceptance without waiting for completion; --count must be 1 or omitted',
+  'Return after acceptance without waiting for completion',
 ] as const;
 
 export function bodySchema(definition: CommandDefinition) {

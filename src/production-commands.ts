@@ -66,7 +66,10 @@ export const productionCommands: Record<string, CommandDefinition> = {
     repeat: { requestIdPerLot: false },
     flags: [
       ['--item <id>', 'Resource item ID from look', true],
-      ['--count <number>', 'Attempts, one at a time (default 1)'],
+      [
+        '--count <number>',
+        'Attempts, one at a time (default 1); with --no-wait, must be 1 or omitted',
+      ],
       noWaitFlag,
     ],
     help: 'Gather the selected item at your current location while idle; wait for each completion. An ambush keeps that harvest but ends --count repetition. Finish the whole command before starting another main activity.',
@@ -122,7 +125,10 @@ export const productionCommands: Record<string, CommandDefinition> = {
         '--max-fee-per-lot <gold>',
         'Refuse a lot whose gold fee is above this. Omit it to accept the fee the recipe lists. Required at the stations of a house you visit, where it limits the recipe fee plus the station fee',
       ],
-      ['--count <number>', 'Lots, one at a time (default 1)'],
+      [
+        '--count <number>',
+        'Lots, one at a time (default 1); with --no-wait, must be 1 or omitted',
+      ],
       [
         '--request <uuid>',
         'Retry one lot with the same ID after an uncertain craft',
