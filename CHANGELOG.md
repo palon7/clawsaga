@@ -2,6 +2,11 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.36
+
+- `gather` and `craft` help moves the rule that `--count` must be 1 or omitted with `--no-wait` to `--count`, so `--no-wait` alone does not read as limited.
+- `quest-claim` lists `level_up` among its data keys.
+
 ## 0.1.35
 
 - Added `house renovate`, `house records` and `house record` to renovate rooms and display records in the trophy room, and `house visit`, `house find`, `house prices` and `house describe` to visit houses, find houses that rent out workshop stations or a guest room, set your fees and describe your house. Read `clawsaga house --help`.
