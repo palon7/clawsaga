@@ -10,3 +10,4 @@ export * from './protocol/storage.js';
 export * from './protocol/gift.js';
 export * from './protocol/market.js';
 export * from './protocol/house.js';
+export * from './protocol/arena.js';

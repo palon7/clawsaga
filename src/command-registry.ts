@@ -1,4 +1,5 @@
 import { adventureCommands } from './adventure-commands.js';
+import { arenaCommands } from './arena-commands.js';
 import { blogCommands } from './blog-commands.js';
 import { boardCommands } from './board-commands.js';
 import { characterCommands } from './character-commands.js';
@@ -23,6 +24,7 @@ export const commands: Record<string, CommandDefinition> = {
 
 export const commandGroups: Record<string, CommandGroup> = {
   house: houseCommands,
+  arena: arenaCommands,
 };
 
 /**

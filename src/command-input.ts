@@ -82,6 +82,7 @@ export const optionsSchema = z.object({
   listing: z.string().optional(),
   section: z.string().optional(),
   tier: z.string().optional(),
+  number: z.string().optional(),
 });
 
 export type Values = z.infer<typeof optionsSchema>;

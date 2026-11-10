@@ -14,8 +14,8 @@ import { localeSchema } from './protocol/ids.js';
 import { GameClient, serverOrigin } from './client.js';
 import { CliError, invalidArguments } from './errors.js';
 import { recoveryHint, withRenderedHints } from './hints.js';
-import { announcementNote, changelogNote, withNotes } from './notices.js';
-import { updateCli } from './update.js';
+import { helloNotes, withNotes } from './notices.js';
+import { configureAutoUpdate, updateCli } from './update.js';
 import metadata from '../package.json' with { type: 'json' };
 import {
   notSent,
@@ -41,6 +41,7 @@ import {
 import { withCliResumeInstructions } from './resume.js';
 
 type Notify = (value: unknown) => void;
+type InputObserver = (command: string, input: Record<string, unknown>) => void;
 
 type CommandResult =
   | { ok: true; version: string }
@@ -64,6 +65,7 @@ type ExecutedCommand = {
 
 /** What one `execute` call learns while commander parses and runs the command. */
 type Run = {
+  onInput: InputObserver;
   helpTarget: string;
   helpCommand: string;
   executed?: ExecutedCommand;
@@ -82,8 +84,17 @@ function clientFor(values: Values) {
   );
 }
 
-export async function execute(args: string[], notify: Notify) {
-  const run: Run = { helpTarget: 'clawsaga', helpCommand: 'clawsaga --help' };
+export async function execute(
+  args: string[],
+  notify: Notify,
+  onInput: InputObserver = () => undefined,
+) {
+  const run: Run = {
+    onInput,
+    helpTarget: 'clawsaga',
+    helpCommand: 'clawsaga --help',
+  };
+
   const program = createProgram(run, notify);
   try {
     await program.parseAsync(args, { from: 'user' });
@@ -176,19 +187,6 @@ function isLostResponse(error: CliError) {
   );
 }
 
-function helloNotes(response: AgentGameResponse): string[] {
-  const notes: string[] = [];
-  if (response.data.announcement) {
-    notes.push(announcementNote(response.data.announcement));
-  }
-
-  if (response.data.changelog) {
-    notes.push(changelogNote(response.data.changelog));
-  }
-
-  return notes;
-}
-
 function createProgram(run: Run, notify: Notify) {
   const program = new Command('clawsaga')
     .description('Play ClawSaga. Requires Node.js 22.12.0 or later.')
@@ -211,6 +209,15 @@ function createProgram(run: Run, notify: Notify) {
         .env('CLAWSAGA_ALLOW_INSECURE_HTTP')
         .hideHelp(),
     )
+    .addOption(
+      new Option(
+        '--no-auto-update',
+        'Disable automatic CLI updates',
+      ).hideHelp(),
+    )
+    .hook('preAction', () => {
+      configureAutoUpdate(program.opts().autoUpdate !== false);
+    })
     .exitOverride()
     .configureHelp({
       showGlobalOptions: true,
@@ -421,6 +428,7 @@ function addGameCommand(
     }
 
     const input = await commandInput(definition, values);
+    run.onInput(name, input);
     const client = clientFor(values);
 
     if (definition.repeat) {

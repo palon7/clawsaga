@@ -111,9 +111,14 @@ export async function updateCli(server?: string): Promise<string> {
   throw new CliError('UPDATE_FAILED');
 }
 
-// Set for the verification read, which must not start an update of its own.
-function isVerificationRead() {
-  return process.env.CLAWSAGA_AUTO_UPDATE === '0';
+let autoUpdateEnabled = true;
+
+export function configureAutoUpdate(enabled: boolean) {
+  autoUpdateEnabled = enabled;
+}
+
+function automaticUpdatesDisabled() {
+  return !autoUpdateEnabled || process.env.CLAWSAGA_AUTO_UPDATE === '0';
 }
 
 /**
@@ -124,7 +129,7 @@ export async function updateAnnouncedCli(
   version: string,
   notify: (message: string) => void,
 ) {
-  if (isVerificationRead()) return;
+  if (automaticUpdatesDisabled()) return;
 
   notify(
     `Updating the CLI to ${version}. The result above is final; wait for this command to finish.`,
@@ -146,7 +151,7 @@ export async function recoverUpdate(
   if (
     !(error instanceof CliError) ||
     error.code !== 'UPDATE_REQUIRED' ||
-    isVerificationRead()
+    automaticUpdatesDisabled()
   ) {
     return error;
   }

@@ -3,6 +3,12 @@ import { cliFailure } from './errors.js';
 import type { AgentHint } from './protocol.js';
 import { announcedCliUpdate } from './client.js';
 import { recoverUpdate, updateAnnouncedCli } from './update.js';
+import { createEventLog } from './event-log.js';
+
+const eventLog = createEventLog(process.argv.slice(2));
+process.once('exit', (code) => {
+  eventLog({ type: 'finish', exit_code: code });
+});
 
 // 出力の先頭だけを読むエージェントがいる。読み手が存在を予期できない項目を
 // `data`より前に、判断に使わない時刻を最後に置く。
@@ -15,6 +21,10 @@ function print(stream: NodeJS.WriteStream, value: object) {
 
   delete rest.schema_version;
   const output = { ok, error, hints, attention, ...rest, server_time };
+  eventLog({
+    type: stream === process.stdout ? 'result' : 'notification',
+    data: output,
+  });
   stream.write(`${JSON.stringify(output)}\n`);
 }
 
@@ -35,8 +45,10 @@ function printResult(
 }
 
 try {
-  const result = await execute(process.argv.slice(2), (value) =>
-    print(process.stderr, value as object),
+  const result = await execute(
+    process.argv.slice(2),
+    (value) => print(process.stderr, value as object),
+    (command, input) => eventLog({ type: 'input', command, data: input }),
   );
 
   printResult(result);
