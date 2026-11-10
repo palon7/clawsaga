@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
 import { agentSchemaVersion } from './protocol.js';
+import { readCliEvents } from './test-event-log.js';
 
 // 実際の配布CLIを子プロセスで動かし、ローカルHTTPハーネスだけで受付・待機の
 // 中断と、別プロセスからの同じ活動の回収を確かめる。参照するbundleは
@@ -123,13 +124,19 @@ function workspace(origin: string) {
   return directory;
 }
 
-function runCli(origin: string, args: string[]) {
+function runCli(
+  origin: string,
+  args: string[],
+  extraEnv: NodeJS.ProcessEnv = {},
+) {
   const directory = workspace(origin);
   // The CLI reads and writes credentials under the home directory.
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     HOME: directory,
     USERPROFILE: directory,
+    CLAWSAGA_EVENT_LOG: undefined,
+    ...extraEnv,
   };
 
   delete env.CLAWSAGA_SERVER;
@@ -342,6 +349,96 @@ it('preserves a failure and an accepted activity through the built CLI', async (
   expect(
     requests.filter((request) => request.path === '/api/v1/character/travel'),
   ).toHaveLength(1);
+});
+
+it.each(['file', 'stdin'])(
+  'records JSON input read from %s without consuming it twice',
+  async (source) => {
+    const { origin, requests } = await harness((_request, response) =>
+      response.end(currentActivity),
+    );
+
+    const dir = workspace(origin);
+    const file = join(dir, 'events.jsonl');
+    const body = { text: 'He said "hi" & $HOME\nnext line', language: 'en' };
+    const input = join(dir, 'input.json');
+    writeFileSync(input, JSON.stringify(body));
+    const cli = runCli(
+      origin,
+      ['chat-send', '-c', characterId, '-i', source === 'stdin' ? '-' : input],
+      { CLAWSAGA_EVENT_LOG: file },
+    );
+
+    cli.child.stdin?.end(source === 'stdin' ? JSON.stringify(body) : undefined);
+    expect(await cli.exited).toEqual({ code: 0, signal: null });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.body).toEqual({ ...body, character_id: characterId });
+    const records = readCliEvents(file);
+    expect(records.find((record) => record.type === 'input')).toMatchObject({
+      command: 'chat-send',
+      data: requests[0]?.body,
+    });
+    expect(records.find((record) => record.type === 'result')).toMatchObject({
+      data: JSON.parse(cli.stdout()),
+    });
+    expect(records.at(-1)).toMatchObject({ type: 'finish', exit_code: 0 });
+  },
+);
+
+it('logs input and acceptance while the CLI is still waiting, without inventing a result on kill', async () => {
+  const { origin, requests } = await harness((_request, response) => {
+    response.end(accepted(60));
+  });
+
+  const file = join(workspace(origin), 'events.jsonl');
+  const cli = runCli(origin, ['travel', '-c', characterId, '--to', 'openpit'], {
+    CLAWSAGA_EVENT_LOG: file,
+  });
+
+  await waitFor(() => cli.stderr().includes('activity_accepted'));
+
+  const records = readCliEvents(file);
+  expect(cli.child.exitCode).toBeNull();
+  expect(records.find((record) => record.type === 'input')).toMatchObject({
+    command: 'travel',
+    data: requests[0]?.body,
+  });
+  expect(
+    records.find((record) => record.type === 'notification'),
+  ).toMatchObject({
+    data: { event: 'activity_accepted', activity_id: travelId },
+  });
+  expect(
+    records.some((record) => ['result', 'finish'].includes(record.type)),
+  ).toBe(false);
+
+  cli.child.kill('SIGKILL');
+  expect(await cli.exited).toEqual({ code: null, signal: 'SIGKILL' });
+  expect(readFileSync(file, 'utf8')).not.toContain('"type":"finish"');
+});
+
+it('records the actual failing exit when the output pipe closes before the result', async () => {
+  let answer: ServerResponse | undefined;
+  const { origin } = await harness((_request, response) => {
+    answer = response;
+  });
+
+  const file = join(workspace(origin), 'events.jsonl');
+  const cli = runCli(origin, ['activity', '-c', characterId], {
+    CLAWSAGA_EVENT_LOG: file,
+  });
+
+  await waitFor(() => answer !== undefined);
+  await new Promise<void>((resolve) => {
+    cli.child.stdout?.once('close', resolve);
+    cli.child.stdout?.destroy();
+  });
+  answer?.end(currentActivity);
+  expect(await cli.exited).toEqual({ code: 1, signal: null });
+  expect(readCliEvents(file).at(-1)).toMatchObject({
+    type: 'finish',
+    exit_code: 1,
+  });
 });
 
 it('copies hints and attention to stderr as a JSON line', async () => {

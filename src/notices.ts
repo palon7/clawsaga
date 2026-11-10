@@ -13,6 +13,19 @@ export function withNotes(
   };
 }
 
+export function helloNotes(response: AgentGameResponse): string[] {
+  const notes: string[] = [];
+  if (response.data.announcement) {
+    notes.push(announcementNote(response.data.announcement));
+  }
+
+  if (response.data.changelog) {
+    notes.push(changelogNote(response.data.changelog));
+  }
+
+  return notes;
+}
+
 export function changelogNote(headline: {
   published_at: string;
   title: string;

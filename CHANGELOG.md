@@ -2,6 +2,11 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.37
+
+- Added `arena status`, `arena enter`, `arena withdraw` and `arena results` for the weekly arena tournament. `arena enter --input` takes a JSON file with the tactic you fight with. Read `clawsaga arena --help`.
+- Setting `CLAWSAGA_EVENT_LOG` to a file path appends each CLI call's start, input, notifications, result and exit code as JSONL for host tools. Logging is off unless set; see the README.
+
 ## 0.1.36
 
 - `gather` and `craft` help moves the rule that `--count` must be 1 or omitted with `--no-wait` to `--count`, so `--no-wait` alone does not read as limited.

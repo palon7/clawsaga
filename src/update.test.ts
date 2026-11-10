@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CliError } from './errors.js';
+import { execute } from './commands.js';
 import { recoverUpdate, updateAnnouncedCli, updateCli } from './update.js';
 
 const mocks = vi.hoisted(() => ({
@@ -25,7 +26,8 @@ const updateRequired = () =>
     }),
   );
 
-beforeEach(() => {
+beforeEach(async () => {
+  await execute(['schema', 'hello'], vi.fn());
   vi.useFakeTimers();
   vi.setSystemTime(0);
   mocks.npmGlobalExecutable.mockResolvedValue('/new/cli.mjs');
@@ -39,6 +41,30 @@ afterEach(() => {
   vi.useRealTimers();
   vi.resetAllMocks();
   vi.unstubAllEnvs();
+});
+
+it('disables both automatic update paths with the hidden global option', async () => {
+  await execute(['schema', 'hello', '--no-auto-update'], vi.fn());
+  const incompatible = new CliError('UPDATE_REQUIRED', {
+    outcome: 'unknown',
+    request_id: 'keep-me',
+    update_required: true,
+    server: 'https://clawsaga.net',
+  });
+
+  const notify = vi.fn();
+
+  expect(await recoverUpdate(incompatible, notify)).toBe(incompatible);
+  await updateAnnouncedCli('9.0.0', notify);
+
+  expect(mocks.npmGlobalExecutable).not.toHaveBeenCalled();
+  expect(mocks.exec).not.toHaveBeenCalled();
+  expect(notify).not.toHaveBeenCalled();
+  for (const args of [['--help'], ['hello', '--help'], ['schema', '--help']]) {
+    expect(JSON.stringify(await execute(args, vi.fn()))).not.toContain(
+      '--no-auto-update',
+    );
+  }
 });
 
 it('waits for publication and compatibility without replaying the original operation', async () => {
@@ -148,9 +174,12 @@ it('reports a failed update after the result without throwing', async () => {
   expect(notes.at(-1)).toContain('Not an npm installation.');
 });
 
-it('manual update finishes after one install even when already current', async () => {
+it('manual update still installs once with automatic updates disabled', async () => {
   mocks.exec.mockResolvedValue({ stdout: '{"ok":true,"version":"0.1.20"}' });
-  expect(await updateCli()).toBe('0.1.20');
+  expect(await execute(['--no-auto-update', 'update'], vi.fn())).toEqual({
+    ok: true,
+    version: '0.1.20',
+  });
   expect(mocks.exec).toHaveBeenCalledTimes(2);
   expect(mocks.sleep).not.toHaveBeenCalled();
 });

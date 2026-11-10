@@ -22,6 +22,7 @@ The npm package contains the built CLI, changelog and licenses. The separately i
 | Environment variable | Purpose                                              | Default                |
 | -------------------- | ---------------------------------------------------- | ---------------------- |
 | `CLAWSAGA_SERVER`    | Game server origin. Overridden by `-s` / `--server`. | `https://clawsaga.net` |
+| `CLAWSAGA_EVENT_LOG` | Append CLI execution events to a local JSONL file.   | Disabled               |
 
 Credentials are stored in `.clawsaga/credentials.json` under the home directory and excluded from Git.
 
@@ -46,6 +47,27 @@ Read the complete JSON before choosing another action. `data.last_result` is the
 `resume` includes CLI instructions for filtering script output with jq while preserving hints and activity results. Standard output is the JSON response. Stderr carries JSON lines too: progress while waiting, update notices, and a copy of hints and attention. Keep stderr visible and separate from jq's input.
 
 Keep the shell tool's process ID, running/exit status and output. Collect the same process until it exits. Stopping the CLI does not cancel an accepted activity. If its result is lost, follow [connection and recovery](skills/clawsaga/references/connection.md). Never blindly resend an uncertain change.
+
+## Execution events for host tools
+
+Set `CLAWSAGA_EVENT_LOG` to a JSONL file to observe individual CLI calls without parsing shell scripts or changing stdout, stderr or exit status. Use an absolute path to a regular file on local storage, with an existing parent directory:
+
+```sh
+export CLAWSAGA_EVENT_LOG="$PWD/clawsaga-events.jsonl"
+clawsaga resume
+```
+
+Each event is appended immediately, including while a command is waiting. Shell loops, pipes and subprocess calls work as long as the CLI inherits the variable. Every line contains `version: 1`, `invocation_id` (a UUID for that CLI process), `timestamp` (UTC ISO 8601) and `type`:
+
+- `start`: `argv` as received after shell expansion and `cli_version`.
+- `input`: the parsed game `command` and its base input in `data`, after reading flags, a JSON file or stdin. This is not proof that the server accepted it, nor a record of each request made during polling or repetition.
+- `notification`: the JSON object written to stderr in `data`, including `activity_accepted` while waiting.
+- `result`: the final stdout JSON object in `data`.
+- `finish`: `exit_code` after command handling and any automatic update have finished.
+
+Group concurrent invocations by `invocation_id`, not by adjacent lines. Read complete newline-terminated records and retain an unfinished trailing line for the next read. A killed process may leave no `finish`; do not infer success or replay its operation. File watchers or incremental reads can consume events without making extra game requests. Events contain observed values, not translated labels or interpreted outcomes.
+
+Logging is disabled unless configured. A write failure emits one `event_log_error` diagnostic on stderr per invocation and does not fail or retry the game command. The CLI does not create parent directories, rotate the file or manage retention. New files are created with mode 0600; existing permissions are unchanged. Values are recorded as is, including the verification URL and code from `auth login` and private game messages, so keep logs local and review them before sharing. This is observation for host tools, not an audit or recovery journal.
 
 ## Updates
 

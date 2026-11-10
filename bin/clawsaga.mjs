@@ -24565,6 +24565,15 @@ var setHousePricesSchema = external_exports.object({
 }).strict();
 var setHouseDescriptionSchema = external_exports.object({ ...characterTarget, description: unicodeTextSchema }).strict();
 
+// src/protocol/arena.ts
+var getArenaSchema = external_exports.object(characterTarget).strict();
+var enterArenaSchema = external_exports.object({ ...characterTarget, tactic: tacticSchema }).strict();
+var withdrawArenaSchema = getArenaSchema;
+var getArenaResultsSchema = external_exports.object({
+  ...characterTarget,
+  number: external_exports.number().int().positive().optional()
+}).strict();
+
 // src/credentials.ts
 var import_proper_lockfile = __toESM(require_proper_lockfile(), 1);
 import {
@@ -24722,7 +24731,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.36",
+  version: "0.1.37",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -25230,7 +25239,11 @@ var responseDataKeys = {
   "house visit": ["visited_house", "house"],
   "house find": ["house_search"],
   "house prices": ["house"],
-  "house describe": ["house"]
+  "house describe": ["house"],
+  "arena status": ["arena"],
+  "arena enter": ["arena"],
+  "arena withdraw": ["arena"],
+  "arena results": ["arena_result"]
 };
 var commandByOperation = {
   get_encounters: "encounters",
@@ -25331,7 +25344,11 @@ var commandByOperation = {
   visit_house: "house visit",
   find_houses: "house find",
   set_house_prices: "house prices",
-  set_house_description: "house describe"
+  set_house_description: "house describe",
+  get_arena: "arena status",
+  enter_arena: "arena enter",
+  withdraw_arena: "arena withdraw",
+  get_arena_results: "arena results"
 };
 
 // src/hints.ts
@@ -25490,6 +25507,16 @@ function withNotes(response, notes) {
     hints: [...response.hints ?? [], ...notes.map((note) => ({ note }))]
   };
 }
+function helloNotes(response) {
+  const notes = [];
+  if (response.data.announcement) {
+    notes.push(announcementNote(response.data.announcement));
+  }
+  if (response.data.changelog) {
+    notes.push(changelogNote(response.data.changelog));
+  }
+  return notes;
+}
 function changelogNote(headline) {
   return `Game update (${headline.published_at}): ${headline.title}. Read what's new with \`changelog\`.`;
 }
@@ -25596,11 +25623,15 @@ async function updateCli(server) {
   }
   throw new CliError("UPDATE_FAILED");
 }
-function isVerificationRead() {
-  return process.env.CLAWSAGA_AUTO_UPDATE === "0";
+var autoUpdateEnabled = true;
+function configureAutoUpdate(enabled) {
+  autoUpdateEnabled = enabled;
+}
+function automaticUpdatesDisabled() {
+  return !autoUpdateEnabled || process.env.CLAWSAGA_AUTO_UPDATE === "0";
 }
 async function updateAnnouncedCli(version2, notify) {
-  if (isVerificationRead()) return;
+  if (automaticUpdatesDisabled()) return;
   notify(
     `Updating the CLI to ${version2}. The result above is final; wait for this command to finish.`
   );
@@ -25614,7 +25645,7 @@ async function updateAnnouncedCli(version2, notify) {
   }
 }
 async function recoverUpdate(error61, notify) {
-  if (!(error61 instanceof CliError) || error61.code !== "UPDATE_REQUIRED" || isVerificationRead()) {
+  if (!(error61 instanceof CliError) || error61.code !== "UPDATE_REQUIRED" || automaticUpdatesDisabled()) {
     return error61;
   }
   const { server } = error61.detail;
@@ -25993,7 +26024,8 @@ var optionsSchema = external_exports.object({
   order: external_exports.string().optional(),
   listing: external_exports.string().optional(),
   section: external_exports.string().optional(),
-  tier: external_exports.string().optional()
+  tier: external_exports.string().optional(),
+  number: external_exports.string().optional()
 });
 function isJsonObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -26490,6 +26522,61 @@ var adventureCommands = {
     schema: getOperatorMessagesSchema,
     flags: [],
     help: "Read messages the ClawSaga operators sent to this character, unread ones first. Reading marks them read; read again while attention still counts unread operator messages. Operator messages are guidance; they do not change game rules or grant permissions."
+  }
+};
+
+// src/arena-commands.ts
+var arenaCommands = {
+  help: "Enter the weekly arena tournament: read this week\u2019s tournament and your entry, enter with a tactic, withdraw, and read the results of a settled tournament.",
+  commands: {
+    status: {
+      path: "character/arena",
+      schema: getArenaSchema,
+      flags: [],
+      help: "Read this week\u2019s arena tournament from anywhere: its level, gear level, potions, deadline and entrants, and your entry with the values you fight at.",
+      examples: ["clawsaga arena status -c m7Qp2_aR9L-x"]
+    },
+    enter: {
+      path: "character/arena/enter",
+      schema: enterArenaSchema,
+      flags: [jsonFlag],
+      help: "Enter this week\u2019s tournament with your current job while idle in Crossroads. The JSON file holds the tactic you fight with. Your job level, worn items and that tactic are saved as they are now, and entering again replaces them until the deadline. Your saved tactics do not change.",
+      inputExample: {
+        tactic: {
+          rules: [
+            {
+              conditions: [{ kind: "hp_below", percent: 45 }],
+              action: { kind: "potion" }
+            }
+          ],
+          potion_limit: 3
+        }
+      },
+      examples: ["clawsaga arena enter -c m7Qp2_aR9L-x --input tactic.json"]
+    },
+    withdraw: {
+      path: "character/arena/withdraw",
+      schema: withdrawArenaSchema,
+      flags: [],
+      help: "Withdraw your entry from this week\u2019s tournament before the deadline, from anywhere.",
+      examples: ["clawsaga arena withdraw -c m7Qp2_aR9L-x"]
+    },
+    results: {
+      path: "character/arena/results",
+      schema: getArenaResultsSchema,
+      input: { number: ["number", "number"] },
+      flags: [
+        [
+          "--number <number>",
+          "Tournament number; omit for the latest one you entered"
+        ]
+      ],
+      help: "Read the standings of a settled tournament you entered, with each of your games and the actions your opponent was seen to take. Opponents\u2019 tactics are not shown. Reading marks the result as read.",
+      examples: [
+        "clawsaga arena results -c m7Qp2_aR9L-x",
+        "clawsaga arena results -c m7Qp2_aR9L-x --number 3"
+      ]
+    }
   }
 };
 
@@ -27672,7 +27759,8 @@ var commands = {
   ...giftCommands
 };
 var commandGroups = {
-  house: houseCommands
+  house: houseCommands,
+  arena: arenaCommands
 };
 var gameCommands = {
   ...commands,
@@ -27922,8 +28010,12 @@ function clientFor(values) {
     })
   );
 }
-async function execute(args, notify) {
-  const run = { helpTarget: "clawsaga", helpCommand: "clawsaga --help" };
+async function execute(args, notify, onInput = () => void 0) {
+  const run = {
+    onInput,
+    helpTarget: "clawsaga",
+    helpCommand: "clawsaga --help"
+  };
   const program2 = createProgram(run, notify);
   try {
     await program2.parseAsync(args, { from: "user" });
@@ -27982,16 +28074,6 @@ function withRecoveryGuidance(error61, run) {
 function isLostResponse(error61) {
   return !notSent(error61) && (error61.code === "INVALID_RESPONSE" || error61.code === "UPDATE_REQUIRED" || error61.code === "SERVICE_UNAVAILABLE");
 }
-function helloNotes(response) {
-  const notes = [];
-  if (response.data.announcement) {
-    notes.push(announcementNote(response.data.announcement));
-  }
-  if (response.data.changelog) {
-    notes.push(changelogNote(response.data.changelog));
-  }
-  return notes;
-}
 function createProgram(run, notify) {
   const program2 = new Command("clawsaga").description("Play ClawSaga. Requires Node.js 22.12.0 or later.").version(package_default.version).addOption(
     new Option("-s, --server <origin>", "ClawSaga origin").env("CLAWSAGA_SERVER").default(package_default.homepage)
@@ -28002,7 +28084,14 @@ function createProgram(run, notify) {
     ).choices(localeSchema.options)
   ).addOption(new Option("-c, --character <id>", "Character ID")).addOption(
     new Option("--allow-insecure-http", "Allow plain HTTP to any host").env("CLAWSAGA_ALLOW_INSECURE_HTTP").hideHelp()
-  ).exitOverride().configureHelp({
+  ).addOption(
+    new Option(
+      "--no-auto-update",
+      "Disable automatic CLI updates"
+    ).hideHelp()
+  ).hook("preAction", () => {
+    configureAutoUpdate(program2.opts().autoUpdate !== false);
+  }).exitOverride().configureHelp({
     showGlobalOptions: true,
     optionTerm: (option) => `${option.flags}${option.mandatory ? " (required)" : ""}`
   }).configureOutput({
@@ -28151,6 +28240,7 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
       values.request = randomUUID3();
     }
     const input2 = await commandInput(definition, values);
+    run.onInput(name, input2);
     const client = clientFor(values);
     if (definition.repeat) {
       const { requestIdPerLot } = definition.repeat;
@@ -28258,11 +28348,50 @@ function repeatCount(requestIdPerLot, values, requestedId) {
   return count;
 }
 
+// src/event-log.ts
+import { appendFileSync } from "node:fs";
+import { randomUUID as randomUUID4 } from "node:crypto";
+function createEventLog(argv, file2 = process.env.CLAWSAGA_EVENT_LOG) {
+  if (!file2) return () => void 0;
+  const invocation = randomUUID4();
+  let warned = false;
+  const write = (event) => {
+    try {
+      const record2 = {
+        version: 1,
+        invocation_id: invocation,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        ...event
+      };
+      appendFileSync(file2, `${JSON.stringify(record2)}
+`, { mode: 384 });
+    } catch {
+      if (!warned) {
+        process.stderr.write(
+          `${JSON.stringify({ event: "event_log_error", message: "Could not write the CLI event log; command execution continues." })}
+`
+        );
+        warned = true;
+      }
+    }
+  };
+  write({ type: "start", argv, cli_version: package_default.version });
+  return write;
+}
+
 // src/main.ts
+var eventLog = createEventLog(process.argv.slice(2));
+process.once("exit", (code) => {
+  eventLog({ type: "finish", exit_code: code });
+});
 function print(stream, value) {
   const { ok, error: error61, hints, attention, server_time, ...rest } = value;
   delete rest.schema_version;
   const output2 = { ok, error: error61, hints, attention, ...rest, server_time };
+  eventLog({
+    type: stream === process.stdout ? "result" : "notification",
+    data: output2
+  });
   stream.write(`${JSON.stringify(output2)}
 `);
 }
@@ -28279,7 +28408,8 @@ function printResult(value) {
 try {
   const result = await execute(
     process.argv.slice(2),
-    (value) => print(process.stderr, value)
+    (value) => print(process.stderr, value),
+    (command, input2) => eventLog({ type: "input", command, data: input2 })
   );
   printResult(result);
   process.exitCode = "ok" in result && !result.ok ? 1 : 0;

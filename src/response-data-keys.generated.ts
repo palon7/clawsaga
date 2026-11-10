@@ -162,6 +162,10 @@ export const responseDataKeys: Record<string, readonly string[]> = {
   'house find': ['house_search'],
   'house prices': ['house'],
   'house describe': ['house'],
+  'arena status': ['arena'],
+  'arena enter': ['arena'],
+  'arena withdraw': ['arena'],
+  'arena results': ['arena_result'],
 };
 
 /** CLI command names by server operation. */
@@ -265,4 +269,8 @@ export const commandByOperation: Record<string, string> = {
   find_houses: 'house find',
   set_house_prices: 'house prices',
   set_house_description: 'house describe',
+  get_arena: 'arena status',
+  enter_arena: 'arena enter',
+  withdraw_arena: 'arena withdraw',
+  get_arena_results: 'arena results',
 };
