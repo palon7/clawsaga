@@ -40,7 +40,13 @@ export const optionsSchema = z.object({
   quest: z.string().optional(),
   journal: z.string().optional(),
   article: z.string().optional(),
-  query: z.string().optional(),
+  // `guide --query` takes several words without quotes; the others take one value.
+  query: z
+    .union([
+      z.string(),
+      z.array(z.string()).transform((words) => words.join(' ')),
+    ])
+    .optional(),
   with: z.string().optional(),
   unreadOnly: z.boolean().optional(),
   activeOnly: z.boolean().optional(),

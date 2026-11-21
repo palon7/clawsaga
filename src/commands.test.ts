@@ -339,7 +339,7 @@ it('parses every structured help command example with a fake client', async () =
 
   const special = new Set([
     'update',
-    'guide [--topic <topic>] [--query <text>]',
+    'guide [--topic <topic>] [--query <words...>]',
     'resume',
     'changelog',
     'schema <command>',
@@ -539,6 +539,8 @@ it.each([
   [['claim-quest', '--help'], 'claim-quest', 'clawsaga --help'],
   [['item', '--help'], 'item', 'clawsaga --help'],
   [['house', 'unknown', '--help'], 'unknown', 'clawsaga house --help'],
+  [['gathr'], "gathr'\n(Did you mean gather?)", 'clawsaga --help'],
+  [['house', 'bild'], "bild'\n(Did you mean build?)", 'clawsaga house --help'],
   [['auth', 'unknown', '--help'], 'unknown', 'clawsaga auth --help'],
   [
     ['-c', 'Traveler0000', 'claim-quest', '--help'],
@@ -551,8 +553,11 @@ it.each([
     const invoke = vi.spyOn(GameClient.prototype, 'invoke');
 
     await expect(execute([...args], vi.fn())).rejects.toMatchObject({
-      code: 'INVALID_COMMAND',
-      detail: { message: `Unknown command '${name}'.`, help_command: help },
+      code: 'INVALID_ARGUMENTS',
+      detail: {
+        message: expect.stringContaining(`unknown command '${name}`),
+        help_command: help,
+      },
     });
     expect(invoke).not.toHaveBeenCalled();
   },
@@ -560,6 +565,7 @@ it.each([
 
 it.each([
   [[], 'clawsaga'],
+  [['house'], 'clawsaga house'],
   [['--help'], 'clawsaga'],
   [['house', '--help'], 'clawsaga house'],
   [['auth', '--help'], 'clawsaga auth'],
@@ -579,7 +585,7 @@ it('sends JSON examples with the character and locale flags added to the body', 
   };
 
   const special = new Set([
-    'guide [--topic <topic>] [--query <text>]',
+    'guide [--topic <topic>] [--query <words...>]',
     'resume',
     'changelog',
     'schema <command>',
@@ -913,13 +919,19 @@ it('reads the guide index, one topic or a search from the document route', async
     expect.anything(),
   );
 
+  await execute(['guide', '--query', 'shop', 'location'], vi.fn());
+  expect(read).toHaveBeenLastCalledWith(
+    'guide?query=shop+location',
+    expect.anything(),
+  );
+
   expect(await execute(['guide', '--help'], vi.fn())).toMatchObject({
     ok: true,
     help: {
       command: 'clawsaga guide',
       options: expect.arrayContaining([
         expect.objectContaining({ flags: '--topic <topic>' }),
-        expect.objectContaining({ flags: '--query <text>' }),
+        expect.objectContaining({ flags: '--query <words...>' }),
       ]),
     },
   });

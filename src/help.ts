@@ -1,5 +1,4 @@
 import type { Command } from 'commander';
-import { CliError } from './errors.js';
 import {
   globalOptions,
   type CommandDefinition,
@@ -25,7 +24,7 @@ export function trackHelp(
       },
     })
     .on('--help', () => {
-      assertKnownSubcommand(command, helpCommand);
+      assertKnownSubcommand(command);
       run.helpTarget = target;
     })
     .hook('preAction', () => {
@@ -33,14 +32,20 @@ export function trackHelp(
     });
 }
 
-export function assertKnownSubcommand(command: Command, helpCommand: string) {
-  const name = command.args.find((arg) => !arg.startsWith('-'));
-  if (command.commands.length === 0 || !name) return;
+/**
+ * `--help` after a mistyped subcommand reaches the parent command, which would
+ * answer with its own help instead of rejecting the name.
+ */
+export class UnknownSubcommand extends Error {}
 
-  throw new CliError('INVALID_COMMAND', {
-    message: `Unknown command '${name}'.`,
-    help_command: helpCommand,
-  });
+export function assertKnownSubcommand(command: Command) {
+  const [first] = command.args;
+  const hasOperand = first !== undefined && !first.startsWith('-');
+  if (command.commands.length > 0 && hasOperand) throw new UnknownSubcommand();
+}
+
+export function withoutHelpFlags(args: string[]) {
+  return args.filter((arg) => arg !== '--help' && arg !== '-h');
 }
 
 type HelpOption = {
@@ -56,9 +61,9 @@ export const guideTopicOption = {
 };
 
 export const guideQueryOption = {
-  flags: '--query <text>',
+  flags: '--query <words...>',
   description:
-    'Search every topic for |-separated alternatives; returns excerpts at guide.matches',
+    'Search every topic for these words; returns the best-matching paragraphs at guide.matches',
 };
 
 type StructuredHelp = {
@@ -146,7 +151,7 @@ function programHelp(): StructuredHelp {
   return {
     command: 'clawsaga',
     description:
-      'Play ClawSaga. Requires Node.js 22.12.0 or later. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it. Its `data_keys` lists the keys that the response `data` can carry.',
+      'Play ClawSaga. Requires Node.js 22.12.0 or later. Run `clawsaga resume` first in a conversation. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it. Its `data_keys` lists the keys that the response `data` can carry.',
     usage: 'clawsaga <command> [options]',
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: [
@@ -154,7 +159,19 @@ function programHelp(): StructuredHelp {
       'clawsaga create -i character.json',
       'clawsaga hello -c m7Qp2_aR9L-x',
     ],
+    // Some agents read only the start of the output, so the commands to run
+    // first lead the list.
     commands: [
+      {
+        name: 'resume',
+        description:
+          'Read the operating guide to follow when starting or resuming play.',
+      },
+      {
+        name: 'guide [--topic <topic>] [--query <words...>]',
+        description:
+          'Read the game guide. --query finds the paragraphs that fit a few words; without --topic or --query, list the topics.',
+      },
       {
         name: 'update',
         description: 'Install the latest CLI with npm.',
@@ -167,16 +184,6 @@ function programHelp(): StructuredHelp {
         name,
         description: firstSentence(group.help),
       })),
-      {
-        name: 'guide [--topic <topic>] [--query <text>]',
-        description:
-          'Read the game guide. Without --topic or --query, list the topics.',
-      },
-      {
-        name: 'resume',
-        description:
-          'Read the operating guide to follow when starting or resuming play.',
-      },
       {
         name: 'changelog',
         description: 'Read the server changelog, newest first.',
@@ -216,9 +223,9 @@ function guideHelp(): StructuredHelp {
       helpOption(guideQueryOption, false),
     ],
     examples: [
-      'clawsaga guide',
+      'clawsaga guide --query "ambush potion"',
       'clawsaga guide --topic travel-gathering',
-      'clawsaga guide --query "ambush|potion"',
+      'clawsaga guide',
     ],
   };
 }
