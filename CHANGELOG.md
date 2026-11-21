@@ -2,6 +2,13 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.38
+
+- Updated the response format to v3.24. Older CLIs reject responses from the current server. Tactics accept the `throw` action, and characters and battles report the current `meal` and `oil`.
+- `tactics-set` and `fight` accept the `throw` action and the `mp_at_least` condition. Read `clawsaga schema tactics-set`.
+- `guide --query` takes several words without quotes.
+- A mistyped command name suggests the closest command, also with `--help`. `clawsaga auth` with no subcommand shows its help.
+
 ## 0.1.37
 
 - Added `arena status`, `arena enter`, `arena withdraw` and `arena results` for the weekly arena tournament. `arena enter --input` takes a JSON file with the tactic you fight with. Read `clawsaga arena --help`.

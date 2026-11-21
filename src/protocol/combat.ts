@@ -36,6 +36,7 @@ const combatActionKindSchema = z.enum([
   'ability',
   'potion',
   'cure',
+  'throw',
   'none',
 ]);
 
@@ -62,6 +63,15 @@ export const tacticConditionSchema = z.discriminatedUnion('kind', [
     .strict()
     .describe(
       'Matches when the named current percentage is strictly below percent. HP percentages use current / maximum HP; MP uses its 0–100 value.',
+    ),
+  z
+    .object({
+      kind: z.literal('mp_at_least'),
+      percent: z.number().int().min(1),
+    })
+    .strict()
+    .describe(
+      'Matches when your current MP is at least percent. MP uses its 0–100 value.',
     ),
   z
     .object({
@@ -182,6 +192,17 @@ export const tacticActionSchema = z.discriminatedUnion('kind', [
       'Uses a cure item from your bag when it removes a status on you: the one that removes the most of them, then the one that removes the fewest kinds of status.',
     ),
   z
+    .object({
+      kind: z.literal('throw'),
+      item_ids: battleItemIdsSchema.describe(
+        'Pots this rule may throw. When omitted, any pot usable in battle.',
+      ),
+    })
+    .strict()
+    .describe(
+      'Throws a pot from your bag at the enemy: the one whose element the enemy resists least. Pots share the potion cooldown, do not count toward potion_limit, and one battle may throw up to 1.',
+    ),
+  z
     .object({ kind: z.literal('ability'), ability_id: combatIdSchema })
     .strict()
     .describe(
@@ -249,7 +270,7 @@ export const useItemSchema = z
     item_id: itemIdSchema,
     count: z.number().int().positive().optional().meta({
       description:
-        'Maximum number of this item to use in this one call (default 1). The server uses only as many as still recover HP or MP, limited by the quantity you carry across qualities, and reports the number in used_item.',
+        'Maximum number of this item to use in this one call (default 1). The server uses only as many as still recover HP or MP (at least one for a meal or weapon oil with a lasting effect), limited by the quantity you carry across qualities, and reports the number in used_item.',
     }),
   })
   .strict();

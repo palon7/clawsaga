@@ -23964,7 +23964,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.23";
+var agentSchemaVersion = "3.24";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   // The client rejects a newer version before parsing. An older server's
@@ -24090,6 +24090,7 @@ var combatActionKindSchema = external_exports.enum([
   "ability",
   "potion",
   "cure",
+  "throw",
   "none"
 ]);
 var heavyPowerAtLeastSchema = external_exports.number().int().min(1).optional().describe(
@@ -24106,6 +24107,12 @@ var tacticConditionSchema = external_exports.discriminatedUnion("kind", [
     percent: external_exports.number().int().min(1)
   }).strict().describe(
     "Matches when the named current percentage is strictly below percent. HP percentages use current / maximum HP; MP uses its 0\u2013100 value."
+  ),
+  external_exports.object({
+    kind: external_exports.literal("mp_at_least"),
+    percent: external_exports.number().int().min(1)
+  }).strict().describe(
+    "Matches when your current MP is at least percent. MP uses its 0\u2013100 value."
   ),
   external_exports.object({
     kind: external_exports.literal("gauge_at_least"),
@@ -24180,6 +24187,14 @@ var tacticActionSchema = external_exports.discriminatedUnion("kind", [
   }).strict().describe(
     "Uses a cure item from your bag when it removes a status on you: the one that removes the most of them, then the one that removes the fewest kinds of status."
   ),
+  external_exports.object({
+    kind: external_exports.literal("throw"),
+    item_ids: battleItemIdsSchema.describe(
+      "Pots this rule may throw. When omitted, any pot usable in battle."
+    )
+  }).strict().describe(
+    "Throws a pot from your bag at the enemy: the one whose element the enemy resists least. Pots share the potion cooldown, do not count toward potion_limit, and one battle may throw up to 1."
+  ),
   external_exports.object({ kind: external_exports.literal("ability"), ability_id: combatIdSchema }).strict().describe(
     "Uses the ability when it is unlocked, off cooldown, affordable in MP and its effect is currently applicable."
   )
@@ -24216,7 +24231,7 @@ var useItemSchema = external_exports.object({
   ...characterTarget,
   item_id: itemIdSchema,
   count: external_exports.number().int().positive().optional().meta({
-    description: "Maximum number of this item to use in this one call (default 1). The server uses only as many as still recover HP or MP, limited by the quantity you carry across qualities, and reports the number in used_item."
+    description: "Maximum number of this item to use in this one call (default 1). The server uses only as many as still recover HP or MP (at least one for a meal or weapon oil with a lasting effect), limited by the quantity you carry across qualities, and reports the number in used_item."
   })
 }).strict();
 var changeJobSchema = external_exports.object({ ...characterTarget, job_id: jobSchema }).strict();
@@ -24731,7 +24746,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.37",
+  version: "0.1.38",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -25084,11 +25099,19 @@ var responseDataKeys = {
   tactics: ["tactics"],
   "tactics-set": ["validation", "tactics"],
   "tactics-check": ["validation"],
-  fight: ["activity", "status", "last_result", "position", "scenery"],
+  fight: [
+    "activity",
+    "status",
+    "meal",
+    "oil",
+    "last_result",
+    "position",
+    "scenery"
+  ],
   report: ["combat_report"],
   rest: ["activity", "status", "last_result", "position", "scenery"],
   inn: ["activity", "status", "last_result", "position", "scenery"],
-  use: ["status", "used_item"],
+  use: ["status", "used_item", "meal", "oil"],
   "change-job": ["capacity", "status", "combat_stats", "equipment_change"],
   "lost-items": ["lost_items"],
   recover: ["capacity", "status"],
@@ -25983,7 +26006,11 @@ var optionsSchema = external_exports.object({
   quest: external_exports.string().optional(),
   journal: external_exports.string().optional(),
   article: external_exports.string().optional(),
-  query: external_exports.string().optional(),
+  // `guide --query` takes several words without quotes; the others take one value.
+  query: external_exports.union([
+    external_exports.string(),
+    external_exports.array(external_exports.string()).transform((words) => words.join(" "))
+  ]).optional(),
   with: external_exports.string().optional(),
   unreadOnly: external_exports.boolean().optional(),
   activeOnly: external_exports.boolean().optional(),
@@ -27781,27 +27808,29 @@ function trackHelp(command, run, target2, helpCommand) {
       run.helpCommand = helpCommand;
     }
   }).on("--help", () => {
-    assertKnownSubcommand(command, helpCommand);
+    assertKnownSubcommand(command);
     run.helpTarget = target2;
   }).hook("preAction", () => {
     run.helpCommand = helpCommand;
   });
 }
-function assertKnownSubcommand(command, helpCommand) {
-  const name = command.args.find((arg) => !arg.startsWith("-"));
-  if (command.commands.length === 0 || !name) return;
-  throw new CliError("INVALID_COMMAND", {
-    message: `Unknown command '${name}'.`,
-    help_command: helpCommand
-  });
+var UnknownSubcommand = class extends Error {
+};
+function assertKnownSubcommand(command) {
+  const [first] = command.args;
+  const hasOperand = first !== void 0 && !first.startsWith("-");
+  if (command.commands.length > 0 && hasOperand) throw new UnknownSubcommand();
+}
+function withoutHelpFlags(args) {
+  return args.filter((arg) => arg !== "--help" && arg !== "-h");
 }
 var guideTopicOption = {
   flags: "--topic <topic>",
   description: "Return one topic body at guide.section.body"
 };
 var guideQueryOption = {
-  flags: "--query <text>",
-  description: "Search every topic for |-separated alternatives; returns excerpts at guide.matches"
+  flags: "--query <words...>",
+  description: "Search every topic for these words; returns the best-matching paragraphs at guide.matches"
 };
 function helpOption(option, required2) {
   return {
@@ -27853,7 +27882,7 @@ function firstSentence(text2) {
 function programHelp() {
   return {
     command: "clawsaga",
-    description: "Play ClawSaga. Requires Node.js 22.12.0 or later. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it. Its `data_keys` lists the keys that the response `data` can carry.",
+    description: "Play ClawSaga. Requires Node.js 22.12.0 or later. Run `clawsaga resume` first in a conversation. Each command is listed by what it does; read `<command> --help` for its rules, options and examples before using it. Its `data_keys` lists the keys that the response `data` can carry.",
     usage: "clawsaga <command> [options]",
     options: globalOptions.map((option) => helpOption(option, false)),
     examples: [
@@ -27861,7 +27890,17 @@ function programHelp() {
       "clawsaga create -i character.json",
       "clawsaga hello -c m7Qp2_aR9L-x"
     ],
+    // Some agents read only the start of the output, so the commands to run
+    // first lead the list.
     commands: [
+      {
+        name: "resume",
+        description: "Read the operating guide to follow when starting or resuming play."
+      },
+      {
+        name: "guide [--topic <topic>] [--query <words...>]",
+        description: "Read the game guide. --query finds the paragraphs that fit a few words; without --topic or --query, list the topics."
+      },
       {
         name: "update",
         description: "Install the latest CLI with npm."
@@ -27874,14 +27913,6 @@ function programHelp() {
         name,
         description: firstSentence(group.help)
       })),
-      {
-        name: "guide [--topic <topic>] [--query <text>]",
-        description: "Read the game guide. Without --topic or --query, list the topics."
-      },
-      {
-        name: "resume",
-        description: "Read the operating guide to follow when starting or resuming play."
-      },
       {
         name: "changelog",
         description: "Read the server changelog, newest first."
@@ -27918,9 +27949,9 @@ function guideHelp() {
       helpOption(guideQueryOption, false)
     ],
     examples: [
-      "clawsaga guide",
+      'clawsaga guide --query "ambush potion"',
       "clawsaga guide --topic travel-gathering",
-      'clawsaga guide --query "ambush|potion"'
+      "clawsaga guide"
     ]
   };
 }
@@ -28020,6 +28051,9 @@ async function execute(args, notify, onInput = () => void 0) {
   try {
     await program2.parseAsync(args, { from: "user" });
   } catch (error61) {
+    if (error61 instanceof UnknownSubcommand) {
+      return execute(withoutHelpFlags(args), notify, onInput);
+    }
     return helpOrFailure(error61, run);
   }
   return commandOutput(run);
@@ -28030,7 +28064,7 @@ function helpOrFailure(error61, run) {
   if (error61.code === "commander.version") {
     return { ok: true, version: package_default.version };
   }
-  if (error61.code === "commander.helpDisplayed" || error61.code === "commander.help" && error61.exitCode === 0) {
+  if (error61.code === "commander.helpDisplayed" || error61.code === "commander.help") {
     return { ok: true, help: structuredHelp(run.helpTarget) };
   }
   throw new CliError("INVALID_ARGUMENTS", {
@@ -28099,9 +28133,8 @@ function createProgram(run, notify) {
     writeErr: () => void 0,
     outputError: () => void 0
   });
-  program2.action(() => program2.help());
   program2.on("--help", () => {
-    assertKnownSubcommand(program2, "clawsaga --help");
+    assertKnownSubcommand(program2);
     run.helpTarget = "clawsaga";
   });
   program2.command("update").description("Install the latest CLI with npm").on("--help", () => {
@@ -28117,7 +28150,6 @@ function createProgram(run, notify) {
   for (const [name, group] of Object.entries(commandGroups)) {
     const groupCommand = program2.command(name).description(group.help);
     trackHelp(groupCommand, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
-    groupCommand.action(() => groupCommand.help());
     for (const [command, definition] of Object.entries(group.commands)) {
       addGameCommand(
         groupCommand,

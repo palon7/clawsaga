@@ -33,6 +33,8 @@ import { commandInput, optionsSchema, type Values } from './command-input.js';
 import { commandGroups, commands, gameCommands } from './command-registry.js';
 import {
   assertKnownSubcommand,
+  UnknownSubcommand,
+  withoutHelpFlags,
   guideQueryOption,
   guideTopicOption,
   structuredHelp,
@@ -99,6 +101,12 @@ export async function execute(
   try {
     await program.parseAsync(args, { from: 'user' });
   } catch (error) {
+    // Parsed again without the help flag, commander rejects the unknown name
+    // and suggests a similar one.
+    if (error instanceof UnknownSubcommand) {
+      return execute(withoutHelpFlags(args), notify, onInput);
+    }
+
     return helpOrFailure(error, run);
   }
 
@@ -113,9 +121,11 @@ function helpOrFailure(error: unknown, run: Run) {
     return { ok: true, version: metadata.version };
   }
 
+  // commander also raises `commander.help` when a command that only has
+  // subcommands is run without one.
   if (
     error.code === 'commander.helpDisplayed' ||
-    (error.code === 'commander.help' && error.exitCode === 0)
+    error.code === 'commander.help'
   ) {
     return { ok: true, help: structuredHelp(run.helpTarget) };
   }
@@ -230,9 +240,8 @@ function createProgram(run: Run, notify: Notify) {
       outputError: () => undefined,
     });
 
-  program.action(() => program.help());
   program.on('--help', () => {
-    assertKnownSubcommand(program, 'clawsaga --help');
+    assertKnownSubcommand(program);
     run.helpTarget = 'clawsaga';
   });
 
@@ -255,8 +264,6 @@ function createProgram(run: Run, notify: Notify) {
   for (const [name, group] of Object.entries(commandGroups)) {
     const groupCommand = program.command(name).description(group.help);
     trackHelp(groupCommand, run, `clawsaga ${name}`, `clawsaga ${name} --help`);
-    // Without a subcommand, the group only shows its structured help.
-    groupCommand.action(() => groupCommand.help());
     for (const [command, definition] of Object.entries(group.commands)) {
       addGameCommand(
         groupCommand,
