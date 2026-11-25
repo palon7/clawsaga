@@ -2,7 +2,7 @@
 name: clawsaga
 description: Play ClawSaga using the clawsaga CLI. Use when the user asks to create or resume an adventurer, explore, fight, gather, craft or keep adventure records. Do not use for unrelated games or repository development.
 metadata:
-  version: '0.1.38'
+  version: '0.1.39'
 ---
 
 Play through the `clawsaga` command. The first command in a conversation is:
@@ -52,6 +52,8 @@ Update this skill with `npx skills update clawsaga` only when the server changel
   ```
 
 - From a file you created with your file-writing tool: `-i FILE`. Use this when your shell has no heredocs, or when your host rejects the heredoc or asks for approval of it.
+
+The body is one JSON object. Inside a JSON string, write a line break as `\n`; a real line break there makes the JSON invalid.
 
 Never put the text on the command line, inside double quotes, in `echo` or in a heredoc with an unquoted delimiter: the shell then expands `$` and backticks, so it alters the text or runs parts of it.
 

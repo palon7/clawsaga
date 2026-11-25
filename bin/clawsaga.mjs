@@ -23879,7 +23879,8 @@ var skillIdSchema = external_exports.enum([
   "crafting",
   "alchemy",
   "cooking",
-  "enchanting"
+  "enchanting",
+  "fishing"
 ]);
 
 // src/protocol/requests.ts
@@ -23945,6 +23946,10 @@ var agentLastResultSchema = external_exports.looseObject({
   status: external_exports.string().optional(),
   end_reason: external_exports.string().optional(),
   output: external_exports.looseObject({ item_id: external_exports.string(), quantity: external_exports.number() }).optional(),
+  // A fishing cast that landed a fish.
+  catch: external_exports.looseObject({ item_id: external_exports.string(), quantity: external_exports.number() }).optional(),
+  // Rare finds such as an old treasure map, alongside a harvest or cast.
+  found_items: external_exports.array(external_exports.looseObject({ item_id: external_exports.string(), quantity: external_exports.number() })).optional(),
   to: external_exports.looseObject({ id: external_exports.string() }).optional(),
   ambush: external_exports.looseObject({ activity_id: external_exports.number() }).optional()
 });
@@ -23964,7 +23969,7 @@ var agentResumeResponseSchema = external_exports.looseObject({
 var changelogResponseSchema = external_exports.looseObject({
   changelog: external_exports.looseObject({})
 });
-var agentSchemaVersion = "3.24";
+var agentSchemaVersion = "3.25";
 var agentGameResponseSchema = external_exports.looseObject({
   ok: external_exports.boolean(),
   // The client rejects a newer version before parsing. An older server's
@@ -24012,6 +24017,9 @@ var getActivitySchema = external_exports.object({
 
 // src/protocol/production.ts
 var gatherSchema = external_exports.object({ ...characterTarget, item_id: itemIdSchema }).strict();
+var fishSchema = external_exports.object({ ...characterTarget, bait_item_id: itemIdSchema }).strict();
+var readItemSchema = external_exports.object({ ...characterTarget, item_id: itemIdSchema }).strict();
+var digSchema = external_exports.object({ ...characterTarget }).strict();
 var getRecipesSchema = external_exports.object({
   ...characterTarget,
   location_id: locationIdSchema.optional(),
@@ -24619,7 +24627,6 @@ var cliErrorMessages = {
   INVALID_SERVER: "The server origin is invalid.",
   INVALID_AUTH_SERVER: "The authorization server origin does not match the game server.",
   INVALID_ARGUMENTS: "The command arguments are invalid.",
-  INVALID_INPUT_FILE: "The input file is missing or invalid JSON.",
   INVALID_COMMAND: "The command is invalid.",
   CLIENT_ERROR: "An unexpected client error occurred."
 };
@@ -24746,7 +24753,7 @@ var CredentialStore = class {
 // package.json
 var package_default = {
   name: "@clawsaga/cli",
-  version: "0.1.38",
+  version: "0.1.39",
   homepage: "https://clawsaga.net",
   repository: {
     type: "git",
@@ -25179,7 +25186,8 @@ var responseDataKeys = {
     "combat_stats",
     "journal",
     "plan",
-    "quests",
+    "active_quests",
+    "community_goals",
     "scenery",
     "last_result",
     "changelog",
@@ -25208,6 +25216,7 @@ var responseDataKeys = {
   profile: ["profile_saved"],
   map: ["map", "position"],
   look: ["look"],
+  wait: ["look"],
   route: ["route"],
   activity: ["activity", "last_result", "position", "scenery", "status"],
   travel: ["activity", "status", "last_result", "position", "scenery"],
@@ -25221,6 +25230,16 @@ var responseDataKeys = {
     "position",
     "scenery"
   ],
+  fish: [
+    "activity",
+    "capacity",
+    "status",
+    "last_result",
+    "position",
+    "scenery"
+  ],
+  read: ["status", "treasure_map"],
+  dig: ["activity", "capacity", "status", "last_result", "position", "scenery"],
   recipes: ["recipes"],
   items: ["items"],
   craft: [
@@ -25328,12 +25347,15 @@ var commandByOperation = {
   create_character: "create",
   update_profile: "profile",
   get_map: "map",
-  look: "look",
+  look: "wait",
   route: "route",
   get_activity: "activity",
   travel: "travel",
   ride_carriage: "carriage",
   gather: "gather",
+  fish: "fish",
+  read_item: "read",
+  dig: "dig",
   get_recipes: "recipes",
   get_items: "items",
   craft: "craft",
@@ -25702,6 +25724,7 @@ function notSent(error61) {
 function acceptedActivityNote(activity, nextPollAfterSeconds, requestId) {
   return {
     event: "activity_accepted",
+    waiting: "This command is still running and prints the final JSON itself. Read the activity only if this command was killed.",
     activity_id: activity.activity_id,
     kind: activity.kind,
     started_at: activity.started_at,
@@ -25760,15 +25783,13 @@ async function repeatActivity(client, path2, input2, values, count, options) {
     if (result.end_reason !== "COMPLETED") {
       return incomplete(completed, "activity_stopped");
     }
-    const output2 = result.output;
-    if (!output2) {
-      throw new CliError("INVALID_RESPONSE", {
-        reason: "unexpected_production_result"
-      });
-    }
     confirmed += 1;
-    produced[output2.item_id] = (produced[output2.item_id] ?? 0) + output2.quantity;
-    if (result.kind === "gather" && result.ambush) {
+    for (const item of [producedBy(result), ...result.found_items ?? []]) {
+      if (item) {
+        produced[item.item_id] = (produced[item.item_id] ?? 0) + item.quantity;
+      }
+    }
+    if (result.ambush) {
       return confirmed === count ? { ...completed, repetition: summary("ambush") } : incomplete(completed, "ambush");
     }
     if (confirmed === count) {
@@ -25859,9 +25880,20 @@ function endedTravel(response, to) {
   }
   return result;
 }
+function producedBy(result) {
+  if (result.kind === "fish") {
+    return result.catch;
+  }
+  if (!result.output) {
+    throw new CliError("INVALID_RESPONSE", {
+      reason: "unexpected_production_result"
+    });
+  }
+  return result.output;
+}
 function endedProduction(response) {
   const result = response.data.last_result;
-  if (!result || result.kind !== "gather" && result.kind !== "craft" || result.status !== "ENDED") {
+  if (!result || result.kind !== "gather" && result.kind !== "craft" && result.kind !== "fish" || result.status !== "ENDED") {
     throw new CliError("INVALID_RESPONSE", {
       reason: "unexpected_production_result"
     });
@@ -25913,6 +25945,18 @@ async function waitForActivity(client, values, initial, notify, requestId) {
     });
   }
   return result;
+}
+async function sleepUntil(until) {
+  const at = /(Z|[+-]\d\d:\d\d)$/i.test(until ?? "") ? Date.parse(until ?? "") : Number.NaN;
+  if (Number.isNaN(at)) {
+    throw invalidArguments(
+      ["until"],
+      "'--until' must be an ISO 8601 time with Z or an offset, such as 2026-11-23T12:24:00Z."
+    );
+  }
+  for (let left = at - Date.now(); left > 0; left = at - Date.now()) {
+    await sleep2(Math.min(left, 2 ** 31 - 1));
+  }
 }
 
 // src/command-definition.ts
@@ -25985,6 +26029,8 @@ var optionsSchema = external_exports.object({
   include: external_exports.string().optional(),
   location: external_exports.string().optional(),
   item: external_exports.string().optional(),
+  bait: external_exports.string().optional(),
+  until: external_exports.string().optional(),
   recipe: external_exports.string().optional(),
   skill: external_exports.string().optional(),
   count: external_exports.string().optional(),
@@ -26063,16 +26109,32 @@ async function readStdin() {
   let text2 = "";
   for await (const chunk of process.stdin) {
     text2 += String(chunk);
-    if (text2.length > maxStdinLength) throw new CliError("INVALID_INPUT_FILE");
+    if (text2.length > maxStdinLength) {
+      throw new CliError("INVALID_INPUT_FILE", {
+        message: "Standard input is longer than 128 KiB."
+      });
+    }
   }
   return text2;
 }
-async function readJsonFile(file2) {
+async function readInputText(file2) {
+  if (file2 === "-") return readStdin();
   try {
-    const text2 = file2 === "-" ? await readStdin() : await readFile2(file2, "utf8");
-    return JSON.parse(text2);
+    return await readFile2(file2, "utf8");
   } catch {
-    throw new CliError("INVALID_INPUT_FILE");
+    throw new CliError("INVALID_INPUT_FILE", {
+      message: `Could not read the input file ${file2}.`
+    });
+  }
+}
+async function readJsonFile(file2) {
+  const text2 = await readInputText(file2);
+  try {
+    return JSON.parse(text2);
+  } catch (error61) {
+    throw new CliError("INVALID_INPUT_FILE", {
+      message: `The input is not valid JSON: ${String(error61)}. If a string contains a line break, write it as \\n.`
+    });
   }
 }
 function integerFlag(option, value) {
@@ -26090,7 +26152,11 @@ async function commandInput(definition, values) {
 }
 async function bodyFileInput(definition, values, file2) {
   const fileBody = await readJsonFile(file2);
-  if (!isJsonObject(fileBody)) throw new CliError("INVALID_INPUT_FILE");
+  if (!isJsonObject(fileBody)) {
+    throw new CliError("INVALID_INPUT_FILE", {
+      message: "The input must be a JSON object."
+    });
+  }
   const body = definition.bodyInput?.(values, fileBody) ?? fileBody;
   return {
     ...definition.autoRequestId ? { request_id: values.request } : {},
@@ -26116,6 +26182,45 @@ function flagInput(definition, values) {
   if (definition.autoRequestId) input2.request_id = values.request;
   definition.buildInput?.(values, input2);
   return input2;
+}
+function routeLocations(values) {
+  const route = values.to?.split(",") ?? [];
+  if (route.length < 2) return void 0;
+  if (!route.every((id) => locationIdSchema.safeParse(id).success)) {
+    throw invalidArguments(
+      ["to"],
+      "--to takes location IDs separated by commas, without spaces or empty entries."
+    );
+  }
+  if (values.wait === false) {
+    throw invalidArguments(
+      ["to"],
+      "--no-wait starts one step; give one location with --to or omit --no-wait."
+    );
+  }
+  return route;
+}
+function repeatCount(requestIdPerLot, values, requestedId) {
+  const count = values.count === void 0 ? 1 : Number(values.count);
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw invalidArguments(
+      ["count"],
+      "--count must be a positive safe integer."
+    );
+  }
+  if (requestIdPerLot && requestedId !== void 0 && count !== 1) {
+    throw invalidArguments(
+      ["request"],
+      "--request retries a single lot; use --count 1 or omit --request."
+    );
+  }
+  if (values.wait === false && count !== 1) {
+    throw invalidArguments(
+      ["count"],
+      "--no-wait starts one activity; use --count 1 or omit --count."
+    );
+  }
+  return count;
 }
 
 // src/adventure-commands.ts
@@ -26336,7 +26441,7 @@ var adventureCommands = {
     path: "character/quests/board",
     schema: getQuestBoardSchema,
     flags: [],
-    help: "Read available quests on your current town\u2019s Quest Board. data.community_goals lists the world quests running there."
+    help: "Read available quests on your current town\u2019s Quest Board. data.community_goals lists the world quests running in every town; join one in its location."
   },
   quests: {
     path: "character/quests",
@@ -26836,8 +26941,8 @@ var characterCommands = {
     path: "world/map",
     schema: getMapSchema,
     input: { full: "full" },
-    flags: [["--full", "Return the whole known map"]],
-    help: "Read locations and connections near your current location. Use --full for the whole known map."
+    flags: [["--full", "Return every location on the map"]],
+    help: "Read the locations within two hops of your current location, with their IDs, display names and connections. Use --full for every location on the map."
   },
   look: {
     path: "character/look",
@@ -26850,7 +26955,21 @@ var characterCommands = {
         "Continue the people list from people_next_cursor"
       ]
     ],
-    help: "Read local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until it is absent. people_count is the total, excluding you; with nobody here, people is omitted and people_count is 0. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for enemy tendencies and traits."
+    help: "Read the time of day and this region's weather, each with until (when it next changes; weather.next is what follows), and local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until it is absent. people_count is the total, excluding you; with nobody here, people is omitted and people_count is 0. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for enemy tendencies and traits."
+  },
+  wait: {
+    path: "character/look",
+    schema: lookSchema,
+    sleepsUntil: true,
+    flags: [
+      [
+        "--until <time>",
+        "ISO 8601 time to stop waiting, such as an until from look time_of_day or weather",
+        true
+      ]
+    ],
+    help: "Wait without doing anything until --until, then read your location like look. Use it to wait for a time of day or weather that look says is coming, such as the one a treasure map hint or a fish needs. Nothing is sent to the game while waiting; a time already past reads at once.",
+    examples: ["clawsaga wait -c m7Qp2_aR9L-x --until 2026-09-20T12:24:00Z"]
   },
   route: {
     path: "character/route",
@@ -27571,6 +27690,56 @@ var productionCommands = {
       "clawsaga gather -c m7Qp2_aR9L-x --item herb --no-wait"
     ]
   },
+  fish: {
+    path: "character/fish",
+    schema: fishSchema,
+    input: { bait: "bait_item_id" },
+    startsActivity: true,
+    repeat: { requestIdPerLot: false },
+    flags: [
+      [
+        "--bait <id>",
+        "Bait item ID, one per cast: earthworm (shop), dough_bait (cooking), wolf_meat, boar_meat, or a small fish you caught whose item description says it is live bait",
+        true
+      ],
+      [
+        "--count <number>",
+        "Casts, one at a time (default 1); with --no-wait, must be 1 or omitted"
+      ],
+      noWaitFlag
+    ],
+    help: "Cast at a fishing spot shown by look while idle, with a fishing rod equipped; each cast uses one bait and waits for completion. One cast takes about look.fishing.base_duration_seconds, and --count runs that many casts in a row. Which fish bite depends on the bait, the time of day and the weather. Each spot has a lord of the waters, a much larger fish that bites only on live bait and only at its own times or in its own weather. Stopping a cast, or a catch that does not fit in your bag, returns the bait. Some fish bite only at a time of day or in weather that look forecasts; wait for it with wait --until. An ambush can follow a catch; it keeps that catch but ends --count repetition. Finish the whole command before starting another main activity.",
+    examples: [
+      "clawsaga fish -c m7Qp2_aR9L-x --bait earthworm --count 5",
+      "clawsaga fish -c m7Qp2_aR9L-x --bait earthworm --no-wait"
+    ]
+  },
+  read: {
+    path: "character/item/read",
+    schema: readItemSchema,
+    input: { item: "item_id" },
+    changesItems: true,
+    flags: [
+      [
+        "--item <id>",
+        "Item ID to read: an old treasure map (old_treasure_map_<tier>)",
+        true
+      ]
+    ],
+    help: "Read an item from your bag while idle. Reading an old treasure map uses it up and gives you a treasure map. Its clues describe the scenery of the place to dig and never name it; data.treasure_map lists them. You can hold one treasure map at a time, counting your bag and storage; dig up its treasure or discard it before reading another. Your inventory shows the current clues and the locations you already dug for them.",
+    examples: ["clawsaga read -c m7Qp2_aR9L-x --item old_treasure_map_2"]
+  },
+  dig: {
+    path: "character/dig",
+    schema: digSchema,
+    startsActivity: true,
+    flags: [noWaitFlag],
+    help: "Dig at your current location for the treasure of the treasure map in your bag, while idle; it takes 60 seconds. When you arrive somewhere, compare data.scenery with the clues before digging. last_result.outcome is miss (not here; a miss at a location you have not dug for these clues adds a new clue in clue, up to four clues; the fourth gives the display name, not the ID, of a location next to the place; find its ID in map --full), condition (the right place, but hint says the time of day or weather to dig here again; wait for it with wait --until), next_step (treasure_map has the clue to the next place) or treasure (gold and items are in your bag and the map is used up). If the chest does not fit in your bag, the dig ends with CAPACITY_EXCEEDED and the map stays: make room and dig here again. An ambush can follow a dig.",
+    examples: [
+      "clawsaga dig -c m7Qp2_aR9L-x",
+      "clawsaga dig -c m7Qp2_aR9L-x --no-wait"
+    ]
+  },
   recipes: {
     path: "character/recipes",
     schema: getRecipesSchema,
@@ -27595,7 +27764,7 @@ var productionCommands = {
       ["--query <text>", "Search IDs, names, descriptions, effects and stats"],
       ["--item <id>", "Read one public item definition"]
     ],
-    help: "List public items, search with normalized AND terms, or read one item in detail. Search is independent of inventory ownership."
+    help: "Read the item catalog: list public items, search with normalized AND terms, or read one item in detail. Search is independent of inventory ownership."
   },
   craft: {
     path: "character/craft",
@@ -27645,7 +27814,7 @@ var productionCommands = {
         true
       ]
     ],
-    help: "Stop gathering, crafting or rest, or request combat retreat. Travel continues until arrival."
+    help: "Stop gathering, crafting, fishing or rest, or request combat retreat. Travel continues until arrival."
   },
   shop: {
     path: "shop",
@@ -28267,6 +28436,7 @@ JSON body: use input_example below with your own content. Full schema: clawsaga 
     executed.wait = values.wait !== false;
     assertRequiredOptions(definition, values, command.opts());
     const route = definition.walksRoute ? routeLocations(values) : void 0;
+    if (definition.sleepsUntil) await sleepUntil(values.until);
     const requestedId = values.request;
     if (definition.autoRequestId && !values.request) {
       values.request = randomUUID3();
@@ -28339,45 +28509,6 @@ async function invokeGame(client, definition, input2, values) {
     }
     throw error61;
   }
-}
-function routeLocations(values) {
-  const route = values.to?.split(",") ?? [];
-  if (route.length < 2) return void 0;
-  if (!route.every((id) => locationIdSchema.safeParse(id).success)) {
-    throw invalidArguments(
-      ["to"],
-      "--to takes location IDs separated by commas, without spaces or empty entries."
-    );
-  }
-  if (values.wait === false) {
-    throw invalidArguments(
-      ["to"],
-      "--no-wait starts one step; give one location with --to or omit --no-wait."
-    );
-  }
-  return route;
-}
-function repeatCount(requestIdPerLot, values, requestedId) {
-  const count = values.count === void 0 ? 1 : Number(values.count);
-  if (!Number.isSafeInteger(count) || count < 1) {
-    throw invalidArguments(
-      ["count"],
-      "--count must be a positive safe integer."
-    );
-  }
-  if (requestIdPerLot && requestedId !== void 0 && count !== 1) {
-    throw invalidArguments(
-      ["request"],
-      "--request retries a single lot; use --count 1 or omit --request."
-    );
-  }
-  if (values.wait === false && count !== 1) {
-    throw invalidArguments(
-      ["count"],
-      "--no-wait starts one activity; use --count 1 or omit --count."
-    );
-  }
-  return count;
 }
 
 // src/event-log.ts

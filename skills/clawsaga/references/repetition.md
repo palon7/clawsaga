@@ -20,7 +20,7 @@ An uncertain attempt of a command that takes `--request` includes that attempt's
 
 ## Examples
 
-These use `gather` and `craft`. Any other command that repeats with `--count` behaves the same way.
+These use `gather`, `fish` and `craft`. Any other command that repeats with `--count` behaves the same way.
 
 1. Run `clawsaga gather -c CHARACTER_ID --item herb --count 10` at a location whose `look` lists `herb`. An ambush after three confirmed harvests returns `ok: false` with `repetition` showing `completed_count: 3`, `produced: { herb: 3 }` and `stopped_reason: ambush`. Keep those yields, use `data.last_result.ambush.activity_id` for the battle, then reconsider the goal and remaining work after combat.
 2. With the same command, an ambush on harvest ten returns `ok: true` with `repetition` showing `completed_count: 10` and `stopped_reason: ambush`. The count is complete, but `data.activity` can still be a running combat. Do not start another main activity just because `ok` is true.

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { AgentGameResponse, AgentRunningActivity } from './protocol.js';
 import type { GameClient } from './client.js';
-import { CliError } from './errors.js';
+import { CliError, invalidArguments } from './errors.js';
 import type { RepetitionSummary, RouteSummary } from './hints.js';
 
 /** The global options an activity read repeats. */
@@ -27,6 +27,8 @@ function acceptedActivityNote(
 ) {
   return {
     event: 'activity_accepted',
+    waiting:
+      'This command is still running and prints the final JSON itself. Read the activity only if this command was killed.',
     activity_id: activity.activity_id,
     kind: activity.kind,
     started_at: activity.started_at,
@@ -117,18 +119,14 @@ export async function repeatActivity(
       return incomplete(completed, 'activity_stopped');
     }
 
-    const output = result.output;
-    if (!output) {
-      throw new CliError('INVALID_RESPONSE', {
-        reason: 'unexpected_production_result',
-      });
+    confirmed += 1;
+    for (const item of [producedBy(result), ...(result.found_items ?? [])]) {
+      if (item) {
+        produced[item.item_id] = (produced[item.item_id] ?? 0) + item.quantity;
+      }
     }
 
-    confirmed += 1;
-    produced[output.item_id] =
-      (produced[output.item_id] ?? 0) + output.quantity;
-
-    if (result.kind === 'gather' && result.ambush) {
+    if (result.ambush) {
       return confirmed === count
         ? { ...completed, repetition: summary('ambush') }
         : incomplete(completed, 'ambush');
@@ -273,11 +271,29 @@ function endedTravel(response: AgentGameResponse, to: string) {
   return result;
 }
 
+// A completed gather or craft always produces its output. A completed fishing
+// cast may catch nothing.
+function producedBy(result: ReturnType<typeof endedProduction>) {
+  if (result.kind === 'fish') {
+    return result.catch;
+  }
+
+  if (!result.output) {
+    throw new CliError('INVALID_RESPONSE', {
+      reason: 'unexpected_production_result',
+    });
+  }
+
+  return result.output;
+}
+
 function endedProduction(response: AgentGameResponse) {
   const result = response.data.last_result;
   if (
     !result ||
-    (result.kind !== 'gather' && result.kind !== 'craft') ||
+    (result.kind !== 'gather' &&
+      result.kind !== 'craft' &&
+      result.kind !== 'fish') ||
     result.status !== 'ENDED'
   ) {
     throw new CliError('INVALID_RESPONSE', {
@@ -347,4 +363,24 @@ export async function waitForActivity(
   }
 
   return result;
+}
+
+/** Sleeps until `--until` for `wait`; a time already past returns at once. */
+export async function sleepUntil(until: string | undefined) {
+  // Without Z or an offset, Date.parse reads the time in this machine's zone.
+  const at = /(Z|[+-]\d\d:\d\d)$/i.test(until ?? '')
+    ? Date.parse(until ?? '')
+    : Number.NaN;
+
+  if (Number.isNaN(at)) {
+    throw invalidArguments(
+      ['until'],
+      "'--until' must be an ISO 8601 time with Z or an offset, such as 2026-11-23T12:24:00Z.",
+    );
+  }
+
+  // Node caps one timer at about 24.8 days, so a longer wait sleeps in parts.
+  for (let left = at - Date.now(); left > 0; left = at - Date.now()) {
+    await sleep(Math.min(left, 2 ** 31 - 1));
+  }
 }

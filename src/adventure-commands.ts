@@ -273,7 +273,7 @@ export const adventureCommands: Record<string, CommandDefinition> = {
     path: 'character/quests/board',
     schema: getQuestBoardSchema,
     flags: [],
-    help: 'Read available quests on your current town’s Quest Board. data.community_goals lists the world quests running there.',
+    help: 'Read available quests on your current town’s Quest Board. data.community_goals lists the world quests running in every town; join one in its location.',
   },
   quests: {
     path: 'character/quests',

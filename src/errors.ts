@@ -19,7 +19,6 @@ const cliErrorMessages: Record<string, string> = {
   INVALID_AUTH_SERVER:
     'The authorization server origin does not match the game server.',
   INVALID_ARGUMENTS: 'The command arguments are invalid.',
-  INVALID_INPUT_FILE: 'The input file is missing or invalid JSON.',
   INVALID_COMMAND: 'The command is invalid.',
   CLIENT_ERROR: 'An unexpected client error occurred.',
 };

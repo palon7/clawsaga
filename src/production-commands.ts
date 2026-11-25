@@ -2,6 +2,9 @@ import {
   travelSchema,
   rideCarriageSchema,
   gatherSchema,
+  fishSchema,
+  readItemSchema,
+  digSchema,
   getItemsSchema,
   getRecipesSchema,
   craftSchema,
@@ -78,6 +81,56 @@ export const productionCommands: Record<string, CommandDefinition> = {
       'clawsaga gather -c m7Qp2_aR9L-x --item herb --no-wait',
     ],
   },
+  fish: {
+    path: 'character/fish',
+    schema: fishSchema,
+    input: { bait: 'bait_item_id' },
+    startsActivity: true,
+    repeat: { requestIdPerLot: false },
+    flags: [
+      [
+        '--bait <id>',
+        'Bait item ID, one per cast: earthworm (shop), dough_bait (cooking), wolf_meat, boar_meat, or a small fish you caught whose item description says it is live bait',
+        true,
+      ],
+      [
+        '--count <number>',
+        'Casts, one at a time (default 1); with --no-wait, must be 1 or omitted',
+      ],
+      noWaitFlag,
+    ],
+    help: 'Cast at a fishing spot shown by look while idle, with a fishing rod equipped; each cast uses one bait and waits for completion. One cast takes about look.fishing.base_duration_seconds, and --count runs that many casts in a row. Which fish bite depends on the bait, the time of day and the weather. Each spot has a lord of the waters, a much larger fish that bites only on live bait and only at its own times or in its own weather. Stopping a cast, or a catch that does not fit in your bag, returns the bait. Some fish bite only at a time of day or in weather that look forecasts; wait for it with wait --until. An ambush can follow a catch; it keeps that catch but ends --count repetition. Finish the whole command before starting another main activity.',
+    examples: [
+      'clawsaga fish -c m7Qp2_aR9L-x --bait earthworm --count 5',
+      'clawsaga fish -c m7Qp2_aR9L-x --bait earthworm --no-wait',
+    ],
+  },
+  read: {
+    path: 'character/item/read',
+    schema: readItemSchema,
+    input: { item: 'item_id' },
+    changesItems: true,
+    flags: [
+      [
+        '--item <id>',
+        'Item ID to read: an old treasure map (old_treasure_map_<tier>)',
+        true,
+      ],
+    ],
+    help: 'Read an item from your bag while idle. Reading an old treasure map uses it up and gives you a treasure map. Its clues describe the scenery of the place to dig and never name it; data.treasure_map lists them. You can hold one treasure map at a time, counting your bag and storage; dig up its treasure or discard it before reading another. Your inventory shows the current clues and the locations you already dug for them.',
+    examples: ['clawsaga read -c m7Qp2_aR9L-x --item old_treasure_map_2'],
+  },
+  dig: {
+    path: 'character/dig',
+    schema: digSchema,
+    startsActivity: true,
+    flags: [noWaitFlag],
+    help: 'Dig at your current location for the treasure of the treasure map in your bag, while idle; it takes 60 seconds. When you arrive somewhere, compare data.scenery with the clues before digging. last_result.outcome is miss (not here; a miss at a location you have not dug for these clues adds a new clue in clue, up to four clues; the fourth gives the display name, not the ID, of a location next to the place; find its ID in map --full), condition (the right place, but hint says the time of day or weather to dig here again; wait for it with wait --until), next_step (treasure_map has the clue to the next place) or treasure (gold and items are in your bag and the map is used up). If the chest does not fit in your bag, the dig ends with CAPACITY_EXCEEDED and the map stays: make room and dig here again. An ambush can follow a dig.',
+    examples: [
+      'clawsaga dig -c m7Qp2_aR9L-x',
+      'clawsaga dig -c m7Qp2_aR9L-x --no-wait',
+    ],
+  },
   recipes: {
     path: 'character/recipes',
     schema: getRecipesSchema,
@@ -102,7 +155,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
       ['--query <text>', 'Search IDs, names, descriptions, effects and stats'],
       ['--item <id>', 'Read one public item definition'],
     ],
-    help: 'List public items, search with normalized AND terms, or read one item in detail. Search is independent of inventory ownership.',
+    help: 'Read the item catalog: list public items, search with normalized AND terms, or read one item in detail. Search is independent of inventory ownership.',
   },
   craft: {
     path: 'character/craft',
@@ -152,7 +205,7 @@ export const productionCommands: Record<string, CommandDefinition> = {
         true,
       ],
     ],
-    help: 'Stop gathering, crafting or rest, or request combat retreat. Travel continues until arrival.',
+    help: 'Stop gathering, crafting, fishing or rest, or request combat retreat. Travel continues until arrival.',
   },
   shop: {
     path: 'shop',

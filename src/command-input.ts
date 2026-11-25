@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { CliError, invalidArguments } from './errors.js';
 import type { CommandDefinition } from './command-definition.js';
+import { locationIdSchema } from './protocol/movement.js';
 
 export const optionsSchema = z.object({
   server: z.string(),
@@ -19,6 +20,8 @@ export const optionsSchema = z.object({
   include: z.string().optional(),
   location: z.string().optional(),
   item: z.string().optional(),
+  bait: z.string().optional(),
+  until: z.string().optional(),
   recipe: z.string().optional(),
   skill: z.string().optional(),
   count: z.string().optional(),
@@ -105,20 +108,36 @@ async function readStdin() {
   let text = '';
   for await (const chunk of process.stdin) {
     text += String(chunk);
-    if (text.length > maxStdinLength) throw new CliError('INVALID_INPUT_FILE');
+    if (text.length > maxStdinLength) {
+      throw new CliError('INVALID_INPUT_FILE', {
+        message: 'Standard input is longer than 128 KiB.',
+      });
+    }
   }
 
   return text;
 }
 
-async function readJsonFile(file: string): Promise<unknown> {
-  try {
-    const text =
-      file === '-' ? await readStdin() : await readFile(file, 'utf8');
+async function readInputText(file: string) {
+  if (file === '-') return readStdin();
 
-    return JSON.parse(text);
+  try {
+    return await readFile(file, 'utf8');
   } catch {
-    throw new CliError('INVALID_INPUT_FILE');
+    throw new CliError('INVALID_INPUT_FILE', {
+      message: `Could not read the input file ${file}.`,
+    });
+  }
+}
+
+async function readJsonFile(file: string): Promise<unknown> {
+  const text = await readInputText(file);
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new CliError('INVALID_INPUT_FILE', {
+      message: `The input is not valid JSON: ${String(error)}. If a string contains a line break, write it as \\n.`,
+    });
   }
 }
 
@@ -158,7 +177,11 @@ async function bodyFileInput(
   file: string,
 ) {
   const fileBody = await readJsonFile(file);
-  if (!isJsonObject(fileBody)) throw new CliError('INVALID_INPUT_FILE');
+  if (!isJsonObject(fileBody)) {
+    throw new CliError('INVALID_INPUT_FILE', {
+      message: 'The input must be a JSON object.',
+    });
+  }
 
   const body = definition.bodyInput?.(values, fileBody) ?? fileBody;
 
@@ -190,4 +213,60 @@ function flagInput(definition: CommandDefinition, values: Values) {
   definition.buildInput?.(values, input);
 
   return input;
+}
+
+/**
+ * The locations of a comma-separated `--to`, or undefined when `--to` is
+ * absent or names one location. Throws when an entry is not a location ID or
+ * with `--no-wait`. The server checks each step's destination.
+ */
+export function routeLocations(values: Values) {
+  const route = values.to?.split(',') ?? [];
+  if (route.length < 2) return undefined;
+
+  if (!route.every((id) => locationIdSchema.safeParse(id).success)) {
+    throw invalidArguments(
+      ['to'],
+      '--to takes location IDs separated by commas, without spaces or empty entries.',
+    );
+  }
+
+  if (values.wait === false) {
+    throw invalidArguments(
+      ['to'],
+      '--no-wait starts one step; give one location with --to or omit --no-wait.',
+    );
+  }
+
+  return route;
+}
+
+export function repeatCount(
+  requestIdPerLot: boolean,
+  values: Values,
+  requestedId: string | undefined,
+) {
+  const count = values.count === undefined ? 1 : Number(values.count);
+  if (!Number.isSafeInteger(count) || count < 1) {
+    throw invalidArguments(
+      ['count'],
+      '--count must be a positive safe integer.',
+    );
+  }
+
+  if (requestIdPerLot && requestedId !== undefined && count !== 1) {
+    throw invalidArguments(
+      ['request'],
+      '--request retries a single lot; use --count 1 or omit --request.',
+    );
+  }
+
+  if (values.wait === false && count !== 1) {
+    throw invalidArguments(
+      ['count'],
+      '--no-wait starts one activity; use --count 1 or omit --count.',
+    );
+  }
+
+  return count;
 }

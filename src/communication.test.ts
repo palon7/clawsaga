@@ -139,6 +139,24 @@ it('generates a journal request ID unless the body file or --request supplies on
   expect(invoke.mock.calls[2]![1]).toMatchObject({ request_id: saved });
 });
 
+it('names the JSON error of a body file with a raw line break and sends nothing', async () => {
+  const invoke = stubInvoke({ ...result });
+  vi.mocked(readFile).mockResolvedValue('{"text": "Line one\nLine two"}');
+
+  const failure = await execute(
+    ['end', '-c', traveler, '-i', 'entry.json'],
+    vi.fn(),
+  ).catch((error: CliError) => error);
+
+  expect(failure).toMatchObject({
+    code: 'INVALID_INPUT_FILE',
+    detail: {
+      message: expect.stringMatching(/not valid JSON: .+\\n\.$/),
+    },
+  });
+  expect(invoke).not.toHaveBeenCalled();
+});
+
 it.each(['journal-write', 'end'])(
   'reports the sent request ID after an uncertain %s and reuses it on retry',
   async (command) => {

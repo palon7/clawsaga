@@ -58,6 +58,7 @@ it.each(['travel', 'carriage'])(
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify).toHaveBeenCalledWith({
       event: 'activity_accepted',
+      waiting: expect.stringContaining('still running'),
       activity_id: initial.data.activity.activity_id,
       kind: 'travel',
       started_at: '2026-09-09T00:00:00.000Z',
