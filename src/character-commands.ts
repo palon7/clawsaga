@@ -134,8 +134,8 @@ export const characterCommands: Record<string, CommandDefinition> = {
     path: 'world/map',
     schema: getMapSchema,
     input: { full: 'full' },
-    flags: [['--full', 'Return the whole known map']],
-    help: 'Read locations and connections near your current location. Use --full for the whole known map.',
+    flags: [['--full', 'Return every location on the map']],
+    help: 'Read the locations within two hops of your current location, with their IDs, display names and connections. Use --full for every location on the map.',
   },
   look: {
     path: 'character/look',
@@ -148,7 +148,21 @@ export const characterCommands: Record<string, CommandDefinition> = {
         'Continue the people list from people_next_cursor',
       ],
     ],
-    help: 'Read local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until it is absent. people_count is the total, excluding you; with nobody here, people is omitted and people_count is 0. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for enemy tendencies and traits.',
+    help: "Read the time of day and this region's weather, each with until (when it next changes; weather.next is what follows), and local resources, enemies and facilities. Use --people for the first page of nearby characters, then --cursor with people_next_cursor until it is absent. people_count is the total, excluding you; with nobody here, people is omitted and people_count is 0. Use search-characters to find someone specific. Use resource item_id for gather and enemy id for fight. Town enemies are training dummies and require --practice. Use encounters for enemy tendencies and traits.",
+  },
+  wait: {
+    path: 'character/look',
+    schema: lookSchema,
+    sleepsUntil: true,
+    flags: [
+      [
+        '--until <time>',
+        'ISO 8601 time to stop waiting, such as an until from look time_of_day or weather',
+        true,
+      ],
+    ],
+    help: 'Wait without doing anything until --until, then read your location like look. Use it to wait for a time of day or weather that look says is coming, such as the one a treasure map hint or a fish needs. Nothing is sent to the game while waiting; a time already past reads at once.',
+    examples: ['clawsaga wait -c m7Qp2_aR9L-x --until 2026-09-20T12:24:00Z'],
   },
   route: {
     path: 'character/route',

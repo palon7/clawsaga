@@ -13,6 +13,16 @@ export const gatherSchema = z
   .object({ ...characterTarget, item_id: itemId })
   .strict();
 
+export const fishSchema = z
+  .object({ ...characterTarget, bait_item_id: itemId })
+  .strict();
+
+export const readItemSchema = z
+  .object({ ...characterTarget, item_id: itemId })
+  .strict();
+
+export const digSchema = z.object({ ...characterTarget }).strict();
+
 export const getRecipesSchema = z
   .object({
     ...characterTarget,

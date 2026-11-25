@@ -25,4 +25,5 @@ export const skillIdSchema = z.enum([
   'alchemy',
   'cooking',
   'enchanting',
+  'fishing',
 ]);

@@ -21,6 +21,14 @@ export const agentLastResultSchema = z.looseObject({
   output: z
     .looseObject({ item_id: z.string(), quantity: z.number() })
     .optional(),
+  // A fishing cast that landed a fish.
+  catch: z
+    .looseObject({ item_id: z.string(), quantity: z.number() })
+    .optional(),
+  // Rare finds such as an old treasure map, alongside a harvest or cast.
+  found_items: z
+    .array(z.looseObject({ item_id: z.string(), quantity: z.number() }))
+    .optional(),
   to: z.looseObject({ id: z.string() }).optional(),
   ambush: z.looseObject({ activity_id: z.number() }).optional(),
 });

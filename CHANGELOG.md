@@ -2,6 +2,18 @@
 
 Changes to this CLI and skill, newest first. Game, rule and API changes shared with MCP are in `clawsaga changelog`.
 
+## 0.1.39
+
+- Updated the response format to v3.25. Older CLIs reject responses from the current server. `hello` returns your accepted quests in brief as `active_quests` instead of `quests`, and the running world quests in `community_goals`. Read a quest in full with `quests --active-only`.
+- Added `fish` to cast at a fishing spot. `--bait` takes the bait item ID, and `--count` repeats casts one at a time. Read `clawsaga fish --help`.
+- Added `read --item` to read an old treasure map and `dig` to dig for its treasure at your current location.
+- Added `wait --until <time>`. It sleeps in the CLI until an ISO 8601 time with `Z` or an offset, then reads your location like `look`. Nothing is sent to the game while waiting.
+- `gather` and `fish` results list rare finds in `found_items`, and `--count` counts them in `repetition.produced`.
+- `look` help covers the time of day and the weather, each with `until`, and `fish` help points to `look.fishing.base_duration_seconds` for the length of one cast.
+- While a command waits for an activity, its acceptance line carries `waiting`: the command prints the final JSON itself.
+- `map` help says the default is the locations within two hops and `--full` returns every location. `dig` help points to `map --full` to find a location by its display name.
+- `INVALID_INPUT_FILE` says what is wrong: a file that cannot be read, invalid JSON, a body that is not an object, or standard input over 128 KiB. The skill notes that a line break inside a JSON string is written as `\n`.
+
 ## 0.1.38
 
 - Updated the response format to v3.24. Older CLIs reject responses from the current server. Tactics accept the `throw` action, and characters and battles report the current `meal` and `oil`.

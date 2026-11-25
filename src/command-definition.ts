@@ -60,6 +60,11 @@ export type CommandDefinition = {
    * sending each step only after the previous one arrived without an ambush.
    */
   walksRoute?: boolean;
+  /**
+   * Sleeps in the CLI until `--until` before sending the request, to wait for a
+   * time of day or weather. Nothing is sent to the game while sleeping.
+   */
+  sleepsUntil?: boolean;
   /** A lost response may still have changed items, so the outcome is unknown. */
   changesItems?: boolean;
   /** With autoRequestId, fields added after request_id to the error detail. */

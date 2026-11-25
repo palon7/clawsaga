@@ -20,16 +20,22 @@ import metadata from '../package.json' with { type: 'json' };
 import {
   notSent,
   repeatActivity,
+  sleepUntil,
   waitForActivity,
   walkRoute,
 } from './activity-wait.js';
-import { locationIdSchema } from './protocol/movement.js';
 import {
   bodySchema,
   jsonFlag,
   type CommandDefinition,
 } from './command-definition.js';
-import { commandInput, optionsSchema, type Values } from './command-input.js';
+import {
+  commandInput,
+  optionsSchema,
+  repeatCount,
+  routeLocations,
+  type Values,
+} from './command-input.js';
 import { commandGroups, commands, gameCommands } from './command-registry.js';
 import {
   assertKnownSubcommand,
@@ -428,6 +434,7 @@ function addGameCommand(
     executed.wait = values.wait !== false;
     assertRequiredOptions(definition, values, command.opts());
     const route = definition.walksRoute ? routeLocations(values) : undefined;
+    if (definition.sleepsUntil) await sleepUntil(values.until);
 
     const requestedId = values.request;
     if (definition.autoRequestId && !values.request) {
@@ -528,60 +535,4 @@ async function invokeGame(
 
     throw error;
   }
-}
-
-/**
- * The locations of a comma-separated `--to`, or undefined when `--to` is
- * absent or names one location. Throws when an entry is not a location ID or
- * with `--no-wait`. The server checks each step's destination.
- */
-function routeLocations(values: Values) {
-  const route = values.to?.split(',') ?? [];
-  if (route.length < 2) return undefined;
-
-  if (!route.every((id) => locationIdSchema.safeParse(id).success)) {
-    throw invalidArguments(
-      ['to'],
-      '--to takes location IDs separated by commas, without spaces or empty entries.',
-    );
-  }
-
-  if (values.wait === false) {
-    throw invalidArguments(
-      ['to'],
-      '--no-wait starts one step; give one location with --to or omit --no-wait.',
-    );
-  }
-
-  return route;
-}
-
-function repeatCount(
-  requestIdPerLot: boolean,
-  values: Values,
-  requestedId: string | undefined,
-) {
-  const count = values.count === undefined ? 1 : Number(values.count);
-  if (!Number.isSafeInteger(count) || count < 1) {
-    throw invalidArguments(
-      ['count'],
-      '--count must be a positive safe integer.',
-    );
-  }
-
-  if (requestIdPerLot && requestedId !== undefined && count !== 1) {
-    throw invalidArguments(
-      ['request'],
-      '--request retries a single lot; use --count 1 or omit --request.',
-    );
-  }
-
-  if (values.wait === false && count !== 1) {
-    throw invalidArguments(
-      ['count'],
-      '--no-wait starts one activity; use --count 1 or omit --count.',
-    );
-  }
-
-  return count;
 }
